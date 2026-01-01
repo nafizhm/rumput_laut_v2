@@ -2,8 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 
-use App\Http\Controllers\UserController;
-
-Route::get('/', [UserController::class, 'index']);
-
-Route::get('/data-tables', [UserController::class, 'index']);
+Route::middleware('auth')->group(function () {
+    Route::get('/data-tables', [App\Http\Controllers\TestingController::class, 'dataTable']);
+    Route::get('/form', [App\Http\Controllers\TestingController::class, 'form']);
+});

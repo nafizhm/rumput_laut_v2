@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
-class UserController extends Controller
+class TestingController extends Controller
 {
-    public function index()
+    public function dataTable()
     {
+
         $columns = [
             ['key' => 'name', 'label' => 'Nama'],
             ['key' => 'phone', 'label' => 'No. Telp'],
