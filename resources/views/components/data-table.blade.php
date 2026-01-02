@@ -1,4 +1,10 @@
-@props(['rows', 'columns', 'headerTitle' => ''])
+@php
+    $gridTemplateColumns = '50px ';
+    foreach ($columns as $column) {
+        $width = $column['width'] ?? '1fr';
+        $gridTemplateColumns .= "minmax(0, $width) ";
+    }
+@endphp
 
 <div x-data="dataTable(@js($rows))"
     class="overflow-hidden rounded-xl border border-gray-200 bg-white pt-4 dark:border-gray-800 dark:bg-white/3">
@@ -54,10 +60,9 @@
     </div>
 
     <div class="max-w-full overflow-x-auto">
-        <div class="min-w-[1102px]">
-            <!-- table header start -->
+        <div class="min-w-full">
             <div class="grid border-t border-gray-200 dark:border-gray-800"
-                style="grid-template-columns: 50px repeat({{ count($columns) }}, minmax(0, 1fr));">
+                style="grid-template-columns: {{ $gridTemplateColumns }};">
                 <div class="flex items-center justify-center border-r border-gray-200 px-4 py-3 dark:border-gray-800">
                     <p class="text-theme-xs font-medium text-gray-700 dark:text-gray-400">
                         No
@@ -68,7 +73,7 @@
                         @if (isset($column['sortable']) && $column['sortable'])
                             <div class="flex w-full cursor-pointer items-center justify-between"
                                 @click="sortBy('{{ $column['key'] }}')">
-                                <p class="text-theme-xs font-medium text-gray-700 dark:text-gray-400">
+                                <p class="text-theme-xs font-medium text-gray-700 dark:text-gray-400 truncate">
                                     {{ $column['label'] }}
                                 </p>
 
@@ -90,7 +95,7 @@
                             </div>
                         @else
                             <div class="flex w-full items-center justify-between">
-                                <p class="text-theme-xs font-medium text-gray-700 dark:text-gray-400">
+                                <p class="text-theme-xs font-medium text-gray-700 dark:text-gray-400 truncate">
                                     {{ $column['label'] }}
                                 </p>
                             </div>
@@ -98,12 +103,10 @@
                     </div>
                 @endforeach
             </div>
-            <!-- table header end -->
 
-            <!-- table body start -->
             <template x-for="(item, index) in paginatedData" :key="item.id">
                 <div class="grid border-t border-gray-100 dark:border-gray-800"
-                    style="grid-template-columns: 50px repeat({{ count($columns) }}, minmax(0, 1fr));">
+                    style="grid-template-columns: {{ $gridTemplateColumns }};">
                     <div
                         class="flex items-center justify-center border-r border-gray-100 px-4 py-3 dark:border-gray-800">
                         <p class="text-theme-sm text-gray-700 dark:text-gray-400"
@@ -114,18 +117,16 @@
                             @if (isset($column['render']) && isset(${$column['render']}))
                                 {{ ${$column['render']} }}
                             @else
-                                <p class="text-theme-sm text-gray-700 dark:text-gray-400"
+                                <p class="text-theme-sm text-gray-700 dark:text-gray-400 truncate"
                                     x-text="item.{{ $column['key'] }}"></p>
                             @endif
                         </div>
                     @endforeach
                 </div>
             </template>
-            <!-- table body end -->
         </div>
     </div>
 
-    <!-- Pagination Controls -->
     <div class="border-t border-gray-100 py-4 pl-[18px] pr-4 dark:border-gray-800">
         <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between">
             <p

@@ -24,10 +24,10 @@ class RolePermissionSeeder extends Seeder
             'menu.update',
             'menu.delete',
 
-            'hak-akses.show',
-            'hak-akses.create',
-            'hak-akses.update',
-            'hak-akses.delete',
+            'permission.show',
+            'permission.create',
+            'permission.update',
+            'permission.delete',
 
             'role.show',
             'role.create',

@@ -12,7 +12,7 @@ class DataTable extends Component
      * Create a new component instance.
      */
     public function __construct(
-        public array $rows,
+        public iterable $rows,
         public array $columns
     ) {}
 

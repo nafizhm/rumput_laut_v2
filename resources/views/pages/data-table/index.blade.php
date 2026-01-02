@@ -22,11 +22,13 @@
         </x-slot:headerAction>
 
         <x-slot:status>
-            <div :class="{
-                'bg-green-500/10 text-green-500': item.status === 'Active',
-                'bg-red-500/10 text-red-500': item.status === 'Inactive'
-            }"
-                class="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium">
+            <div
+                :class="{
+                    'bg-success-50 text-theme-xs text-success-700 dark:bg-success-500/15 dark:text-success-500 inline-block rounded-full px-2 py-0.5 font-medium': item
+                        .status === 'Active',
+                    'bg-error-50 text-theme-xs text-error-700 dark:bg-error-500/15 dark:text-error-500 inline-block rounded-full px-2 py-0.5 font-medium': item
+                        .status === 'Inactive'
+                }">
                 <span x-text="item.status"></span>
             </div>
         </x-slot:status>
