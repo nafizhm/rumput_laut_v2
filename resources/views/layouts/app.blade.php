@@ -29,6 +29,7 @@ $watch('darkMode', value =>
 
             @include('layouts.partials.overlay')
             @include('layouts.partials.header')
+            <x-toast-container />
 
             <main>
                 <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
@@ -44,6 +45,16 @@ $watch('darkMode', value =>
     </div>
 
     @stack('scripts')
+    <script>
+        document.addEventListener('alpine:init', () => {
+            @if (session('success'))
+                window.toast.success("Success", "{{ session('success') }}");
+            @endif
+            @if (session('error'))
+                window.toast.error("Error", "{{ session('error') }}");
+            @endif
+        });
+    </script>
 </body>
 
 </html>

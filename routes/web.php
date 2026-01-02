@@ -2,7 +2,21 @@
 
 use Illuminate\Support\Facades\Route;
 
+Route::get('/', function () {
+    return view('welcome');
+});
+
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [App\Http\Controllers\Auth\AuthController::class, 'index'])->name('login');
+    Route::post('/login', [App\Http\Controllers\Auth\AuthController::class, 'login']);
+});
+
 Route::middleware('auth')->group(function () {
-    Route::get('/data-tables', [App\Http\Controllers\TestingController::class, 'dataTable']);
-    Route::get('/form', [App\Http\Controllers\TestingController::class, 'form']);
+    Route::get('/dashboard', [App\Http\Controllers\TestingController::class, 'index'])->name('dashboard');
+    Route::get('/data-table', [App\Http\Controllers\TestingController::class, 'dataTable'])->name('data-table.index');
+    Route::get('/form', [App\Http\Controllers\TestingController::class, 'form'])->name('form.index');
+
+    Route::resource('manajemen-menu', App\Http\Controllers\Setting\MenuController::class);
+    Route::resource('manajemen-permission', App\Http\Controllers\Setting\PermissionController::class);
+    Route::resource('manajemen-role', App\Http\Controllers\Setting\RoleController::class);
 });

@@ -101,6 +101,6 @@ class TestingController extends Controller
             ],
         ];
 
-        return view('welcome', compact('data', 'columns'));
+        return view('pages.data-table.index', compact('data', 'columns'));
     }
 }

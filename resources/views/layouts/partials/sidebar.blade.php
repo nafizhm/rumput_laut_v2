@@ -1,7 +1,6 @@
 <aside :class="sidebarToggle ? 'translate-x-0 lg:w-[90px]' : '-translate-x-full'"
     class="sidebar fixed top-0 left-0 z-9999 flex h-screen w-[290px] flex-col overflow-y-auto border-r border-gray-200 bg-white px-5 transition-all duration-300 lg:static lg:translate-x-0 dark:border-gray-800 dark:bg-black"
     @click.outside="sidebarToggle = false">
-    <!-- SIDEBAR HEADER -->
     <div :class="sidebarToggle ? 'justify-center' : 'justify-between'"
         class="sidebar-header flex items-center gap-2 pt-8 pb-7">
         <a href="index.html">
@@ -14,10 +13,8 @@
                 alt="Logo" />
         </a>
     </div>
-    <!-- SIDEBAR HEADER -->
 
     <div class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
-        <!-- Sidebar Menu -->
         @inject('sidebarService', 'App\Services\Sidebar\SidebarService')
         @php
             $menus = $sidebarService::getSidebarMenu();
@@ -28,7 +25,6 @@
         @endphp
 
         <nav x-data="{ selected: '{{ $initialSelected }}' }">
-            <!-- Menu Group -->
             <div>
                 <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
                     <span class="menu-group-title" :class="sidebarToggle ? 'lg:hidden' : ''">
@@ -44,10 +40,9 @@
                     </svg>
                 </h3>
 
-                <ul class="mb-6 flex flex-col gap-4">
+                <ul class="mb-6 flex flex-col gap-1">
                     @foreach ($menus as $menu)
                         @if ($menu->children->isNotEmpty())
-                            <!-- Dropdown Menu Item -->
                             <li>
                                 <a href="#"
                                     @click.prevent="selected = (selected === '{{ $menu->name }}' ? '':'{{ $menu->name }}')"
@@ -56,7 +51,10 @@
                                         'menu-item-active' : 'menu-item-inactive'">
 
                                     @if ($menu->icon)
-                                        <i class="{{ $menu->icon }} text-2xl"></i>
+                                        <i data-lucide="{{ $menu->icon }}" class="w-6 h-6"
+                                            :class="(selected === '{{ $menu->name }}') ||
+                                            {{ $menu->is_active ? 'true' : 'false' }} ? 'text-brand-500!' :
+                                                'text-gray-500'"></i>
                                     @endif
 
                                     <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">
@@ -75,7 +73,6 @@
                                     </svg>
                                 </a>
 
-                                <!-- Dropdown Menu Start -->
                                 <div class="translate transform overflow-hidden"
                                     :class="(selected === '{{ $menu->name }}') ? 'block' : 'hidden'">
                                     <ul :class="sidebarToggle ? 'lg:hidden' : 'flex'"
@@ -90,15 +87,16 @@
                                         @endforeach
                                     </ul>
                                 </div>
-                                <!-- Dropdown Menu End -->
                             </li>
                         @else
-                            <!-- Simple Menu Item -->
                             <li>
                                 <a href="{{ $menu->route ? route($menu->route) : $menu->url ?? '#' }}"
                                     class="menu-item group {{ $menu->is_active ? 'menu-item-active' : 'menu-item-inactive' }}">
                                     @if ($menu->icon)
-                                        <i class="{{ $menu->icon }} text-2xl"></i>
+                                        <i data-lucide="{{ $menu->icon }}" class="w-6 h-6"
+                                            :class="selected === '{{ $menu->name }}' ||
+                                                {{ $menu->is_active ? 'true' : 'false' }} ? 'text-brand-500!' :
+                                                'text-gray-500'"></i>
                                     @endif
 
                                     <span class="menu-item-text" :class="sidebarToggle ? 'lg:hidden' : ''">
@@ -111,22 +109,5 @@
                 </ul>
             </div>
         </nav>
-        <!-- Sidebar Menu -->
-
-        <!-- Promo Box -->
-        <div :class="sidebarToggle ? 'lg:hidden' : ''"
-            class="mx-auto mb-10 w-full max-w-60 rounded-2xl bg-gray-50 px-4 py-5 text-center dark:bg-white/3">
-            <h3 class="mb-2 font-semibold text-gray-900 dark:text-white">
-                #1 Tailwind CSS Dashboard
-            </h3>
-            <p class="text-theme-sm mb-4 text-gray-500 dark:text-gray-400">
-                Leading Tailwind CSS Admin Template with 400+ UI Component and Pages.
-            </p>
-            <a href="https://tailadmin.com/pricing" target="_blank" rel="nofollow"
-                class="bg-brand-500 text-theme-sm hover:bg-brand-600 flex items-center justify-center rounded-lg p-3 font-medium text-white">
-                Purchase Plan
-            </a>
-        </div>
-        <!-- Promo Box -->
     </div>
 </aside>

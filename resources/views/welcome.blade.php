@@ -1,86 +1,74 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta charset="UTF-8" />
+    <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    <title>Document</title>
+    <title>@yield('title', 'App')</title>
 </head>
 
-<body x-data="{ page: 'dataTables', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }" x-init="darkMode = JSON.parse(localStorage.getItem('darkMode'));
+<body x-data="{ page: 'maintenance', 'loaded': true, 'darkMode': false, 'stickyMenu': false, 'sidebarToggle': false, 'scrollTop': false }" x-init="darkMode = JSON.parse(localStorage.getItem('darkMode'));
 $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)))" :class="{ 'dark bg-gray-900': darkMode === true }">
-    <div class="flex h-screen overflow-hidden">
-        <!-- ===== Sidebar Start ===== -->
-        @include('layouts.partials.sidebar')
-        <!-- ===== Sidebar End ===== -->
+    <x-toast-container />
+    <!-- ===== Preloader Start ===== -->
+    <include src="./partials/preloader.html"></include>
+    <!-- ===== Preloader End ===== -->
 
-        <!-- ===== Content Area Start ===== -->
-        <div class="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
-            <!-- Small Device Overlay Start -->
-            @include('layouts.partials.overlay')
-            <!-- Small Device Overlay End -->
-
-            <!-- ===== Header Start ===== -->
-            @include('layouts.partials.header')
-            <!-- ===== Header End ===== -->
-
-            <!-- ===== Main Content Start ===== -->
-            <main>
-                <div class="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
-                    <!-- Breadcrumb Start -->
-                    <x-breadcrumb :pageTitle="'Data Tables'" :links="[['name' => 'Data Tables', 'url' => '#']]" />
-                    <!-- Breadcrumb End -->
-
-                    <div class="space-y-5 sm:space-y-6">
-                        <x-data-table :rows="$data" :columns="$columns">
-                            <x-slot:headerAction>
-                                <button type="submit"
-                                    class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto hover:bg-gray-50 dark:hover:bg-white/3 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round"
-                                        class="lucide lucide-plus-icon lucide-plus">
-                                        <path d="M5 12h14" />
-                                        <path d="M12 5v14" />
-                                    </svg>
-                                    Tambah User
-                                </button>
-                            </x-slot:headerAction>
-
-                            <x-slot:status>
-                                <div :class="{
-                                    'bg-green-500/10 text-green-500': item.status === 'Active',
-                                    'bg-red-500/10 text-red-500': item.status === 'Inactive'
-                                }"
-                                    class="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium">
-                                    <span x-text="item.status"></span>
-                                </div>
-                            </x-slot:status>
-
-                            <x-slot:action>
-                                <div class="flex items-center gap-2">
-                                    <button type="submit"
-                                        class="flex items-center w-full justify-center gap-2 py-2 px-4 text-sm font-medium text-white transition-colors rounded-lg bg-brand-500 hover:bg-brand-600">
-                                        Edit
-                                    </button>
-                                    <button type="submit"
-                                        class="flex items-center w-full justify-center gap-2 py-2 px-4 text-sm font-medium text-white transition-colors rounded-lg bg-rose-500 hover:bg-rose-600">
-                                        Delete
-                                    </button>
-                                </div>
-                            </x-slot:action>
-                        </x-data-table>
-                        <!-- ====== DataTable One End -->
-                    </div>
-                </div>
-            </main>
-            <!-- ===== Main Content End ===== -->
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="relative flex flex-col items-center justify-center min-h-screen p-6 overflow-hidden z-1">
+        <!-- ===== Common Grid Shape Start ===== -->
+        <div class="absolute right-0 top-0 -z-1 w-full max-w-[250px] xl:max-w-[450px]">
+            <img src="/assets/shape/grid-01.svg" alt="grid" />
         </div>
-        <!-- ===== Content Area End ===== -->
+        <div class="absolute bottom-0 left-0 -z-1 w-full max-w-[250px] rotate-180 xl:max-w-[450px]">
+            <img src="/assets/shape/grid-01.svg" alt="grid" />
+        </div>
+
+        <!-- ===== Common Grid Shape End ===== -->
+
+        <div>
+            <div class="mx-auto w-full max-w-[274px] text-center sm:max-w-[555px]">
+                <div class="mx-auto mb-10 w-full max-w-[155px] text-center sm:max-w-[204px]">
+                    <img src="/assets/error/maintenance.svg" alt="maintenance" class="dark:hidden" />
+                    <img src="/assets/error/maintenance-dark.svg" alt="maintenance" class="hidden dark:block" />
+                </div>
+
+                <h1 class="mb-2 font-bold text-gray-800 text-title-md dark:text-white/90 xl:text-title-2xl">
+                    UNDER DEVELOPMENT
+                </h1>
+
+                <p class="mt-6 mb-6 text-base text-gray-700 dark:text-gray-400 sm:text-lg">
+                    This site is still under development.
+                    We’re making improvements and will be live soon.
+                    Thanks for your understanding!
+                </p>
+
+                <a href="index.html"
+                    class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-3.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
+                    Go To login page
+                </a>
+            </div>
+            <!-- Footer -->
+            <p class="absolute text-sm text-center text-gray-500 -translate-x-1/2 bottom-6 left-1/2 dark:text-gray-400">
+                &copy; <span id="year"></span> - TailAdmin
+            </p>
+        </div>
     </div>
+    <!-- ===== Page Wrapper End ===== -->
+    <script>
+        document.addEventListener('alpine:init', () => {
+            @if (session('success'))
+                window.toast.success("Success", "{{ session('success') }}");
+            @endif
+            @if (session('error'))
+                window.toast.error("Error", "{{ session('error') }}");
+            @endif
+        });
+    </script>
 </body>
 
 </html>

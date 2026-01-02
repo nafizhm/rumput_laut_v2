@@ -16,7 +16,7 @@ class MenuSeeder extends Seeder
         $menus = [
             [
                 'name' => 'Dashboard',
-                'icon' => 'bi bi-speedometer',
+                'icon' => 'layout-grid',
                 'route' => 'dashboard',
                 'url' => 'dashboard',
                 'permission' => 'dashboard.show',
@@ -26,7 +26,7 @@ class MenuSeeder extends Seeder
             ],
             [
                 'name' => 'Setting',
-                'icon' => 'bi bi-gear',
+                'icon' => 'settings',
                 'route' => null,
                 'url' => null,
                 'permission' => null,
@@ -45,7 +45,7 @@ class MenuSeeder extends Seeder
         $childMenus = [
             [
                 'name' => 'Manajemen Menu',
-                'icon' => '',
+                'icon' => 'menu',
                 'route' => 'manajemen-menu.index',
                 'url' => 'manajemen-menu',
                 'permission' => 'menu.show',
@@ -55,17 +55,17 @@ class MenuSeeder extends Seeder
             ],
             [
                 'name' => 'Manajemen Hak Akses',
-                'icon' => '',
-                'route' => 'manajemen-hak-akses.index',
-                'url' => 'manajemen-hak-akses',
-                'permission' => 'hak-akses.show',
+                'icon' => 'key',
+                'route' => 'manajemen-permission.index',
+                'url' => 'manajemen-permission',
+                'permission' => 'permission.show',
                 'parent_id' => $parent->id,
                 'order' => 2,
                 'is_active' => true
             ],
             [
                 'name' => 'Manajemen Role',
-                'icon' => '',
+                'icon' => 'users',
                 'route' => 'manajemen-role.index',
                 'url' => 'manajemen-role',
                 'permission' => 'role.show',
