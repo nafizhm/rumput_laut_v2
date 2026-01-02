@@ -6,6 +6,11 @@ use Illuminate\Http\Request;
 
 class TestingController extends Controller
 {
+    public function dashboard()
+    {
+        return view('pages.dashboard.index');
+    }
+
     public function dataTable()
     {
 

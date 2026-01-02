@@ -12,11 +12,13 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [App\Http\Controllers\TestingController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [App\Http\Controllers\TestingController::class, 'dashboard'])->name('dashboard');
     Route::get('/data-table', [App\Http\Controllers\TestingController::class, 'dataTable'])->name('data-table.index');
     Route::get('/form', [App\Http\Controllers\TestingController::class, 'form'])->name('form.index');
 
     Route::resource('manajemen-menu', App\Http\Controllers\Setting\MenuController::class);
     Route::resource('manajemen-permission', App\Http\Controllers\Setting\PermissionController::class);
     Route::resource('manajemen-role', App\Http\Controllers\Setting\RoleController::class);
+
+    Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout'])->name('logout');
 });
