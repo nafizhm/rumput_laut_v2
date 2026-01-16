@@ -25,4 +25,11 @@ class MenuController extends Controller
 
         return view('pages.settings.menu.index', compact('data', 'columns'));
     }
+
+    public function indexData()
+    {
+        $data = Menu::with('parent')->orderBy('order', 'asc')->get();
+
+        return response()->json($data);
+    }
 }

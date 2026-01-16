@@ -12,8 +12,11 @@ class DataTable extends Component
      * Create a new component instance.
      */
     public function __construct(
+        public ?string $id,
         public iterable $rows,
-        public array $columns
+        public array $columns,
+        public ?string $url,
+        public ?bool $showRefreshButton = false
     ) {}
 
     /**

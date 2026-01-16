@@ -7,7 +7,18 @@
 @endsection
 
 @section('content')
-    <x-data-table :rows="$data" :columns="$columns">
+    <div class="mb-4 flex justify-end">
+        <button onclick="refreshDataTable('usersTable');"
+            class="flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span class="ml-2">Refresh All Tables</span>
+        </button>
+    </div>
+
+    <x-data-table id="usersTable" :rows="$data" :columns="$columns" :url="route('menu-data.index')">
         <x-slot:headerAction>
             <button type="submit"
                 class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto hover:bg-gray-50 dark:hover:bg-white/3 transition-colors">

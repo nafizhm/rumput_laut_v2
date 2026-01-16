@@ -1,4 +1,8 @@
 @php
+    if (!$id) {
+        $id = 'dataTable_' . uniqid();
+    }
+
     $gridTemplateColumns = '50px ';
     foreach ($columns as $column) {
         $width = $column['width'] ?? '1fr';
@@ -6,8 +10,15 @@
     }
 @endphp
 
-<div x-data="dataTable(@js($rows))"
+<div x-data="dataTable(@js($url), @js($rows), @js($id))" x-init="init()" x-ref="dataTable" id="{{ $id }}"
     class="overflow-hidden rounded-xl border border-gray-200 bg-white pt-4 dark:border-gray-800 dark:bg-white/3">
+
+    <!-- Loading Overlay -->
+    <div x-show="isLoading" x-transition.opacity
+        class="absolute inset-0 z-50 flex items-center justify-center bg-white/70 dark:bg-gray-900/70">
+        <div class="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+    </div>
+
     <div class="mb-4 flex flex-col gap-4 px-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex items-center gap-3">
             <span class="text-gray-500 dark:text-gray-400"> Show </span>
@@ -15,7 +26,7 @@
                 <select
                     class="dark:bg-dark-900 h-9 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none py-2 pl-3 pr-8 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                     :class="isOptionSelected && 'text-gray-500 dark:text-gray-400'" @click="isOptionSelected = true"
-                    @change="perPage = parseInt($event.target.value)">
+                    @change="perPage = parseInt($event.target.value); currentPage = 1">
                     <option value="5" class="text-gray-500 dark:bg-gray-900 dark:text-gray-400">
                         5
                     </option>
@@ -24,6 +35,9 @@
                     </option>
                     <option value="25" class="text-gray-500 dark:bg-gray-900 dark:text-gray-400">
                         25
+                    </option>
+                    <option value="50" class="text-gray-500 dark:bg-gray-900 dark:text-gray-400">
+                        50
                     </option>
                 </select>
                 <span
@@ -49,9 +63,22 @@
                     </svg>
                 </button>
 
-                <input type="text" x-model="search" placeholder="Search..."
+                <input type="text" x-model="search" placeholder="Search..." @input.debounce.300ms="currentPage = 1"
                     class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pl-11 pr-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[300px]" />
             </div>
+
+            @if (isset($showRefreshButton) && $showRefreshButton)
+                <button @click="refreshData()"
+                    class="flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3"
+                    :class="{ 'opacity-50 cursor-not-allowed': isLoading }" :disabled="isLoading">
+                    <svg class="h-4 w-4" :class="{ 'animate-spin': isLoading }" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span class="ml-2" x-text="isLoading ? 'Loading...' : 'Refresh'"></span>
+                </button>
+            @endif
 
             @if (isset($headerAction))
                 {{ $headerAction }}
@@ -61,6 +88,7 @@
 
     <div class="max-w-full overflow-x-auto">
         <div class="min-w-full">
+            <!-- Table Header -->
             <div class="grid border-t border-gray-200 dark:border-gray-800"
                 style="grid-template-columns: {{ $gridTemplateColumns }};">
                 <div class="flex items-center justify-center border-r border-gray-200 px-4 py-3 dark:border-gray-800">
@@ -104,30 +132,46 @@
                 @endforeach
             </div>
 
-            <template x-for="(item, index) in paginatedData" :key="item.id">
-                <div class="grid border-t border-gray-100 dark:border-gray-800"
-                    style="grid-template-columns: {{ $gridTemplateColumns }};">
-                    <div
-                        class="flex items-center justify-center border-r border-gray-100 px-4 py-3 dark:border-gray-800">
-                        <p class="text-theme-sm text-gray-700 dark:text-gray-400"
-                            x-text="(currentPage - 1) * perPage + index + 1"></p>
-                    </div>
-                    @foreach ($columns as $column)
-                        <div class="flex items-center border-r border-gray-100 px-4 py-3 dark:border-gray-800">
-                            @if (isset($column['render']) && isset(${$column['render']}))
-                                {{ ${$column['render']} }}
-                            @else
-                                <p class="text-theme-sm text-gray-700 dark:text-gray-400 truncate"
-                                    x-text="item.{{ $column['key'] }}"></p>
-                            @endif
+            <!-- Table Body -->
+            <template x-if="!isLoading && paginatedData.length > 0">
+                <template x-for="(item, index) in paginatedData" :key="item.id">
+                    <div class="grid border-t border-gray-100 dark:border-gray-800"
+                        style="grid-template-columns: {{ $gridTemplateColumns }};">
+                        <div
+                            class="flex items-center justify-center border-r border-gray-100 px-4 py-3 dark:border-gray-800">
+                            <p class="text-theme-sm text-gray-700 dark:text-gray-400"
+                                x-text="(currentPage - 1) * perPage + index + 1"></p>
                         </div>
-                    @endforeach
-                </div>
+                        @foreach ($columns as $column)
+                            <div class="flex items-center border-r border-gray-100 px-4 py-3 dark:border-gray-800">
+                                @if (isset($column['render']) && isset(${$column['render']}))
+                                    {{ ${$column['render']} }}
+                                @else
+                                    <p class="text-theme-sm text-gray-700 dark:text-gray-400 truncate"
+                                        x-text="item.{{ $column['key'] }}"></p>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </template>
             </template>
+
+            <!-- Empty State -->
+            <div x-show="!isLoading && filteredData.length === 0"
+                class="flex flex-col items-center justify-center border-t border-gray-100 py-12 dark:border-gray-800">
+                <svg class="mb-4 h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p class="text-gray-500 dark:text-gray-400"
+                    x-text="search ? 'No data found for your search.' : 'No data available.'"></p>
+            </div>
         </div>
     </div>
 
-    <div class="border-t border-gray-100 py-4 pl-[18px] pr-4 dark:border-gray-800">
+    <!-- Pagination -->
+    <div x-show="!isLoading && filteredData.length > 0"
+        class="border-t border-gray-100 py-4 pl-[18px] pr-4 dark:border-gray-800">
         <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between">
             <p
                 class="border-b border-gray-100 pb-3 text-center text-sm font-medium text-gray-500 dark:border-gray-800 dark:text-gray-400 xl:border-b-0 xl:pb-0 xl:text-left">
@@ -139,7 +183,7 @@
             <div class="flex items-center justify-center gap-0.5 pt-4 xl:justify-end xl:pt-0">
                 <button @click="prevPage()"
                     class="mr-2.5 flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3"
-                    :disabled="currentPage === 1">
+                    :disabled="currentPage === 1 || isLoading">
                     <svg class="fill-current" width="20" height="20" viewBox="0 0 20 20" fill="none"
                         xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" clip-rule="evenodd"
@@ -151,7 +195,8 @@
                 <button @click="goToPage(1)"
                     :class="currentPage === 1 ? 'bg-blue-500/8 text-brand-500' :
                         'text-gray-700 dark:text-gray-400'"
-                    class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-blue-500/8 hover:text-brand-500 dark:hover:text-brand-500">
+                    class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-blue-500/8 hover:text-brand-500 dark:hover:text-brand-500"
+                    :disabled="isLoading">
                     1
                 </button>
 
@@ -164,7 +209,8 @@
                     <button @click="goToPage(page)"
                         :class="currentPage === page ? 'bg-blue-500/8 text-brand-500' :
                             'text-gray-700 dark:text-gray-400'"
-                        class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-blue-500/8 hover:text-brand-500 dark:hover:text-brand-500">
+                        class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-blue-500/8 hover:text-brand-500 dark:hover:text-brand-500"
+                        :disabled="isLoading">
                         <span x-text="page"></span>
                     </button>
                 </template>
@@ -178,12 +224,12 @@
                     :class="currentPage === totalPages ? 'bg-blue-500/8 text-brand-500' :
                         'text-gray-700 dark:text-gray-400'"
                     class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-blue-500/8 hover:text-brand-500 dark:hover:text-brand-500"
-                    x-text="totalPages" x-show="totalPages > 1">
+                    x-text="totalPages" x-show="totalPages > 1" :disabled="isLoading">
                 </button>
 
                 <button @click="nextPage()"
                     class="ml-2.5 flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 shadow-theme-xs hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3"
-                    :disabled="currentPage === totalPages">
+                    :disabled="currentPage === totalPages || isLoading">
                     <svg class="fill-current" width="20" height="20" viewBox="0 0 20 20" fill="none"
                         xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" clip-rule="evenodd"
@@ -197,14 +243,56 @@
 </div>
 
 <script>
-    function dataTable(initialData) {
+    function dataTable(url, initialData = [], instanceId) {
         return {
+            instanceId: instanceId,
+            url: url,
             search: "",
             sortColumn: "",
             sortDirection: "asc",
             currentPage: 1,
             perPage: 10,
             data: initialData,
+            isLoading: false,
+            error: null,
+
+            async init() {
+                if (this.instanceId) {
+                    window.dataTableInstances = window.dataTableInstances || {};
+                    window.dataTableInstances[this.instanceId] = this;
+                }
+
+                if (this.data.length === 0 && this.url) {
+                    await this.fetchData();
+                }
+            },
+
+            async fetchData() {
+                if (!this.url) return;
+
+                this.isLoading = true;
+                this.error = null;
+
+                try {
+                    const response = await fetch(this.url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const result = await response.json();
+
+                    this.data = result.data || result;
+                } catch (error) {
+                    console.error('Error fetching data:', error);
+                    this.error = error.message;
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            async refreshData() {
+                await this.fetchData();
+                this.currentPage = 1;
+            },
 
             get pagesAroundCurrent() {
                 let pages = [];
@@ -218,20 +306,27 @@
             },
 
             get filteredData() {
+                if (!this.data || !Array.isArray(this.data)) return [];
+
                 const searchLower = this.search.toLowerCase();
                 return this.data
-                    .filter(
-                        (item) => {
-                            return Object.values(item).some(val =>
-                                String(val).toLowerCase().includes(searchLower)
-                            );
-                        }
-                    )
+                    .filter((item) => {
+                        return Object.values(item).some(val =>
+                            String(val).toLowerCase().includes(searchLower)
+                        );
+                    })
                     .sort((a, b) => {
                         if (!this.sortColumn) return 0;
                         let modifier = this.sortDirection === "asc" ? 1 : -1;
-                        if (a[this.sortColumn] < b[this.sortColumn]) return -1 * modifier;
-                        if (a[this.sortColumn] > b[this.sortColumn]) return 1 * modifier;
+                        const aVal = a[this.sortColumn];
+                        const bVal = b[this.sortColumn];
+
+                        if (aVal == null && bVal == null) return 0;
+                        if (aVal == null) return 1 * modifier;
+                        if (bVal == null) return -1 * modifier;
+
+                        if (aVal < bVal) return -1 * modifier;
+                        if (aVal > bVal) return 1 * modifier;
                         return 0;
                     });
             },
@@ -261,31 +356,58 @@
             },
 
             goToPage(page) {
-                if (page >= 1 && page <= this.totalPages) {
+                if (page >= 1 && page <= this.totalPages && !this.isLoading) {
                     this.currentPage = page;
                 }
             },
 
             nextPage() {
-                if (this.currentPage < this.totalPages) {
+                if (this.currentPage < this.totalPages && !this.isLoading) {
                     this.currentPage++;
                 }
             },
 
             prevPage() {
-                if (this.currentPage > 1) {
+                if (this.currentPage > 1 && !this.isLoading) {
                     this.currentPage--;
                 }
             },
 
             sortBy(column) {
+                if (this.isLoading) return;
+
                 if (this.sortColumn === column) {
                     this.sortDirection = this.sortDirection === "asc" ? "desc" : "asc";
                 } else {
                     this.sortDirection = "asc";
                     this.sortColumn = column;
                 }
+                this.currentPage = 1;
             },
         };
     }
+
+    window.refreshDataTable = function(instanceId) {
+        const instances = window.dataTableInstances || {};
+        const instance = instances[instanceId];
+
+        if (instance && typeof instance.refreshData === 'function') {
+            instance.refreshData();
+        } else {
+            console.warn(`DataTable instance with ID "${instanceId}" not found`);
+        }
+    };
+
+    window.refreshAllDataTables = function() {
+        const instances = window.dataTableInstances || {};
+        Object.values(instances).forEach(instance => {
+            if (instance && typeof instance.refreshData === 'function') {
+                instance.refreshData();
+            }
+        });
+    };
+
+    window.getDataTableInstances = function() {
+        return window.dataTableInstances || {};
+    };
 </script>

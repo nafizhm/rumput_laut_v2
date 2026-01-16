@@ -17,6 +17,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/form', [App\Http\Controllers\TestingController::class, 'form'])->name('form.index');
 
     Route::resource('manajemen-menu', App\Http\Controllers\Setting\MenuController::class);
+    Route::get('menu-data', [App\Http\Controllers\Setting\MenuController::class, 'indexData'])->name('menu-data.index');
     Route::resource('manajemen-permission', App\Http\Controllers\Setting\PermissionController::class);
     Route::resource('manajemen-role', App\Http\Controllers\Setting\RoleController::class);
 
