@@ -23,13 +23,89 @@ class MenuController extends Controller
 
         $data = Menu::with('parent')->orderBy('order', 'asc')->get();
 
-        return view('pages.settings.menu.index', compact('data', 'columns'));
+        $parents = Menu::whereNull('parent_id')
+            ->orderBy('name', 'asc')
+            ->get()
+            ->map(fn($menu) => [
+                'label' => $menu->name,
+                'value' => $menu->id,
+            ]);
+
+        return view('pages.settings.menu.index', compact('data', 'columns', 'parents'));
     }
 
     public function indexData()
     {
-        $data = Menu::with('parent')->orderBy('order', 'asc')->get();
+        try {
+            $data = Menu::with('parent')->orderBy('order', 'asc')->get();
 
-        return response()->json($data);
+            return response()->json([
+                'status' => true,
+                'message' => 'Menu berhasil diambil',
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Menu gagal diambil' . $e->getMessage()
+            ]);
+        }
+    }
+
+    public function store(Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'name' => 'required',
+                'icon' => 'nullable',
+                'route' => 'required|nullable',
+                'url' => 'required|nullable',
+                'parent_id' => 'nullable|exists:menus,id',
+                'order' => 'required|integer',
+                'is_active' => 'required|boolean',
+                'permission' => 'nullable',
+            ]);
+
+            Menu::create($data);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Menu berhasil ditambahkan'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Menu gagal ditambahkan' . $e->getMessage()
+            ]);
+        }
+    }
+
+    public function update(Request $request, Menu $manajemen_menu)
+    {
+        $data = $request->validate([
+            'name' => 'required',
+            'icon' => 'nullable',
+            'route' => 'nullable',
+            'url' => 'nullable',
+            'parent_id' => 'nullable|exists:menus,id',
+            'order' => 'nullable|integer',
+            'is_active' => 'boolean',
+            'permission' => 'nullable',
+        ]);
+
+        $manajemen_menu->update($data);
+
+        return response()->json([
+            'message' => 'Menu berhasil diperbarui'
+        ]);
+    }
+
+    public function destroy(Menu $manajemen_menu)
+    {
+        $manajemen_menu->delete();
+
+        return response()->json([
+            'message' => 'Menu berhasil dihapus'
+        ]);
     }
 }

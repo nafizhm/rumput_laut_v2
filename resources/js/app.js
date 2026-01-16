@@ -4,6 +4,9 @@ import Alpine from "alpinejs";
 import persist from "@alpinejs/persist";
 
 import { createIcons, icons } from "lucide";
+import { useForm } from "./lib/form";
+
+window.useForm = useForm;
 
 Alpine.plugin(persist);
 

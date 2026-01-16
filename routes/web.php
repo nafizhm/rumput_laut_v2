@@ -23,3 +23,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout'])->name('logout');
 });
+
+Route::get('/test', function () {
+    return view('test');
+})->name('test.index');

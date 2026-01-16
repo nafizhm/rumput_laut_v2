@@ -1,13 +1,13 @@
-<div x-data="{ toasts: $store.toast.toasts }" class="fixed top-4 right-4 z-999 flex flex-col gap-3 pointer-events-none">
+<div x-data="{ toasts: $store.toast.toasts }" class="fixed top-4 right-4 z-99999 flex flex-col gap-3 pointer-events-none">
     <template x-for="toast in $store.toast.toasts" :key="toast.id">
         <div x-data="{
             get bgClass() {
                 return {
-                    'success': 'border-success-500 bg-success-50 dark:border-success-500/30 dark:bg-success-500/15',
-                    'warning': 'border-warning-500 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/15',
-                    'error': 'border-error-500 bg-error-50 dark:border-error-500/30 dark:bg-error-500/15',
-                    'info': 'border-blue-light-500 bg-blue-light-50 dark:border-blue-light-500/30 dark:bg-blue-light-500/15',
-                } [toast.type] || 'border-blue-light-500 bg-blue-light-50 dark:border-blue-light-500/30 dark:bg-blue-light-500/15';
+                    'success': 'border-success-500 bg-success-50 dark:border-success-500 dark:bg-success-950',
+                    'warning': 'border-warning-500 bg-warning-50 dark:border-warning-500 dark:bg-warning-950',
+                    'error': 'border-error-500 bg-error-50 dark:border-error-500 dark:bg-error-950',
+                    'info': 'border-blue-light-500 bg-blue-light-50 dark:border-blue-light-500 dark:bg-blue-light-950',
+                } [toast.type] || 'border-blue-light-500 bg-blue-light-50 dark:border-blue-light-500 dark:bg-blue-light-950';
             },
             get textClass() {
                 return {
