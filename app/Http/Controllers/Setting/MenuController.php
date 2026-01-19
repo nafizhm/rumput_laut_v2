@@ -34,19 +34,19 @@ class MenuController extends Controller
         return view('pages.settings.menu.index', compact('data', 'columns', 'parents'));
     }
 
-    public function indexData()
+    public function data()
     {
         try {
             $data = Menu::with('parent')->orderBy('order', 'asc')->get();
 
             return response()->json([
-                'status' => true,
+                'success' => true,
                 'message' => 'Menu berhasil diambil',
                 'data' => $data
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'status' => false,
+                'success' => false,
                 'message' => 'Menu gagal diambil' . $e->getMessage()
             ]);
         }
@@ -69,12 +69,12 @@ class MenuController extends Controller
             Menu::create($data);
 
             return response()->json([
-                'status' => true,
+                'success' => true,
                 'message' => 'Menu berhasil ditambahkan'
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'status' => false,
+                'success' => false,
                 'message' => 'Menu gagal ditambahkan' . $e->getMessage()
             ]);
         }
