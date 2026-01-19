@@ -74,7 +74,7 @@
                                 </a>
 
                                 <div class="translate transform overflow-hidden"
-                                    :class="(selected === '{{ $menu->name }}') ? 'block' : 'hidden'">
+                                    x-show="selected === '{{ $menu->name }}'" x-cloak>
                                     <ul :class="sidebarToggle ? 'lg:hidden' : 'flex'"
                                         class="menu-dropdown mt-2 flex flex-col gap-1 pl-9">
                                         @foreach ($menu->children as $child)

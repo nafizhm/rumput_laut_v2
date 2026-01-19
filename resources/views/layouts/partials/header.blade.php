@@ -74,7 +74,7 @@
             </div>
         </div>
 
-        <div :class="menuToggle ? 'flex' : 'hidden'"
+        <div :class="menuToggle ? 'flex' : 'hidden'" x-cloak
             class="w-full items-center justify-between gap-4 px-5 py-4 shadow-theme-md lg:flex lg:justify-end lg:px-0 lg:shadow-none">
             <div class="flex items-center gap-2 2xsm:gap-3">
                 <!-- Dark Mode Toggler -->
@@ -115,7 +115,7 @@
                     </button>
 
                     <!-- Dropdown Start -->
-                    <div x-show="dropdownOpen"
+                    <div x-show="dropdownOpen" x-cloak
                         class="absolute -right-[240px] mt-[17px] flex h-[480px] w-[350px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[361px] lg:right-0">
                         <div
                             class="mb-3 flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-800">
@@ -394,7 +394,7 @@
                 </a>
 
                 <!-- Dropdown Start -->
-                <div x-show="dropdownOpen"
+                <div x-show="dropdownOpen" x-cloak
                     class="absolute right-0 mt-[17px] flex w-[260px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark">
                     <div>
                         <span class="block text-theme-sm font-medium text-gray-700 dark:text-gray-400">
