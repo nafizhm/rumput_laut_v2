@@ -46,36 +46,28 @@ class RoleController extends Controller
 
     public function data()
     {
+        $data = Role::with('permissions')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(function ($role) {
+                $grouped = [];
 
-        try {
-            $data = Role::with('permissions')
-                ->orderBy('id', 'desc')
-                ->get()
-                ->map(function ($role) {
-                    $grouped = [];
+                foreach ($role->permissions as $permission) {
+                    [$menu, $action] = explode('.', $permission->name);
 
-                    foreach ($role->permissions as $permission) {
-                        [$menu, $action] = explode('.', $permission->name);
+                    $grouped[$menu][] = $action;
+                }
 
-                        $grouped[$menu][] = $action;
-                    }
+                $role->permission_grouped = $grouped;
 
-                    $role->permission_grouped = $grouped;
+                return $role;
+            });
 
-                    return $role;
-                });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data berhasil diambil',
-                'data' => $data,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Data berhasil diambil',
+            'data' => $data,
+        ]);
     }
 
     public function store(Request $request)
@@ -85,30 +77,23 @@ class RoleController extends Controller
             'permissions' => 'nullable|array',
         ]);
 
-        try {
-            DB::transaction(function () use ($request) {
-                $db = [
-                    'name' => $request->name,
-                    'guard_name' => 'web',
-                ];
+        DB::transaction(function () use ($request) {
+            $db = [
+                'name' => $request->name,
+                'guard_name' => 'web',
+            ];
 
-                $role = Role::create($db);
+            $role = Role::create($db);
 
-                if ($request->has('permissions') && !empty($request->permissions)) {
-                    $role->givePermissionTo($request->permissions);
-                }
-            });
+            if ($request->has('permissions') && !empty($request->permissions)) {
+                $role->givePermissionTo($request->permissions);
+            }
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Role berhasil ditambahkan'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Role gagal ditambahkan' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Role berhasil ditambahkan'
+        ]);
     }
 
     public function update(Request $request, Role $manajemen_role)
@@ -118,47 +103,31 @@ class RoleController extends Controller
             'permissions' => 'nullable|array',
         ]);
 
-        try {
-            DB::transaction(function () use ($request, $manajemen_role) {
-                $manajemen_role->update([
-                    'name' => $request->name,
-                ]);
-
-                if ($request->filled('permissions')) {
-                    $manajemen_role->syncPermissions($request->permissions);
-                } else {
-                    $manajemen_role->syncPermissions([]);
-                }
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Role berhasil diupdate'
+        DB::transaction(function () use ($request, $manajemen_role) {
+            $manajemen_role->update([
+                'name' => $request->name,
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Role gagal diupdate: ' . $e->getMessage(),
-            ], 500);
-        }
+
+            if ($request->filled('permissions')) {
+                $manajemen_role->syncPermissions($request->permissions);
+            } else {
+                $manajemen_role->syncPermissions([]);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Role berhasil diupdate'
+        ]);
     }
 
     public function destroy(Role $manajemen_role)
     {
-        try {
-            DB::transaction(function () use ($manajemen_role) {
-                $manajemen_role->delete();
-            });
+        $manajemen_role->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Role berhasil dihapus'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Role gagal dihapus' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Role berhasil dihapus'
+        ]);
     }
 }

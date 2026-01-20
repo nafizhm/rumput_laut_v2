@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Setting;
 use App\Http\Controllers\Controller;
 use App\Models\Menu;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class MenuController extends Controller
 {
@@ -37,25 +36,18 @@ class MenuController extends Controller
 
     public function data()
     {
-        try {
-            $data = Menu::with('parent')->orderBy('order', 'asc')->get();
+        $data = Menu::with('parent')->orderBy('order', 'asc')->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Menu berhasil diambil',
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Menu gagal diambil' . $e->getMessage()
-            ]);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Menu berhasil diambil',
+            'data' => $data
+        ]);
     }
 
     public function store(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'name' => 'required|string|max:255',
             'icon' => 'nullable|string',
             'route' => 'nullable|string',
@@ -66,31 +58,12 @@ class MenuController extends Controller
             'permission' => 'nullable|string',
         ]);
 
-        try {
-            DB::transaction(function () use ($request) {
-                $db = [
-                    'name' => $request->name,
-                    'icon' => $request->icon,
-                    'route' => $request->route,
-                    'url' => $request->url,
-                    'parent_id' => $request->parent_id,
-                    'order' => $request->order,
-                    'is_active' => $request->is_active === 'true',
-                ];
+        Menu::create($data);
 
-                Menu::create($db);
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Menu berhasil ditambahkan'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Menu gagal ditambahkan' . $e->getMessage()
-            ]);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Menu berhasil ditambahkan'
+        ]);
     }
 
     public function update(Request $request, Menu $manajemen_menu)
@@ -106,48 +79,30 @@ class MenuController extends Controller
             'permission' => 'nullable|string',
         ]);
 
-        try {
-            DB::transaction(function () use ($request, $manajemen_menu) {
-                $manajemen_menu->update([
-                    'name' => $request->name,
-                    'icon' => $request->icon ?? null,
-                    'route' => $request->route ?? null,
-                    'url' => $request->url ?? null,
-                    'parent_id' => $request->parent_id ?? null,
-                    'order' => $request->order,
-                    'is_active' => $request->is_active,
-                    'permission' => $request->permission ?? null,
-                ]);
-            });
+        $manajemen_menu->update([
+            'name' => $request->name,
+            'icon' => $request->icon ?? null,
+            'route' => $request->route ?? null,
+            'url' => $request->url ?? null,
+            'parent_id' => $request->parent_id ?? null,
+            'order' => $request->order,
+            'is_active' => $request->is_active,
+            'permission' => $request->permission ?? null,
+        ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Menu berhasil diperbarui'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Menu gagal diperbarui' . $e->getMessage()
-            ]);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Menu berhasil diperbarui'
+        ]);
     }
 
     public function destroy(Menu $manajemen_menu)
     {
-        try {
-            DB::transaction(function () use ($manajemen_menu) {
-                $manajemen_menu->delete();
-            });
+        $manajemen_menu->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Menu berhasil dihapus'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Menu gagal dihapus' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Menu berhasil dihapus'
+        ]);
     }
 }

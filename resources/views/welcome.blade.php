@@ -54,7 +54,7 @@ $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(valu
             </div>
             <!-- Footer -->
             <p class="absolute text-sm text-center text-gray-500 -translate-x-1/2 bottom-6 left-1/2 dark:text-gray-400">
-                &copy; <span id="year"></span> - TailAdmin
+                &copy; <span id="year"></span> - BMS Indonesia
             </p>
         </div>
     </div>

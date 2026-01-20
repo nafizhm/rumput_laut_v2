@@ -51,35 +51,28 @@ class PermissionController extends Controller
 
     public function data()
     {
-        try {
-            $data = Permission::all()->groupBy(function ($permission) {
-                return Str::contains($permission->name, '.')
-                    ? Str::before($permission->name, '.')
-                    : $permission->name;
-            })->map(function ($group, $baseName) {
-                $menu = Menu::where('permission', $baseName . '.read')->first();
+        $data = Permission::all()->groupBy(function ($permission) {
+            return Str::contains($permission->name, '.')
+                ? Str::before($permission->name, '.')
+                : $permission->name;
+        })->map(function ($group, $baseName) {
+            $menu = Menu::where('permission', $baseName . '.read')->first();
 
-                return [
-                    'id' => $group->first()->id,
-                    'name' => $baseName,
-                    'module_name' => Str::title(str_replace('-', ' ', $baseName)),
-                    'access' => $group->map(fn($p) => Str::after($p->name, $baseName . '.'))->toArray(),
-                    'menu_id' => $menu ? $menu->id : null,
-                    'guard_name' => $group->first()->guard_name,
-                ];
-            })->values();
+            return [
+                'id' => $group->first()->id,
+                'name' => $baseName,
+                'module_name' => Str::title(str_replace('-', ' ', $baseName)),
+                'access' => $group->map(fn($p) => Str::after($p->name, $baseName . '.'))->toArray(),
+                'menu_id' => $menu ? $menu->id : null,
+                'guard_name' => $group->first()->guard_name,
+            ];
+        })->values();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data berhasil diambil',
-                'data' => $data,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Data berhasil diambil',
+            'data' => $data,
+        ]);
     }
 
     public function store(Request $request)
@@ -90,36 +83,29 @@ class PermissionController extends Controller
             'menu_id' => 'nullable|exists:menus,id'
         ]);
 
-        try {
-            DB::transaction(function () use ($request) {
-                $moduleSlug = Str::slug($request->module_name);
+        DB::transaction(function () use ($request) {
+            $moduleSlug = Str::slug($request->module_name);
 
-                foreach ($request->access as $access) {
-                    $permissionName = $moduleSlug . '.' . $access;
+            foreach ($request->access as $access) {
+                $permissionName = $moduleSlug . '.' . $access;
 
-                    if (!Permission::where('name', $permissionName)->exists()) {
-                        Permission::create(['name' => $permissionName, 'guard_name' => 'web']);
-                    }
+                if (!Permission::where('name', $permissionName)->exists()) {
+                    Permission::create(['name' => $permissionName, 'guard_name' => 'web']);
                 }
+            }
 
-                if ($request->menu_id && in_array('read', $request->access)) {
-                    $menu = Menu::find($request->menu_id);
-                    if ($menu) {
-                        $menu->update(['permission' => $moduleSlug . '.read']);
-                    }
+            if ($request->menu_id && in_array('read', $request->access)) {
+                $menu = Menu::find($request->menu_id);
+                if ($menu) {
+                    $menu->update(['permission' => $moduleSlug . '.read']);
                 }
-            });
+            }
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Permission berhasil ditambahkan'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal menambahkan permission: ' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Permission berhasil ditambahkan'
+        ]);
     }
 
     public function update(Request $request, Permission $manajemen_permission)
@@ -130,103 +116,89 @@ class PermissionController extends Controller
             'menu_id' => 'nullable|exists:menus,id'
         ]);
 
-        try {
-            DB::transaction(function () use ($request, $manajemen_permission) {
-                $oldBaseName = Str::contains($manajemen_permission->name, '.')
-                    ? Str::before($manajemen_permission->name, '.')
-                    : $manajemen_permission->name;
+        DB::transaction(function () use ($request, $manajemen_permission) {
+            $oldBaseName = Str::contains($manajemen_permission->name, '.')
+                ? Str::before($manajemen_permission->name, '.')
+                : $manajemen_permission->name;
 
-                $newBaseName = Str::slug($request->module_name);
-                $existingPermissions = Permission::where('name', 'like', $oldBaseName . '.%')->get();
+            $newBaseName = Str::slug($request->module_name);
+            $existingPermissions = Permission::where('name', 'like', $oldBaseName . '.%')->get();
 
-                if ($oldBaseName !== $newBaseName) {
-                    foreach ($existingPermissions as $existingPermission) {
-                        $action = Str::after($existingPermission->name, $oldBaseName . '.');
-                        $existingPermission->update([
-                            'name' => $newBaseName . '.' . $action
-                        ]);
-                    }
-
-                    Menu::where('permission', $oldBaseName . '.read')->update(['permission' => $newBaseName . '.read']);
+            if ($oldBaseName !== $newBaseName) {
+                foreach ($existingPermissions as $existingPermission) {
+                    $action = Str::after($existingPermission->name, $oldBaseName . '.');
+                    $existingPermission->update([
+                        'name' => $newBaseName . '.' . $action
+                    ]);
                 }
 
-                $currentActions = Permission::where('name', 'like', $newBaseName . '.%')
-                    ->get()
-                    ->map(fn($p) => Str::after($p->name, $newBaseName . '.'))
-                    ->toArray();
+                Menu::where('permission', $oldBaseName . '.read')->update(['permission' => $newBaseName . '.read']);
+            }
 
-                $desiredActions = $request->access;
+            $currentActions = Permission::where('name', 'like', $newBaseName . '.%')
+                ->get()
+                ->map(fn($p) => Str::after($p->name, $newBaseName . '.'))
+                ->toArray();
 
-                $actionsToDelete = array_diff($currentActions, $desiredActions);
-                foreach ($actionsToDelete as $action) {
-                    Permission::where('name', $newBaseName . '.' . $action)->delete();
+            $desiredActions = $request->access;
 
-                    if ($action === 'read') {
-                        Menu::where('permission', $newBaseName . '.read')->update(['permission' => null]);
-                    }
+            $actionsToDelete = array_diff($currentActions, $desiredActions);
+            foreach ($actionsToDelete as $action) {
+                Permission::where('name', $newBaseName . '.' . $action)->delete();
+
+                if ($action === 'read') {
+                    Menu::where('permission', $newBaseName . '.read')->update(['permission' => null]);
                 }
+            }
 
-                $actionsToAdd = array_diff($desiredActions, $currentActions);
-                foreach ($actionsToAdd as $action) {
-                    $permissionName = $newBaseName . '.' . $action;
-                    if (!Permission::where('name', $permissionName)->exists()) {
-                        Permission::create([
-                            'name' => $permissionName,
-                            'guard_name' => 'web'
-                        ]);
-                    }
+            $actionsToAdd = array_diff($desiredActions, $currentActions);
+            foreach ($actionsToAdd as $action) {
+                $permissionName = $newBaseName . '.' . $action;
+                if (!Permission::where('name', $permissionName)->exists()) {
+                    Permission::create([
+                        'name' => $permissionName,
+                        'guard_name' => 'web'
+                    ]);
                 }
+            }
 
-                if (in_array('read', $desiredActions)) {
-                    if ($request->menu_id) {
-                        Menu::where('permission', $newBaseName . '.read')
-                            ->where('id', '!=', $request->menu_id)
-                            ->update(['permission' => null]);
+            if (in_array('read', $desiredActions)) {
+                if ($request->menu_id) {
+                    Menu::where('permission', $newBaseName . '.read')
+                        ->where('id', '!=', $request->menu_id)
+                        ->update(['permission' => null]);
 
-                        $menu = Menu::find($request->menu_id);
-                        if ($menu) {
-                            $menu->update(['permission' => $newBaseName . '.read']);
-                        }
-                    } else {
-                        Menu::where('permission', $newBaseName . '.read')->update(['permission' => null]);
+                    $menu = Menu::find($request->menu_id);
+                    if ($menu) {
+                        $menu->update(['permission' => $newBaseName . '.read']);
                     }
+                } else {
+                    Menu::where('permission', $newBaseName . '.read')->update(['permission' => null]);
                 }
-            });
+            }
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Permission berhasil diperbarui'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal memperbarui permission: ' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Permission berhasil diperbarui'
+        ]);
     }
 
     public function destroy(Permission $manajemen_permission)
     {
-        try {
-            DB::transaction(function () use ($manajemen_permission) {
-                $baseName = Str::contains($manajemen_permission->name, '.')
-                    ? Str::before($manajemen_permission->name, '.')
-                    : $manajemen_permission->name;
+        DB::transaction(function () use ($manajemen_permission) {
+            $baseName = Str::contains($manajemen_permission->name, '.')
+                ? Str::before($manajemen_permission->name, '.')
+                : $manajemen_permission->name;
 
-                Menu::where('permission', $baseName . '.read')->update(['permission' => null]);
+            Menu::where('permission', $baseName . '.read')->update(['permission' => null]);
 
-                Permission::where('name', 'like', $baseName . '.%')->delete();
-            });
+            Permission::where('name', 'like', $baseName . '.%')->delete();
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Permission berhasil dihapus'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal menghapus permission: ' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Permission berhasil dihapus'
+        ]);
     }
 }
