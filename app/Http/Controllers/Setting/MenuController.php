@@ -54,18 +54,18 @@ class MenuController extends Controller
 
     public function store(Request $request)
     {
-        try {
-            $data = $request->validate([
-                'name' => 'required',
-                'icon' => 'nullable',
-                'route' => 'required|nullable',
-                'url' => 'required|nullable',
-                'parent_id' => 'nullable|exists:menus,id',
-                'order' => 'required|integer',
-                'is_active' => 'required|boolean',
-                'permission' => 'nullable',
-            ]);
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'icon' => 'nullable|string',
+            'route' => 'nullable|string',
+            'url' => 'nullable|string',
+            'parent_id' => 'nullable|exists:menus,id',
+            'order' => 'required|integer',
+            'is_active' => 'required|boolean',
+            'permission' => 'nullable|string',
+        ]);
 
+        try {
             Menu::create($data);
 
             return response()->json([
@@ -83,29 +83,45 @@ class MenuController extends Controller
     public function update(Request $request, Menu $manajemen_menu)
     {
         $data = $request->validate([
-            'name' => 'required',
-            'icon' => 'nullable',
-            'route' => 'nullable',
-            'url' => 'nullable',
+            'name' => 'required|string|max:255',
+            'icon' => 'nullable|string',
+            'route' => 'nullable|string',
+            'url' => 'nullable|string',
             'parent_id' => 'nullable|exists:menus,id',
-            'order' => 'nullable|integer',
-            'is_active' => 'boolean',
-            'permission' => 'nullable',
+            'order' => 'required|integer',
+            'is_active' => 'required|boolean',
+            'permission' => 'nullable|string',
         ]);
 
-        $manajemen_menu->update($data);
+        try {
+            $manajemen_menu->update($data);
 
-        return response()->json([
-            'message' => 'Menu berhasil diperbarui'
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Menu berhasil diperbarui'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Menu gagal diperbarui' . $e->getMessage()
+            ]);
+        }
     }
 
     public function destroy(Menu $manajemen_menu)
     {
-        $manajemen_menu->delete();
+        try {
+            $manajemen_menu->delete();
 
-        return response()->json([
-            'message' => 'Menu berhasil dihapus'
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Menu berhasil dihapus'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Menu gagal dihapus' . $e->getMessage()
+            ]);
+        }
     }
 }

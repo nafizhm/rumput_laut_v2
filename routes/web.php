@@ -17,9 +17,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/form', [App\Http\Controllers\TestingController::class, 'form'])->name('form.index');
 
     Route::resource('manajemen-menu', App\Http\Controllers\Setting\MenuController::class);
-    Route::get('menu-data', [App\Http\Controllers\Setting\MenuController::class, 'data'])->name('menu-data.index');
+    Route::get('menu-data', [App\Http\Controllers\Setting\MenuController::class, 'data'])->name('menu-data');
     Route::resource('manajemen-permission', App\Http\Controllers\Setting\PermissionController::class);
-    Route::get('permission-data', [App\Http\Controllers\Setting\PermissionController::class, 'data'])->name('permission-data.index');
+    Route::get('permission-data', [App\Http\Controllers\Setting\PermissionController::class, 'data'])->name('permission-data');
     Route::resource('manajemen-role', App\Http\Controllers\Setting\RoleController::class);
 
     Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout'])->name('logout');

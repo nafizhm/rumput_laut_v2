@@ -52,7 +52,6 @@
      <script>
          function menuForm() {
              return {
-                 parents: @json($parents),
                  editMode: false,
                  editId: null,
                  form: useForm({

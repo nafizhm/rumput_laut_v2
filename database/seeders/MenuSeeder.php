@@ -19,7 +19,7 @@ class MenuSeeder extends Seeder
                 'icon' => 'layout-grid',
                 'route' => 'dashboard',
                 'url' => 'dashboard',
-                'permission' => 'dashboard.show',
+                'permission' => 'dashboard.read',
                 'parent_id' => null,
                 'order' => 1,
                 'is_active' => true
@@ -48,7 +48,7 @@ class MenuSeeder extends Seeder
                 'icon' => 'menu',
                 'route' => 'manajemen-menu.index',
                 'url' => 'manajemen-menu',
-                'permission' => 'menu.show',
+                'permission' => 'menu.read',
                 'parent_id' => $parent->id,
                 'order' => 1,
                 'is_active' => true
@@ -58,7 +58,7 @@ class MenuSeeder extends Seeder
                 'icon' => 'key',
                 'route' => 'manajemen-permission.index',
                 'url' => 'manajemen-permission',
-                'permission' => 'permission.show',
+                'permission' => 'permission.read',
                 'parent_id' => $parent->id,
                 'order' => 2,
                 'is_active' => true
@@ -68,7 +68,7 @@ class MenuSeeder extends Seeder
                 'icon' => 'users',
                 'route' => 'manajemen-role.index',
                 'url' => 'manajemen-role',
-                'permission' => 'role.show',
+                'permission' => 'role.read',
                 'parent_id' => $parent->id,
                 'order' => 3,
                 'is_active' => true

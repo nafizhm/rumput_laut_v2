@@ -7,7 +7,7 @@
 @endsection
 
 @section('content')
-    <x-data-table id="usersTable" :rows="$data" :columns="$columns" :url="route('permission-data.index')">
+    <x-data-table id="permissionsTable" :rows="$data" :columns="$columns" :url="route('permission-data')">
         <x-slot:headerAction>
             <button type="button" @click="$dispatch('create-permission')"
                 class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto hover:bg-gray-50 dark:hover:bg-white/3 transition-colors">
@@ -21,20 +21,17 @@
             </button>
         </x-slot:headerAction>
 
-        <x-slot:status>
-            <div
-                :class="{
-                    'bg-success-50 text-theme-xs text-success-700 dark:bg-success-500/15 dark:text-success-500 inline-block rounded-full px-2 py-0.5 font-medium': item
-                        .is_active,
-                    'bg-error-50 text-theme-xs text-error-700 dark:bg-error-500/15 dark:text-error-500 inline-block rounded-full px-2 py-0.5 font-medium':
-                        !item.is_active
-                }">
-                <span x-text="item.is_active ? 'Active' : 'Inactive'"></span>
+        <x-slot:permission>
+            <div class="flex flex-wrap gap-1">
+                <template x-for="action in item.access" :key="action">
+                    <span
+                        class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-400/10 dark:text-gray-400 dark:ring-gray-400/20"
+                        x-text="action.charAt(0).toUpperCase() + action.slice(1)">
+                    </span>
+                </template>
             </div>
-        </x-slot:status>
-        <x-slot:parent_name>
-            <span x-text="item.parent?.name || '-'"></span>
-        </x-slot:parent_name>
+        </x-slot:permission>
+
         <x-slot:action>
             <div class="flex items-center gap-2">
                 <button type="button" @click="$dispatch('edit-permission', item)"
@@ -49,5 +46,5 @@
         </x-slot:action>
     </x-data-table>
 
-    {{-- @include('pages.settings.permission._permission_modal') --}}
+    @include('pages.settings.permission._permission-modal')
 @endsection
