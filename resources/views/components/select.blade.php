@@ -35,6 +35,8 @@
     loading: false,
 
     init() {
+        this.selected = this.selected.filter(v => v !== null && v !== '' && v !== undefined);
+
         if (this.remoteUrl) {
             this.fetchOptions();
 
@@ -46,12 +48,15 @@
         }
 
         window.addEventListener('set-selected-{{ $name }}', (e) => {
-            const val = e.detail;
+            let val = e.detail;
+
             if (this.multiple) {
                 this.selected = Array.isArray(val) ? val : [val];
             } else {
                 this.selected = (val !== null && val !== '') ? [val] : [];
             }
+
+            this.selected = this.selected.filter(v => v !== null && v !== '' && v !== undefined);
         });
 
         this.$watch('selected', (value) => {

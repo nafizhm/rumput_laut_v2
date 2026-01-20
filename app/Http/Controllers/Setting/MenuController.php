@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Setting;
 use App\Http\Controllers\Controller;
 use App\Models\Menu;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MenuController extends Controller
 {
@@ -54,7 +55,7 @@ class MenuController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate([
+        $request->validate([
             'name' => 'required|string|max:255',
             'icon' => 'nullable|string',
             'route' => 'nullable|string',
@@ -66,7 +67,19 @@ class MenuController extends Controller
         ]);
 
         try {
-            Menu::create($data);
+            DB::transaction(function () use ($request) {
+                $db = [
+                    'name' => $request->name,
+                    'icon' => $request->icon,
+                    'route' => $request->route,
+                    'url' => $request->url,
+                    'parent_id' => $request->parent_id,
+                    'order' => $request->order,
+                    'is_active' => $request->is_active === 'true',
+                ];
+
+                Menu::create($db);
+            });
 
             return response()->json([
                 'success' => true,
@@ -82,7 +95,7 @@ class MenuController extends Controller
 
     public function update(Request $request, Menu $manajemen_menu)
     {
-        $data = $request->validate([
+        $request->validate([
             'name' => 'required|string|max:255',
             'icon' => 'nullable|string',
             'route' => 'nullable|string',
@@ -94,7 +107,18 @@ class MenuController extends Controller
         ]);
 
         try {
-            $manajemen_menu->update($data);
+            DB::transaction(function () use ($request, $manajemen_menu) {
+                $manajemen_menu->update([
+                    'name' => $request->name,
+                    'icon' => $request->icon ?? null,
+                    'route' => $request->route ?? null,
+                    'url' => $request->url ?? null,
+                    'parent_id' => $request->parent_id ?? null,
+                    'order' => $request->order,
+                    'is_active' => $request->is_active,
+                    'permission' => $request->permission ?? null,
+                ]);
+            });
 
             return response()->json([
                 'success' => true,
@@ -111,7 +135,9 @@ class MenuController extends Controller
     public function destroy(Menu $manajemen_menu)
     {
         try {
-            $manajemen_menu->delete();
+            DB::transaction(function () use ($manajemen_menu) {
+                $manajemen_menu->delete();
+            });
 
             return response()->json([
                 'success' => true,
@@ -120,8 +146,8 @@ class MenuController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Menu gagal dihapus' . $e->getMessage()
-            ]);
+                'message' => 'Menu gagal dihapus' . $e->getMessage(),
+            ], 500);
         }
     }
 }

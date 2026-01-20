@@ -20,7 +20,22 @@ class PermissionController extends Controller
             ['key' => 'action', 'label' => 'Action', 'width' => '170px', 'render' => 'action'],
         ];
 
-        $data = $this->getGroupedPermissions();
+        $data = Permission::all()->groupBy(function ($permission) {
+            return Str::contains($permission->name, '.')
+                ? Str::before($permission->name, '.')
+                : $permission->name;
+        })->map(function ($group, $baseName) {
+            $menu = Menu::where('permission', $baseName . '.read')->first();
+
+            return [
+                'id' => $group->first()->id,
+                'name' => $baseName,
+                'module_name' => Str::title(str_replace('-', ' ', $baseName)),
+                'access' => $group->map(fn($p) => Str::after($p->name, $baseName . '.'))->toArray(),
+                'menu_id' => $menu ? $menu->id : null,
+                'guard_name' => $group->first()->guard_name,
+            ];
+        })->values();
 
         $menus = Menu::whereNotNull('route')
             ->orWhereNotNull('url')
@@ -37,10 +52,27 @@ class PermissionController extends Controller
     public function data()
     {
         try {
+            $data = Permission::all()->groupBy(function ($permission) {
+                return Str::contains($permission->name, '.')
+                    ? Str::before($permission->name, '.')
+                    : $permission->name;
+            })->map(function ($group, $baseName) {
+                $menu = Menu::where('permission', $baseName . '.read')->first();
+
+                return [
+                    'id' => $group->first()->id,
+                    'name' => $baseName,
+                    'module_name' => Str::title(str_replace('-', ' ', $baseName)),
+                    'access' => $group->map(fn($p) => Str::after($p->name, $baseName . '.'))->toArray(),
+                    'menu_id' => $menu ? $menu->id : null,
+                    'guard_name' => $group->first()->guard_name,
+                ];
+            })->values();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Data berhasil diambil',
-                'data' => $this->getGroupedPermissions(),
+                'data' => $data,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -48,27 +80,6 @@ class PermissionController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
-    }
-
-    private function getGroupedPermissions()
-    {
-        $permissions = Permission::all();
-        return $permissions->groupBy(function ($permission) {
-            return Str::contains($permission->name, '.')
-                ? Str::before($permission->name, '.')
-                : $permission->name;
-        })->map(function ($group, $baseName) {
-            $menu = Menu::where('permission', $baseName . '.read')->first();
-
-            return [
-                'id' => $group->first()->id,
-                'name' => $baseName,
-                'module_name' => Str::title(str_replace('-', ' ', $baseName)),
-                'access' => $group->map(fn($p) => Str::after($p->name, $baseName . '.'))->toArray(),
-                'menu_id' => $menu ? $menu->id : null,
-                'guard_name' => $group->first()->guard_name,
-            ];
-        })->values();
     }
 
     public function store(Request $request)
