@@ -1,9 +1,9 @@
 @extends('layouts.app')
 
-@section('title', 'Manajemen Menu')
+@section('title', 'Manajemen Permission')
 
 @section('breadcrumb')
-    <x-breadcrumb pageTitle="Manajemen Permission" :links="[['name' => 'Permission', 'url' => route('manajemen-permission.index')]]" />
+    <x-breadcrumb pageTitle="Manajemen Permission" :links="[['name' => 'Manajemen Permission', 'url' => route('manajemen-permission.index')]]" />
 @endsection
 
 @section('content')

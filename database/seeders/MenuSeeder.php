@@ -54,7 +54,7 @@ class MenuSeeder extends Seeder
                 'is_active' => true
             ],
             [
-                'name' => 'Manajemen Hak Akses',
+                'name' => 'Manajemen Permission',
                 'icon' => 'key',
                 'route' => 'manajemen-permission.index',
                 'url' => 'manajemen-permission',
