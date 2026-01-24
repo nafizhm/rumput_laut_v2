@@ -3,13 +3,23 @@
 namespace App\Http\Controllers\Setting;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Spatie\Permission\Models\Permission;
+use App\Http\Requests\Setting\Role\StoreRoleRequest;
+use App\Http\Requests\Setting\Role\UpdateRoleRequest;
+use App\Services\Setting\RoleService;
+use App\Traits\JsonResponser;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
+    use JsonResponser;
+
+    protected RoleService $roleService;
+
+    public function __construct(RoleService $roleService)
+    {
+        $this->roleService = $roleService;
+    }
+
     public function index()
     {
         $columns = [
@@ -19,24 +29,9 @@ class RoleController extends Controller
             ['key' => 'action', 'label' => 'Action', 'width' => '170px', 'render' => 'action'],
         ];
 
-        $data = Role::with('permissions')
-            ->orderBy('id', 'desc')
-            ->get()
-            ->map(function ($role) {
-                $grouped = [];
+        $data = $this->roleService->getRolesWithPermissions();
 
-                foreach ($role->permissions as $permission) {
-                    [$menu, $action] = explode('.', $permission->name);
-
-                    $grouped[$menu][] = $action;
-                }
-
-                $role->permission_grouped = $grouped;
-
-                return $role;
-            });
-
-        $permission = Permission::all()->map(fn($menu) => [
+        $permission = $this->roleService->getAllPermissions()->map(fn($menu) => [
             'label' => $menu->name,
             'value' => $menu->id,
         ]);
@@ -46,88 +41,29 @@ class RoleController extends Controller
 
     public function data()
     {
-        $data = Role::with('permissions')
-            ->orderBy('id', 'desc')
-            ->get()
-            ->map(function ($role) {
-                $grouped = [];
+        $data = $this->roleService->getRolesWithPermissions();
 
-                foreach ($role->permissions as $permission) {
-                    [$menu, $action] = explode('.', $permission->name);
-
-                    $grouped[$menu][] = $action;
-                }
-
-                $role->permission_grouped = $grouped;
-
-                return $role;
-            });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data berhasil diambil',
-            'data' => $data,
-        ]);
+        return $this->successResponse('Data berhasil diambil', $data);
     }
 
-    public function store(Request $request)
+    public function store(StoreRoleRequest $request)
     {
-        $request->validate([
-            'name' => 'required|unique:roles,name',
-            'permissions' => 'nullable|array',
-        ]);
+        $this->roleService->createRole($request->validated());
 
-        DB::transaction(function () use ($request) {
-            $db = [
-                'name' => $request->name,
-                'guard_name' => 'web',
-            ];
-
-            $role = Role::create($db);
-
-            if ($request->has('permissions') && !empty($request->permissions)) {
-                $role->givePermissionTo($request->permissions);
-            }
-        });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Role berhasil ditambahkan'
-        ]);
+        return $this->successResponse('Role berhasil ditambahkan');
     }
 
-    public function update(Request $request, Role $manajemen_role)
+    public function update(UpdateRoleRequest $request, Role $manajemen_role)
     {
-        $request->validate([
-            'name' => 'required|unique:roles,name,' . $manajemen_role->id,
-            'permissions' => 'nullable|array',
-        ]);
+        $this->roleService->updateRole($manajemen_role, $request->validated());
 
-        DB::transaction(function () use ($request, $manajemen_role) {
-            $manajemen_role->update([
-                'name' => $request->name,
-            ]);
-
-            if ($request->filled('permissions')) {
-                $manajemen_role->syncPermissions($request->permissions);
-            } else {
-                $manajemen_role->syncPermissions([]);
-            }
-        });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Role berhasil diupdate'
-        ]);
+        return $this->successResponse('Role berhasil diupdate');
     }
 
     public function destroy(Role $manajemen_role)
     {
-        $manajemen_role->delete();
+        $this->roleService->deleteRole($manajemen_role);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Role berhasil dihapus'
-        ]);
+        return $this->successResponse('Role berhasil dihapus');
     }
 }

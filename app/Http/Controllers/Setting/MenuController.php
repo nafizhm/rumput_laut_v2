@@ -3,11 +3,24 @@
 namespace App\Http\Controllers\Setting;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Setting\Menu\StoreMenuRequest;
+use App\Http\Requests\Setting\Menu\UpdateMenuRequest;
 use App\Models\Menu;
+use App\Services\Setting\MenuService;
+use App\Traits\JsonResponser;
 use Illuminate\Http\Request;
 
 class MenuController extends Controller
 {
+    use JsonResponser;
+
+    protected MenuService $menuService;
+
+    public function __construct(MenuService $menuService)
+    {
+        $this->menuService = $menuService;
+    }
+
     public function index()
     {
         $columns = [
@@ -21,11 +34,9 @@ class MenuController extends Controller
             ['key' => 'action', 'label' => 'Action', 'width' => '170px', 'render' => 'action'],
         ];
 
-        $data = Menu::with('parent')->orderBy('order', 'asc')->get();
+        $data = $this->menuService->getAllMenus();
 
-        $parents = Menu::whereNull('parent_id')
-            ->orderBy('name', 'asc')
-            ->get()
+        $parents = $this->menuService->getParentOptions()
             ->map(fn($menu) => [
                 'label' => $menu->name,
                 'value' => $menu->id,
@@ -36,73 +47,29 @@ class MenuController extends Controller
 
     public function data()
     {
-        $data = Menu::with('parent')->orderBy('order', 'asc')->get();
+        $data = $this->menuService->getAllMenus();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Menu berhasil diambil',
-            'data' => $data
-        ]);
+        return $this->successResponse('Menu berhasil diambil', $data);
     }
 
-    public function store(Request $request)
+    public function store(StoreMenuRequest $request)
     {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'icon' => 'nullable|string',
-            'route' => 'nullable|string',
-            'url' => 'nullable|string',
-            'parent_id' => 'nullable|exists:menus,id',
-            'order' => 'required|integer',
-            'is_active' => 'required|boolean',
-            'permission' => 'nullable|string',
-        ]);
+        $this->menuService->createMenu($request->validated());
 
-        Menu::create($data);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Menu berhasil ditambahkan'
-        ]);
+        return $this->successResponse('Menu berhasil ditambahkan');
     }
 
-    public function update(Request $request, Menu $manajemen_menu)
+    public function update(UpdateMenuRequest $request, Menu $manajemen_menu)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'icon' => 'nullable|string',
-            'route' => 'nullable|string',
-            'url' => 'nullable|string',
-            'parent_id' => 'nullable|exists:menus,id',
-            'order' => 'required|integer',
-            'is_active' => 'required|boolean',
-            'permission' => 'nullable|string',
-        ]);
+        $this->menuService->updateMenu($manajemen_menu, $request->validated());
 
-        $manajemen_menu->update([
-            'name' => $request->name,
-            'icon' => $request->icon ?? null,
-            'route' => $request->route ?? null,
-            'url' => $request->url ?? null,
-            'parent_id' => $request->parent_id ?? null,
-            'order' => $request->order,
-            'is_active' => $request->is_active,
-            'permission' => $request->permission ?? null,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Menu berhasil diperbarui'
-        ]);
+        return $this->successResponse('Menu berhasil diperbarui');
     }
 
     public function destroy(Menu $manajemen_menu)
     {
-        $manajemen_menu->delete();
+        $this->menuService->deleteMenu($manajemen_menu);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Menu berhasil dihapus'
-        ]);
+        return $this->successResponse('Menu berhasil dihapus');
     }
 }
