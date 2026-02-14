@@ -57,6 +57,10 @@
              </div>
          </form>
      </x-modal>
+
+     <x-delete-modal name="delete-permission-modal"
+         message="Apakah anda yakin ingin menghapus permission ini? Semua aksi dalam modul ini akan ikut terhapus."
+         @confirm-delete-delete-permission-modal.window="deleteConfirmed" />
  </div>
 
  @push('scripts')
@@ -65,6 +69,7 @@
              return {
                  editMode: false,
                  editId: null,
+                 deleteId: null,
                  form: useForm({
                      menu_id: '',
                      module_name: '',
@@ -124,15 +129,18 @@
                  },
 
                  async deleteItem(id) {
-                     if (!confirm(
-                             'Apakah anda yakin ingin menghapus permission ini? Semua aksi dalam modul ini akan ikut terhapus.'
-                         )) return;
+                     this.deleteId = id;
+                     this.$dispatch('open-modal', 'delete-permission-modal');
+                 },
 
+                 async deleteConfirmed() {
                      try {
-                         await this.form.delete(`{{ url('manajemen-permission') }}/${id}`, {
+                         await this.form.delete(`{{ url('manajemen-permission') }}/${this.deleteId}`, {
                              onSuccess: () => {
                                  refreshDataTable('permissionsTable');
+                                 this.$dispatch('close-modal', 'delete-permission-modal');
                                  toast.success('Berhasil', 'Permission berhasil dihapus');
+                                 this.deleteId = null;
                              },
                              onError: () => {
                                  toast.error('Gagal', 'Terjadi kesalahan saat menghapus permission');

@@ -26,6 +26,10 @@
              </div>
          </form>
      </x-modal>
+
+     <x-delete-modal name="delete-role-modal"
+         message="Apakah anda yakin ingin menghapus role ini? Semua permission dalam role ini akan ikut terhapus."
+         @confirm-delete-delete-role-modal.window="deleteConfirmed" />
  </div>
 
  @push('scripts')
@@ -33,7 +37,9 @@
          function roleForm() {
              return {
                  editMode: false,
+                 editMode: false,
                  editId: null,
+                 deleteId: null,
                  form: useForm({
                      name: '',
                      permissions: []
@@ -93,15 +99,18 @@
                  },
 
                  async deleteItem(id) {
-                     if (!confirm(
-                             'Apakah anda yakin ingin menghapus role ini? Semua permission dalam role ini akan ikut terhapus.'
-                         )) return;
+                     this.deleteId = id;
+                     this.$dispatch('open-modal', 'delete-role-modal');
+                 },
 
+                 async deleteConfirmed() {
                      try {
-                         await this.form.delete(`{{ url('manajemen-role') }}/${id}`, {
+                         await this.form.delete(`{{ url('manajemen-role') }}/${this.deleteId}`, {
                              onSuccess: () => {
                                  refreshDataTable('rolesTable');
+                                 this.$dispatch('close-modal', 'delete-role-modal');
                                  toast.success('Berhasil', 'Role berhasil dihapus');
+                                 this.deleteId = null;
                              },
                              onError: () => {
                                  toast.error('Gagal', 'Terjadi kesalahan saat menghapus role');

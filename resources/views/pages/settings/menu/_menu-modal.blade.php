@@ -46,6 +46,10 @@
              </div>
          </form>
      </x-modal>
+
+     <x-delete-modal name="delete-menu-modal"
+         message="Apakah anda yakin ingin menghapus menu ini? Menu yang dihapus tidak dapat dikembalikan."
+         @confirm-delete-delete-menu-modal.window="deleteConfirmed" />
  </div>
 
  @push('scripts')
@@ -54,6 +58,7 @@
              return {
                  editMode: false,
                  editId: null,
+                 deleteId: null,
                  form: useForm({
                      name: '',
                      icon: '',
@@ -131,13 +136,18 @@
                  },
 
                  async deleteItem(id) {
-                     if (!confirm('Apakah anda yakin ingin menghapus menu ini?')) return;
+                     this.deleteId = id;
+                     this.$dispatch('open-modal', 'delete-menu-modal');
+                 },
 
+                 async deleteConfirmed() {
                      try {
-                         await this.form.delete(`{{ url('manajemen-menu') }}/${id}`, {
+                         await this.form.delete(`{{ url('manajemen-menu') }}/${this.deleteId}`, {
                              onSuccess: () => {
                                  refreshDataTable('usersTable');
+                                 this.$dispatch('close-modal', 'delete-menu-modal');
                                  toast.success('Berhasil', 'Menu berhasil dihapus');
+                                 this.deleteId = null;
                              },
                              onError: () => {
                                  toast.error('Gagal', 'Terjadi kesalahan saat menghapus menu');

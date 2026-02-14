@@ -8,7 +8,6 @@ use App\Http\Requests\Setting\Menu\UpdateMenuRequest;
 use App\Models\Menu;
 use App\Services\Setting\MenuService;
 use App\Traits\JsonResponser;
-use Illuminate\Http\Request;
 
 class MenuController extends Controller
 {

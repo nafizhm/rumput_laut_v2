@@ -3,7 +3,7 @@
 <div x-data="{ show: false }" x-cloak x-show="show"
     @open-modal.window="if ($event.detail === '{{ $name }}') show = true"
     @close-modal.window="if ($event.detail === '{{ $name }}') show = false" @keydown.escape.window="show = false"
-    x-cloak class="fixed inset-0 z-9999">
+    x-cloak class="fixed inset-0 z-9999" {{ $attributes }}>
     <div x-show="show" @click="show = false" x-transition:enter="ease-out duration-300"
         x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
         x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100"
