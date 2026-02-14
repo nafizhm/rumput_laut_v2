@@ -14,11 +14,11 @@
 
              <div class="flex justify-end gap-3 mt-6">
                  <button type="button" @click="$dispatch('close-modal', 'roleModal')"
-                     class="px-4 py-2 border rounded-lg">
+                     class="rounded-lg border justify-center border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:z-10 focus:ring-4 focus:ring-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white dark:focus:ring-gray-700">
                      Batal
                  </button>
 
-                 <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg"
+                 <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600"
                      :disabled="form.processing">
                      <span x-show="!form.processing">Simpan</span>
                      <span x-show="form.processing">Menyimpan...</span>
