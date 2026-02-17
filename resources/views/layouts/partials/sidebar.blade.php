@@ -1,6 +1,6 @@
 <aside :class="sidebarToggle ? 'translate-x-0 lg:w-[90px]' : '-translate-x-full'"
     class="sidebar fixed top-0 left-0 z-9999 flex h-screen w-[290px] flex-col overflow-y-auto border-r border-gray-200 bg-white px-5 transition-all duration-300 lg:static lg:translate-x-0 dark:border-gray-800 dark:bg-black"
-    @click.outside="sidebarToggle = false">
+    @click.outside="if (window.innerWidth < 1024) sidebarToggle = false">
     <div :class="sidebarToggle ? 'justify-center' : 'justify-between'"
         class="sidebar-header flex items-center gap-2 pt-8 pb-7">
         <a href="index.html">
