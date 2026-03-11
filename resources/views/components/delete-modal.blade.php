@@ -6,7 +6,7 @@
 ])
 
 <x-modal :name="$name" maxWidth="max-w-sm" {{ $attributes }}>
-    <div class="p-4 text-center">
+    <div class="text-center">
         <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900">
             <svg class="h-6 w-6 text-rose-600 dark:text-rose-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                 xmlns="http://www.w3.org/2000/svg">

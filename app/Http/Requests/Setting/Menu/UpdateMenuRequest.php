@@ -21,7 +21,6 @@ class UpdateMenuRequest extends FormRequest
             'parent_id' => 'nullable|exists:menus,id',
             'order' => 'required|integer',
             'is_active' => 'required|boolean',
-            'permission' => 'nullable|string',
         ];
     }
 }

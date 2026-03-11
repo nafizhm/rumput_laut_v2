@@ -30,6 +30,8 @@ class MenuService
      */
     public function createMenu(array $data): Menu
     {
+        $data['permission'] = strtolower(str_replace(' ', '-', trim($data['name']))) . '.read';
+
         return Menu::create($data);
     }
 
@@ -46,7 +48,6 @@ class MenuService
             'parent_id' => $data['parent_id'] ?? null,
             'order' => $data['order'],
             'is_active' => $data['is_active'],
-            'permission' => $data['permission'] ?? null,
         ]);
     }
 

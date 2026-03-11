@@ -26,10 +26,6 @@
                  <x-select label="Status" name="is_active" :options="[['label' => 'Active', 'value' => 1], ['label' => 'Inactive', 'value' => 0]]" placeholder="Pilih status"
                      x-on:change="$dispatch('update-field', { field: 'is_active', value: $event.detail })"
                      alpine-error="form.hasErrors('is_active') ? form.getError('is_active') : null" />
-
-                 <x-input label="Permission" name="permission" placeholder="Contoh: menu.view"
-                     x-model="form.data.permission"
-                     alpine-error="form.hasErrors('permission') ? form.getError('permission') : null" />
              </div>
 
              <div class="flex justify-end gap-3 mt-6">
@@ -66,8 +62,7 @@
                      url: '',
                      parent_id: '',
                      order: '',
-                     is_active: true,
-                     permission: ''
+                     is_active: true
                  }),
 
                  init() {
@@ -120,8 +115,7 @@
                          url: item.url || '',
                          parent_id: item.parent_id || '',
                          order: item.order || '',
-                         is_active: isActive,
-                         permission: item.permission || ''
+                         is_active: isActive
                      };
 
                      window.dispatchEvent(new CustomEvent('set-selected-parent_id', {
