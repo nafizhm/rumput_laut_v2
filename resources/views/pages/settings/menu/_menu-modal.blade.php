@@ -138,7 +138,7 @@
                      try {
                          await this.form.delete(`{{ url('manajemen-menu') }}/${this.deleteId}`, {
                              onSuccess: () => {
-                                 refreshDataTable('usersTable');
+                                 refreshDataTable('menusTable');
                                  this.$dispatch('close-modal', 'delete-menu-modal');
                                  toast.success('Berhasil', 'Menu berhasil dihapus');
                                  this.deleteId = null;
@@ -161,7 +161,7 @@
                                      this.editMode = false;
                                      this.editId = null;
                                      this.$dispatch('close-modal', 'menuModal');
-                                     refreshDataTable('usersTable');
+                                     refreshDataTable('menusTable');
                                      toast.success('Berhasil', 'Menu berhasil diperbarui');
                                  },
                                  onError: (e) => {
@@ -177,7 +177,7 @@
                                      this.editMode = false;
                                      this.editId = null;
                                      this.$dispatch('close-modal', 'menuModal');
-                                     refreshDataTable('usersTable');
+                                     refreshDataTable('menusTable');
                                      toast.success('Berhasil', 'Menu berhasil disimpan');
                                  },
                                  onError: (e) => {

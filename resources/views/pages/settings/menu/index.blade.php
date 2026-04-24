@@ -7,7 +7,8 @@
 @endsection
 
 @section('content')
-    {{-- <div class="mb-4 flex justify-end">
+    <x-data-table id="menusTable" :rows="$data" :columns="$columns" :url="route('menu-data')">
+        {{-- <div class="mb-4 flex justify-end">
         <button onclick="refreshDataTable('usersTable');"
             class="flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -17,8 +18,7 @@
             <span class="ml-2">Refresh All Tables</span>
         </button>
     </div> --}}
-
-    <x-data-table id="usersTable" :rows="$data" :columns="$columns" :url="route('menu-data')">
+    
         <x-slot:headerAction>
             <button type="button" @click="$dispatch('create-menu')"
                 class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto hover:bg-gray-50 dark:hover:bg-white/3 transition-colors">
@@ -33,16 +33,20 @@
         </x-slot:headerAction>
 
         <x-slot:status>
-            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
-                :class="item.is_active ?
-                    'bg-green-50 text-green-600 ring-green-500/10 dark:bg-green-400/10 dark:text-green-400 dark:ring-green-400/20' :
-                    'bg-red-50 text-red-600 ring-red-500/10 dark:bg-red-400/10 dark:text-red-400 dark:ring-red-400/20'"
-                x-text="item.is_active ? 'Active' : 'Inactive'">
-            </span>
+            <template x-if="item.is_active">
+                <span
+                    class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
+                    Active
+                </span>
+            </template>
+            <template x-if="!item.is_active">
+                <span
+                    class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20">
+                    Inactive
+                </span>
+            </template>
         </x-slot:status>
-        <x-slot:parent_name>
-            <span x-text="item.parent?.name || '-'"></span>
-        </x-slot:parent_name>
+
         <x-slot:action>
             <div class="flex items-center gap-2">
                 <button type="button" @click="$dispatch('edit-menu', item)"
