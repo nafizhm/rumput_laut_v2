@@ -59,33 +59,26 @@
                         this.form.data[field] = value;
                     });
 
-                    window.addEventListener('edit-loan', (event) => {
-                        this.edit(event.detail);
-                    });
-                    window.addEventListener('delete-loan', (event) => {
-                        this.deleteItem(event.detail);
-                    });
-                    window.addEventListener('create-loan', () => {
-                        this.create();
-                    });
+                    window.addEventListener('edit-loan', (event) => this.edit(event.detail));
+                    window.addEventListener('delete-loan', (event) => this.deleteItem(event.detail));
+                    window.addEventListener('create-loan', () => this.create());
                 },
 
                 create() {
-                    this.form.reset();
                     this.editMode = false;
                     this.editId = null;
-                    
-                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', {
-                        detail: null
-                    }));
-
+                    this.form.reset();
                     this.form.clearErrors();
+                    
+                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', { detail: null }));
+
                     this.$dispatch('open-modal', 'loan-modal');
                 },
 
                 edit(item) {
                     this.editMode = true;
                     this.editId = item.id;
+                    this.form.clearErrors();
 
                     this.form.data = {
                         farmer_id: item.farmer_id || '',
@@ -94,11 +87,8 @@
                         description: item.description || ''
                     };
 
-                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', {
-                        detail: item.farmer_id
-                    }));
+                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', { detail: item.farmer_id }));
 
-                    this.form.clearErrors();
                     this.$dispatch('open-modal', 'loan-modal');
                 },
 
@@ -108,45 +98,38 @@
                 },
 
                 async deleteConfirmed() {
-                    try {
-                        await this.form.delete(`{{ url('manajemen-pinjaman') }}/${this.deleteId}`, {
-                            onSuccess: () => {
-                                refreshDataTable('loanTable');
-                                this.$dispatch('close-modal', 'delete-loan-modal');
-                                toast.success('Berhasil', 'Pinjaman berhasil dihapus (dibalik)');
-                                this.deleteId = null;
-                            },
-                            onError: () => {
-                                toast.error('Gagal', 'Terjadi kesalahan saat menghapus pinjaman');
-                            }
-                        });
-                    } catch (e) {}
+                    await this.form.submit('delete', `{{ url('manajemen-pinjaman') }}/${this.deleteId}`, {
+                        onSuccess: (response) => {
+                            toast.success('Berhasil', response.data.message);
+                            refreshDataTable('loanTable');
+                            this.$dispatch('close-modal', 'delete-loan-modal');
+                            this.deleteId = null;
+                        },
+                        onError: (error) => {
+                            toast.error('Gagal', error.response?.data?.message || 'Terjadi kesalahan saat menghapus data');
+                        }
+                    });
                 },
 
                 async submit() {
-                    try {
-                        const url = this.editMode 
-                            ? `{{ url('manajemen-pinjaman') }}/${this.editId}`
-                            : '{{ route('manajemen-pinjaman.store') }}';
-                        
-                        const method = this.editMode ? 'put' : 'post';
+                    const url = this.editMode 
+                        ? `{{ url('manajemen-pinjaman') }}/${this.editId}`
+                        : `{{ url('manajemen-pinjaman') }}`;
+                    
+                    const method = this.editMode ? 'put' : 'post';
 
-                        await this.form[method](url, {
-                            onSuccess: () => {
-                                this.form.reset();
-                                this.editMode = false;
-                                this.editId = null;
-                                this.$dispatch('close-modal', 'loan-modal');
-                                refreshDataTable('loanTable');
-                                toast.success('Berhasil', `Pinjaman berhasil ${this.editMode ? 'diperbarui' : 'disimpan'}`);
-                            },
-                            onError: (e) => {
-                                if (!this.form.hasErrors()) {
-                                    toast.error('Gagal', `Terjadi kesalahan saat ${this.editMode ? 'memperbarui' : 'menyimpan'} pinjaman`);
-                                }
+                    await this.form.submit(method, url, {
+                        onSuccess: (response) => {
+                            toast.success('Berhasil', response.data.message);
+                            refreshDataTable('loanTable');
+                            this.$dispatch('close-modal', 'loan-modal');
+                        },
+                        onError: (error) => {
+                            if (!this.form.hasErrors()) {
+                                toast.error('Gagal', error.response?.data?.message || 'Terjadi kesalahan sistem');
                             }
-                        });
-                    } catch (e) {}
+                        }
+                    });
                 }
             }
         }

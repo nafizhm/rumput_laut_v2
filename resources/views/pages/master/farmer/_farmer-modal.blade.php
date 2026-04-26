@@ -1,7 +1,7 @@
 <div x-data="farmerForm()">
     <x-modal name="farmer-modal">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90"
-            x-text="editMode ? 'Edit Data' : 'Add Data'"></h4>
+            x-text="editMode ? 'Edit Data' : 'Tambah Data'"></h4>
         
         <form @submit.prevent="submit">
             <div class="space-y-4">
@@ -18,20 +18,20 @@
             <div class="flex justify-end gap-3 mt-6">
                 <button type="button" @click="$dispatch('close-modal', 'farmer-modal')"
                     class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">
-                    Cancel
+                    Batal
                 </button>
 
                 <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600"
                     :disabled="form.processing">
-                    <span x-show="!form.processing">Save</span>
-                    <span x-show="form.processing">Saving...</span>
+                    <span x-show="!form.processing">Simpan</span>
+                    <span x-show="form.processing">Menyimpan...</span>
                 </button>
             </div>
         </form>
     </x-modal>
 
     <x-delete-modal name="delete-farmer-modal"
-        message="Are you sure you want to delete this data? This action cannot be undone."
+        message="Apakah anda yakin ingin menghapus data ini? Data yang dihapus tidak dapat dikembalikan."
         @confirm-delete-delete-farmer-modal.window="deleteConfirmed" />
 </div>
 
@@ -49,21 +49,15 @@
                 }),
 
                 init() {
-                    window.addEventListener('edit-farmer', (event) => {
-                        this.edit(event.detail);
-                    });
-                    window.addEventListener('delete-farmer', (event) => {
-                        this.deleteItem(event.detail);
-                    });
-                    window.addEventListener('create-farmer', () => {
-                        this.create();
-                    });
+                    window.addEventListener('edit-farmer', (event) => this.edit(event.detail));
+                    window.addEventListener('delete-farmer', (event) => this.deleteItem(event.detail));
+                    window.addEventListener('create-farmer', () => this.create());
                 },
 
                 create() {
-                    this.form.reset();
                     this.editMode = false;
                     this.editId = null;
+                    this.form.reset();
                     this.form.clearErrors();
                     this.$dispatch('open-modal', 'farmer-modal');
                 },
@@ -71,6 +65,7 @@
                 edit(item) {
                     this.editMode = true;
                     this.editId = item.id;
+                    this.form.clearErrors();
 
                     this.form.data = {
                         name: item.name || '',
@@ -78,7 +73,6 @@
                         address: item.address || ''
                     };
 
-                    this.form.clearErrors();
                     this.$dispatch('open-modal', 'farmer-modal');
                 },
 
@@ -88,45 +82,38 @@
                 },
 
                 async deleteConfirmed() {
-                    try {
-                        await this.form.delete(`{{ url('manajemen-petani') }}/${this.deleteId}`, {
-                            onSuccess: () => {
-                                refreshDataTable('farmerTable');
-                                this.$dispatch('close-modal', 'delete-farmer-modal');
-                                toast.success('Success', 'Farmer deleted successfully');
-                                this.deleteId = null;
-                            },
-                            onError: () => {
-                                toast.error('Error', 'Failed to delete farmer');
-                            }
-                        });
-                    } catch (e) {}
+                    await this.form.submit('delete', `{{ url('manajemen-petani') }}/${this.deleteId}`, {
+                        onSuccess: (response) => {
+                            toast.success('Berhasil', response.data.message);
+                            refreshDataTable('farmerTable');
+                            this.$dispatch('close-modal', 'delete-farmer-modal');
+                            this.deleteId = null;
+                        },
+                        onError: (error) => {
+                            toast.error('Gagal', error.response?.data?.message || 'Terjadi kesalahan saat menghapus data');
+                        }
+                    });
                 },
 
                 async submit() {
-                    try {
-                        const url = this.editMode 
-                            ? `{{ url('manajemen-petani') }}/${this.editId}`
-                            : '{{ route('manajemen-petani.store') }}';
-                        
-                        const method = this.editMode ? 'put' : 'post';
+                    const url = this.editMode 
+                        ? `{{ url('manajemen-petani') }}/${this.editId}`
+                        : `{{ url('manajemen-petani') }}`;
+                    
+                    const method = this.editMode ? 'put' : 'post';
 
-                        await this.form[method](url, {
-                            onSuccess: () => {
-                                this.form.reset();
-                                this.editMode = false;
-                                this.editId = null;
-                                this.$dispatch('close-modal', 'farmer-modal');
-                                refreshDataTable('farmerTable');
-                                toast.success('Success', `Farmer ${this.editMode ? 'updated' : 'created'} successfully`);
-                            },
-                            onError: (e) => {
-                                if (!this.form.hasErrors()) {
-                                    toast.error('Error', `Failed to ${this.editMode ? 'update' : 'create'} farmer`);
-                                }
+                    await this.form.submit(method, url, {
+                        onSuccess: (response) => {
+                            toast.success('Berhasil', response.data.message);
+                            refreshDataTable('farmerTable');
+                            this.$dispatch('close-modal', 'farmer-modal');
+                        },
+                        onError: (error) => {
+                            if (!this.form.hasErrors()) {
+                                toast.error('Gagal', error.response?.data?.message || 'Terjadi kesalahan sistem');
                             }
-                        });
-                    } catch (e) {}
+                        }
+                    });
                 }
             }
         }

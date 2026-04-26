@@ -90,7 +90,6 @@
                 },
 
                 init() {
-                    // Sync calculated values to form data
                     this.$watch('totalHarvestValue', (val) => this.form.data.total_harvest_value = val);
                     this.$watch('debtDeduction', (val) => this.form.data.debt_deduction = val);
 
@@ -99,17 +98,10 @@
                         this.form.data[field] = value;
                     });
 
-                    window.addEventListener('edit-harvest-transaction', (event) => {
-                        this.edit(event.detail);
-                    });
-                    window.addEventListener('delete-harvest-transaction', (event) => {
-                        this.deleteItem(event.detail);
-                    });
-                    window.addEventListener('create-harvest-transaction', () => {
-                        this.create();
-                    });
+                    window.addEventListener('edit-harvest-transaction', (event) => this.edit(event.detail));
+                    window.addEventListener('delete-harvest-transaction', (event) => this.deleteItem(event.detail));
+                    window.addEventListener('create-harvest-transaction', () => this.create());
 
-                    // Watch for total harvest value changes to ensure cash_payout doesn't exceed it
                     this.$watch('totalHarvestValue', (value) => {
                         if (parseFloat(this.form.data.cash_payout) > value) {
                             this.form.data.cash_payout = value;
@@ -118,21 +110,20 @@
                 },
 
                 create() {
-                    this.form.reset();
                     this.editMode = false;
                     this.editId = null;
-                    
-                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', {
-                        detail: null
-                    }));
-
+                    this.form.reset();
                     this.form.clearErrors();
+                    
+                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', { detail: null }));
+
                     this.$dispatch('open-modal', 'harvest-modal');
                 },
 
                 edit(item) {
                     this.editMode = true;
                     this.editId = item.id;
+                    this.form.clearErrors();
 
                     this.form.data = {
                         farmer_id: item.farmer_id || '',
@@ -146,11 +137,8 @@
                         debt_deduction: item.debt_deduction || 0,
                     };
 
-                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', {
-                        detail: item.farmer_id
-                    }));
+                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', { detail: item.farmer_id }));
 
-                    this.form.clearErrors();
                     this.$dispatch('open-modal', 'harvest-modal');
                 },
 
@@ -160,45 +148,38 @@
                 },
 
                 async deleteConfirmed() {
-                    try {
-                        await this.form.delete(`{{ url('manajemen-panen') }}/${this.deleteId}`, {
-                            onSuccess: () => {
-                                refreshDataTable('harvestTransactionTable');
-                                this.$dispatch('close-modal', 'delete-harvest-transaction-modal');
-                                toast.success('Berhasil', 'Transaksi panen berhasil dihapus');
-                                this.deleteId = null;
-                            },
-                            onError: () => {
-                                toast.error('Gagal', 'Terjadi kesalahan saat menghapus transaksi');
-                            }
-                        });
-                    } catch (e) {}
+                    await this.form.submit('delete', `{{ url('manajemen-panen') }}/${this.deleteId}`, {
+                        onSuccess: (response) => {
+                            toast.success('Berhasil', response.data.message);
+                            refreshDataTable('harvestTransactionTable');
+                            this.$dispatch('close-modal', 'delete-harvest-transaction-modal');
+                            this.deleteId = null;
+                        },
+                        onError: (error) => {
+                            toast.error('Gagal', error.response?.data?.message || 'Terjadi kesalahan saat menghapus data');
+                        }
+                    });
                 },
 
                 async submit() {
-                    try {
-                        const url = this.editMode 
-                            ? `{{ url('manajemen-panen') }}/${this.editId}`
-                            : '{{ route('manajemen-panen.store') }}';
-                        
-                        const method = this.editMode ? 'put' : 'post';
+                    const url = this.editMode 
+                        ? `{{ url('manajemen-panen') }}/${this.editId}`
+                        : `{{ url('manajemen-panen') }}`;
+                    
+                    const method = this.editMode ? 'put' : 'post';
 
-                        await this.form[method](url, {
-                            onSuccess: () => {
-                                this.form.reset();
-                                this.editMode = false;
-                                this.editId = null;
-                                this.$dispatch('close-modal', 'harvest-modal');
-                                refreshDataTable('harvestTransactionTable');
-                                toast.success('Berhasil', `Transaksi panen berhasil ${this.editMode ? 'diperbarui' : 'disimpan'}`);
-                            },
-                            onError: (e) => {
-                                if (!this.form.hasErrors()) {
-                                    toast.error('Gagal', `Terjadi kesalahan saat ${this.editMode ? 'memperbarui' : 'menyimpan'} transaksi`);
-                                }
+                    await this.form.submit(method, url, {
+                        onSuccess: (response) => {
+                            toast.success('Berhasil', response.data.message);
+                            refreshDataTable('harvestTransactionTable');
+                            this.$dispatch('close-modal', 'harvest-modal');
+                        },
+                        onError: (error) => {
+                            if (!this.form.hasErrors()) {
+                                toast.error('Gagal', error.response?.data?.message || 'Terjadi kesalahan sistem');
                             }
-                        });
-                    } catch (e) {}
+                        }
+                    });
                 }
             }
         }
