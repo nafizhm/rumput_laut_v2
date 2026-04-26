@@ -13,7 +13,7 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', function () {
-        return view('dashboard');
+        return view('pages.dashboard.index');
     })->name('dashboard');
 
     Route::resource('manajemen-menu', App\Http\Controllers\Setting\MenuController::class);
@@ -30,6 +30,9 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('manajemen-pinjaman', App\Http\Controllers\Transaction\LoanController::class);
     Route::get('loan-data', [App\Http\Controllers\Transaction\LoanController::class, 'data'])->name('loan-data');
+
+    Route::resource('manajemen-panen', App\Http\Controllers\Transaction\HarvestTransactionController::class);
+    Route::get('harvest-data', [App\Http\Controllers\Transaction\HarvestTransactionController::class, 'data'])->name('harvest-data');
 
     Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout'])->name('logout');
 });
