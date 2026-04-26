@@ -1,3 +1,5 @@
+@props(['id' => null, 'columns', 'rows' => [], 'url' => null, 'perPage' => 10])
+
 @php
     if (!$id) {
         $id = 'dataTable_' . uniqid();
@@ -10,7 +12,7 @@
     }
 @endphp
 
-<div x-data="dataTable(@js($url), @js($rows), @js($id))" x-init="init()" x-ref="dataTable" id="{{ $id }}"
+<div x-data="dataTable(@js($url), @js($rows), @js($id), @js($perPage))" x-init="init()" x-ref="dataTable" id="{{ $id }}"
     class="overflow-hidden rounded-xl border border-gray-200 bg-white pt-4 dark:border-gray-800 dark:bg-white/3">
 
     <!-- Loading Overlay -->
@@ -26,11 +28,12 @@
                 <select
                     class="dark:bg-dark-900 h-9 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none py-2 pl-3 pr-8 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                     :class="isOptionSelected && 'text-gray-500 dark:text-gray-400'" @click="isOptionSelected = true"
-                    @change="perPage = parseInt($event.target.value); currentPage = 1">
+                    x-model="perPage"
+                    @change="currentPage = 1">
                     <option value="5" class="text-gray-500 dark:bg-gray-900 dark:text-gray-400">
                         5
                     </option>
-                    <option value="10" class="text-gray-500 dark:bg-gray-900 dark:text-gray-400" selected>
+                    <option value="10" class="text-gray-500 dark:bg-gray-900 dark:text-gray-400">
                         10
                     </option>
                     <option value="25" class="text-gray-500 dark:bg-gray-900 dark:text-gray-400">
@@ -243,7 +246,7 @@
 </div>
 
 <script>
-    function dataTable(url, initialData = [], instanceId) {
+    function dataTable(url, initialData = [], instanceId, initialPerPage = 10) {
         return {
             instanceId: instanceId,
             url: url,
@@ -251,7 +254,7 @@
             sortColumn: "",
             sortDirection: "asc",
             currentPage: 1,
-            perPage: 10,
+            perPage: initialPerPage,
             data: initialData,
             isLoading: false,
             error: null,

@@ -30,12 +30,20 @@ class FarmerController extends Controller
             ['key' => 'phone', 'label' => 'No. Telepon', 'sortable' => true],
             ['key' => 'address', 'label' => 'Alamat'],
             ['key' => 'current_debt', 'label' => 'Hutang Saat Ini', 'render' => 'currency', 'sortable' => true],
-            ['key' => 'action', 'label' => 'Aksi', 'width' => '170px', 'render' => 'action'],
+            ['key' => 'action', 'label' => 'Aksi', 'render' => 'action'],
         ];
 
         $data = $this->farmerService->getAllFarmers();
 
-        return view('pages.master.farmer.index', compact('data', 'columns'));
+        $ledgerColumns = [
+            ['key' => 'created_at', 'label' => 'Tanggal', 'width' => '120px', 'render' => 'ledgerDate'],
+            ['key' => 'reference_type', 'label' => 'Referensi', 'render' => 'reference'],
+            ['key' => 'type', 'label' => 'Tipe', 'render' => 'typeBadge'],  
+            ['key' => 'amount', 'label' => 'Jumlah', 'render' => 'ledgerAmount'],
+            ['key' => 'balance_after', 'label' => 'Saldo Akhir', 'render' => 'ledgerBalance'],
+        ];
+
+        return view('pages.master.farmer.index', compact('data', 'columns', 'ledgerColumns'));
     }
 
     /**
@@ -76,5 +84,12 @@ class FarmerController extends Controller
         $this->farmerService->deleteFarmer($manajemen_petani);
 
         return $this->successResponse('Petani berhasil dihapus');
+    }
+
+    public function ledgers($id)
+    {
+        $data = $this->farmerService->getFarmerLedgers($id);
+
+        return $this->successResponse('Data mutasi berhasil diambil', $data);
     }
 }

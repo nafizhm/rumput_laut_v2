@@ -61,4 +61,17 @@ class FarmerService
             return $farmer->delete();
         });
     }
+
+    /**
+     * Get farmer transaction mutation (ledgers).
+     */
+    public function getFarmerLedgers(int $farmerId): Collection
+    {
+        $farmer = Farmer::findOrFail($farmerId);
+        
+        return $farmer->ledgers()
+            ->with('reference')
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
 }

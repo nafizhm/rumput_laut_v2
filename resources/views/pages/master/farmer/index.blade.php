@@ -28,6 +28,10 @@
 
         <x-slot:action>
             <div class="flex items-center gap-2">
+                <button type="button" @click="$dispatch('detail-farmer', item)"
+                    class="flex items-center w-full justify-center gap-2 py-2 px-4 text-sm font-medium text-gray-700 bg-gray-100 transition-colors rounded-lg hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700">
+                    Detail
+                </button>
                 <button type="button" @click="$dispatch('edit-farmer', item)"
                     class="flex items-center w-full justify-center gap-2 py-2 px-4 text-sm font-medium text-white transition-colors rounded-lg bg-brand-500 hover:bg-brand-600">
                     Edit
@@ -41,4 +45,5 @@
     </x-data-table>
 
     @include('pages.master.farmer._farmer-modal')
+    @include('pages.master.farmer._farmer-detail-modal')
 @endsection

@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('manajemen-petani', App\Http\Controllers\Master\FarmerController::class);
     Route::get('farmer-data', [App\Http\Controllers\Master\FarmerController::class, 'data'])->name('farmer-data');
+    Route::get('manajemen-petani/{id}/ledgers', [App\Http\Controllers\Master\FarmerController::class, 'ledgers'])->name('farmer.ledgers');
 
     Route::resource('manajemen-pinjaman', App\Http\Controllers\Transaction\LoanController::class);
     Route::get('loan-data', [App\Http\Controllers\Transaction\LoanController::class, 'data'])->name('loan-data');
