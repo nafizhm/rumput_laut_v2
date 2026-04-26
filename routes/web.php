@@ -32,6 +32,12 @@ Route::middleware('auth')->group(function () {
     Route::resource('manajemen-kategori-pengeluaran', App\Http\Controllers\Master\ExpenseCategoryController::class);
     Route::get('expense-category-data', [App\Http\Controllers\Master\ExpenseCategoryController::class, 'data'])->name('expense-category-data');
 
+    Route::resource('manajemen-pabrik', App\Http\Controllers\Master\FactoryController::class);
+    Route::get('factory-data', [App\Http\Controllers\Master\FactoryController::class, 'data'])->name('manajemen-pabrik.data');
+
+    Route::resource('manajemen-inventori', App\Http\Controllers\Master\InventoryController::class);
+    Route::get('inventory-data', [App\Http\Controllers\Master\InventoryController::class, 'data'])->name('manajemen-inventori.data');
+
     Route::resource('manajemen-pinjaman', App\Http\Controllers\Transaction\LoanController::class);
     Route::get('loan-data', [App\Http\Controllers\Transaction\LoanController::class, 'data'])->name('loan-data');
 
@@ -40,6 +46,17 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('manajemen-pengeluaran', App\Http\Controllers\Transaction\ExpenseController::class);
     Route::get('expense-data', [App\Http\Controllers\Transaction\ExpenseController::class, 'data'])->name('expense-data');
+
+    // Warehouse
+    Route::get('manajemen-gudang', [App\Http\Controllers\Transaction\WarehouseController::class, 'index'])->name('manajemen-gudang.index');
+    Route::get('warehouse-data', [App\Http\Controllers\Transaction\WarehouseController::class, 'data'])->name('manajemen-gudang.data');
+    Route::post('manajemen-gudang/receive', [App\Http\Controllers\Transaction\WarehouseController::class, 'receive'])->name('manajemen-gudang.receive');
+    Route::post('manajemen-gudang/shrinkage', [App\Http\Controllers\Transaction\WarehouseController::class, 'shrinkage'])->name('manajemen-gudang.shrinkage');
+    Route::post('manajemen-gudang/adjustment', [App\Http\Controllers\Transaction\WarehouseController::class, 'adjustment'])->name('manajemen-gudang.adjustment');
+
+    // Sales
+    Route::resource('manajemen-penjualan', App\Http\Controllers\Transaction\SalesController::class);
+    Route::get('sales-data', [App\Http\Controllers\Transaction\SalesController::class, 'data'])->name('manajemen-penjualan.data');
 
     Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout'])->name('logout');
 });

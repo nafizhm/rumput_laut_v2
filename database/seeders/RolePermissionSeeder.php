@@ -44,6 +44,16 @@ class RolePermissionSeeder extends Seeder
             'manajemen-kategori-pengeluaran.update',
             'manajemen-kategori-pengeluaran.delete',
 
+            'manajemen-pabrik.read',
+            'manajemen-pabrik.create',
+            'manajemen-pabrik.update',
+            'manajemen-pabrik.delete',
+            
+            'manajemen-inventori.read',
+            'manajemen-inventori.create',
+            'manajemen-inventori.update',
+            'manajemen-inventori.delete',
+
             'manajemen-pinjaman.read',
             'manajemen-pinjaman.create',
             'manajemen-pinjaman.update',
@@ -58,6 +68,16 @@ class RolePermissionSeeder extends Seeder
             'manajemen-pengeluaran.create',
             'manajemen-pengeluaran.update',
             'manajemen-pengeluaran.delete',
+
+            'manajemen-gudang.read',
+            'manajemen-gudang.create',
+            'manajemen-gudang.update',
+            'manajemen-gudang.delete',
+
+            'manajemen-penjualan.read',
+            'manajemen-penjualan.create',
+            'manajemen-penjualan.update',
+            'manajemen-penjualan.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -74,10 +94,46 @@ class RolePermissionSeeder extends Seeder
             'manajemen-petani.create',
             'manajemen-petani.update',
             'manajemen-petani.delete',
+
+            'manajemen-kategori-pengeluaran.read',
+            'manajemen-kategori-pengeluaran.create',
+            'manajemen-kategori-pengeluaran.update',
+            'manajemen-kategori-pengeluaran.delete',
+
+            'manajemen-pabrik.read',
+            'manajemen-pabrik.create',
+            'manajemen-pabrik.update',
+            'manajemen-pabrik.delete',
+
+            'manajemen-inventori.read',
+            'manajemen-inventori.create',
+            'manajemen-inventori.update',
+            'manajemen-inventori.delete',
+
             'manajemen-pinjaman.read',
             'manajemen-pinjaman.create',
             'manajemen-pinjaman.update',
             'manajemen-pinjaman.delete',
+
+            'manajemen-panen.read',
+            'manajemen-panen.create',
+            'manajemen-panen.update',
+            'manajemen-panen.delete',
+
+            'manajemen-pengeluaran.read',
+            'manajemen-pengeluaran.create',
+            'manajemen-pengeluaran.update',
+            'manajemen-pengeluaran.delete',
+
+            'manajemen-gudang.read',
+            'manajemen-gudang.create',
+            'manajemen-gudang.update',
+            'manajemen-gudang.delete',
+
+            'manajemen-penjualan.read',
+            'manajemen-penjualan.create',
+            'manajemen-penjualan.update',
+            'manajemen-penjualan.delete',
         ]);
     }
 }

@@ -123,6 +123,28 @@ class MenuSeeder extends Seeder
             'is_active' => true
         ]);
 
+        Menu::create([
+            'name' => 'Manajemen Pabrik',
+            'icon' => null,
+            'route' => 'manajemen-pabrik.index',
+            'url' => 'manajemen-pabrik',
+            'permission' => 'manajemen-pabrik.read',
+            'parent_id' => $master->id,
+            'order' => 3,
+            'is_active' => true
+        ]);
+
+        Menu::create([
+            'name' => 'Data Inventori',
+            'icon' => null,
+            'route' => 'manajemen-inventori.index',
+            'url' => 'manajemen-inventori',
+            'permission' => 'manajemen-inventori.read',
+            'parent_id' => $master->id,
+            'order' => 4,
+            'is_active' => true
+        ]);
+
         // Transaksi children
         $transaksi = Menu::where('name', 'Transaksi')->first();
         Menu::create([
@@ -155,6 +177,28 @@ class MenuSeeder extends Seeder
             'permission' => 'manajemen-pengeluaran.read',
             'parent_id' => $transaksi->id,
             'order' => 3,
+            'is_active' => true
+        ]);
+
+        Menu::create([
+            'name' => 'Manajemen Gudang',
+            'icon' => null,
+            'route' => 'manajemen-gudang.index',
+            'url' => 'manajemen-gudang',
+            'permission' => 'manajemen-gudang.read',
+            'parent_id' => $transaksi->id,
+            'order' => 4,
+            'is_active' => true
+        ]);
+
+        Menu::create([
+            'name' => 'Manajemen Penjualan',
+            'icon' => null,
+            'route' => 'manajemen-penjualan.index',
+            'url' => 'manajemen-penjualan',
+            'permission' => 'manajemen-penjualan.read',
+            'parent_id' => $transaksi->id,
+            'order' => 5,
             'is_active' => true
         ]);
     }
