@@ -12,9 +12,9 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [App\Http\Controllers\TestingController::class, 'dashboard'])->name('dashboard');
-    Route::get('/data-table', [App\Http\Controllers\TestingController::class, 'dataTable'])->name('data-table.index');
-    Route::get('/form', [App\Http\Controllers\TestingController::class, 'form'])->name('form.index');
+    Route::get('/dashboard', function () {
+        return view('dashboard');
+    })->name('dashboard');
 
     Route::resource('manajemen-menu', App\Http\Controllers\Setting\MenuController::class);
     Route::get('menu-data', [App\Http\Controllers\Setting\MenuController::class, 'data'])->name('menu-data');
@@ -27,6 +27,9 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('manajemen-petani', App\Http\Controllers\Master\FarmerController::class);
     Route::get('farmer-data', [App\Http\Controllers\Master\FarmerController::class, 'data'])->name('farmer-data');
+
+    Route::resource('manajemen-pinjaman', App\Http\Controllers\Transaction\LoanController::class);
+    Route::get('loan-data', [App\Http\Controllers\Transaction\LoanController::class, 'data'])->name('loan-data');
 
     Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout'])->name('logout');
 });

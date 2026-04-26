@@ -33,6 +33,16 @@ class RolePermissionSeeder extends Seeder
             'role.create',
             'role.update',
             'role.delete',
+
+            'farmer-data.read',
+            'farmer-data.create',
+            'farmer-data.update',
+            'farmer-data.delete',
+
+            'manajemen-pinjaman.read',
+            'manajemen-pinjaman.create',
+            'manajemen-pinjaman.update',
+            'manajemen-pinjaman.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -43,6 +53,16 @@ class RolePermissionSeeder extends Seeder
         $superAdmin->givePermissionTo(Permission::all());
 
         $admin = Role::create(['name' => 'admin']);
-        $admin->givePermissionTo(['dashboard.read']);
+        $admin->givePermissionTo([
+            'dashboard.read',
+            'farmer-data.read',
+            'farmer-data.create',
+            'farmer-data.update',
+            'farmer-data.delete',
+            'manajemen-pinjaman.read',
+            'manajemen-pinjaman.create',
+            'manajemen-pinjaman.update',
+            'manajemen-pinjaman.delete',
+        ]);
     }
 }

@@ -23,7 +23,6 @@ class StoreFarmerRequest extends FormRequest
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string',
-            'current_debt' => 'nullable|numeric|min:0',
         ];
     }
 }

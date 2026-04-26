@@ -13,9 +13,6 @@
 
                 <x-input label="Alamat" name="address" placeholder="Contoh: Jl. Tani No. 1" x-model="form.data.address"
                     alpine-error="form.getError('address')" />
-
-                <x-input label="Hutang Saat Ini" name="current_debt" type="number" placeholder="Contoh: 100000" x-model="form.data.current_debt" :isCurrency="true"
-                    alpine-error="form.getError('current_debt')" />
             </div>
 
             <div class="flex justify-end gap-3 mt-6">
@@ -48,8 +45,7 @@
                 form: useForm({
                     name: '',
                     phone: '',
-                    address: '',
-                    current_debt: 0
+                    address: ''
                 }),
 
                 init() {
@@ -79,8 +75,7 @@
                     this.form.data = {
                         name: item.name || '',
                         phone: item.phone || '',
-                        address: item.address || '',
-                        current_debt: item.current_debt || 0
+                        address: item.address || ''
                     };
 
                     this.form.clearErrors();

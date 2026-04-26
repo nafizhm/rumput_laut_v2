@@ -4,7 +4,8 @@ namespace App\Services\Master;
 
 use App\Models\Farmer;
 use App\Traits\HandlesTransaction;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 
 class FarmerService
 {
@@ -13,9 +14,22 @@ class FarmerService
     /**
      * Get all farmers ordered by name.
      */
-    public function getAllFarmers(): Collection
+    public function getAllFarmers(): EloquentCollection
     {
         return Farmer::orderBy('name', 'asc')->get();
+    }
+
+    /**
+     * Get farmers for select options.
+     */
+    public function getFarmerOptions(): Collection
+    {
+        return Farmer::orderBy('name', 'asc')
+            ->get(['id', 'name'])
+            ->map(fn($farmer) => [
+                'label' => $farmer->name,
+                'value' => $farmer->id,
+            ]);
     }
 
     /**

@@ -30,7 +30,11 @@ class MenuService
      */
     public function createMenu(array $data): Menu
     {
-        $data['permission'] = strtolower(str_replace(' ', '-', trim($data['name']))) . '.read';
+        if (empty($data['parent_id']) && empty($data['route'])) {
+            $data['permission'] = null;
+        } else {
+            $data['permission'] = strtolower(str_replace([' ', '/'], '-', trim($data['name']))) . '.read';
+        }
 
         return Menu::create($data);
     }
