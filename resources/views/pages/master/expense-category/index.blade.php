@@ -29,14 +29,20 @@
             </button>
         </x-slot:headerAction>
 
-        <x-slot:statusBadge>
+        <x-slot:status>
             <template x-if="item.is_active">
-                <span class="bg-green-50 text-green-700 ring-1 ring-green-600/20 inline-flex items-center rounded-md px-2 py-1 text-xs font-medium">Aktif</span>
+                <span
+                    class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
+                    Aktif
+                </span>
             </template>
             <template x-if="!item.is_active">
-                <span class="bg-red-50 text-red-700 ring-1 ring-red-600/20 inline-flex items-center rounded-md px-2 py-1 text-xs font-medium">Non-Aktif</span>
+                <span
+                    class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20">
+                    Non-Aktif
+                </span>
             </template>
-        </x-slot:statusBadge>
+        </x-slot:status>
 
         <x-slot:action>
             <div class="flex items-center gap-2">

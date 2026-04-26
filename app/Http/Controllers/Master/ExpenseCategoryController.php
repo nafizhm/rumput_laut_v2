@@ -20,7 +20,7 @@ class ExpenseCategoryController extends Controller
     {
         $columns = [
             ['key' => 'name', 'label' => 'Nama Kategori', 'sortable' => true],
-            ['key' => 'is_active', 'label' => 'Status', 'render' => 'statusBadge'],
+            ['key' => 'is_active', 'label' => 'Status', 'render' => 'status'],
             ['key' => 'action', 'label' => 'Aksi', 'width' => '170px', 'render' => 'action'],
         ];
 
