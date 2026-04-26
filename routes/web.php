@@ -12,9 +12,9 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', function () {
-        return view('pages.dashboard.index');
-    })->name('dashboard');
+    Route::get('/', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/stats', [App\Http\Controllers\DashboardController::class, 'stats'])->name('dashboard.stats');
+    Route::get('/dashboard/chart-data', [App\Http\Controllers\DashboardController::class, 'chartData'])->name('dashboard.chart-data');
 
     Route::resource('manajemen-menu', App\Http\Controllers\Setting\MenuController::class);
     Route::get('menu-data', [App\Http\Controllers\Setting\MenuController::class, 'data'])->name('menu-data');
