@@ -15,27 +15,37 @@
                 </div>
 
                 <x-input label="Lokasi" name="location" placeholder="Contoh: Sawah Blok A" x-model="form.data.location"
-                    alpine-error="form.getError('location')" required />
+                    alpine-error="form.getError('location')" />
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <x-input label="Berat (Kg)" name="wet_weight_kg" type="number" placeholder="0" x-model="form.data.wet_weight_kg"
-                        alpine-error="form.getError('wet_weight_kg')" required />
-
-                    <x-input label="Harga / Kg" name="price_per_kg" placeholder="0" x-model="form.data.price_per_kg" :isCurrency="true"
-                        alpine-error="form.getError('price_per_kg')" required />
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <x-input label="Total Berat (Kg)" name="gross_weight_kg" type="number" step="0.01" placeholder="0" x-model="form.data.gross_weight_kg"
+                        alpine-error="form.getError('gross_weight_kg')" required />
 
                     <x-input label="Jumlah Karung" name="sack_count" type="number" placeholder="0" x-model="form.data.sack_count"
                         alpine-error="form.getError('sack_count')" required />
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <x-input label="Total Nilai Panen" name="total_harvest_value" x-model="form.data.total_harvest_value" :isCurrency="true" disabled />
-                    
-                    <x-input label="Bayar Tunai (Cash Payout)" name="cash_payout" placeholder="0" x-model="form.data.cash_payout" :isCurrency="true"
-                        alpine-error="form.getError('cash_payout')" />
+                    <x-input label="Potongan / Karung (Kg)" name="sack_deduction_kg" type="number" step="0.01" placeholder="0" x-model="form.data.sack_deduction_kg"
+                        alpine-error="form.getError('sack_deduction_kg')" required />
+
+                    <x-input label="Berat Bersih Bayar (Kg)" name="net_weight_kg" type="number" step="0.01" x-model="form.data.net_weight_kg"
+                        alpine-error="form.getError('net_weight_kg')" readonly disabled />
                 </div>
 
-                <x-input label="Potong Hutang (Otomatis)" name="debt_deduction" x-model="form.data.debt_deduction" :isCurrency="true" disabled />
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <x-input label="Harga / Kg" name="price_per_kg" placeholder="0" x-model="form.data.price_per_kg" :isCurrency="true"
+                        alpine-error="form.getError('price_per_kg')" required />
+
+                    <x-input label="Total Nilai Panen" name="total_harvest_value" x-model="form.data.total_harvest_value" :isCurrency="true" readonly disabled />
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <x-input label="Bayar Tunai (Cash Payout)" name="cash_payout" placeholder="0" x-model="form.data.cash_payout" :isCurrency="true"
+                        alpine-error="form.getError('cash_payout')" />
+
+                    <x-input label="Potong Hutang (Otomatis)" name="debt_deduction" x-model="form.data.debt_deduction" :isCurrency="true" readonly disabled />
+                </div>
             </div>
 
             <div class="flex justify-end gap-3 mt-6">
@@ -69,16 +79,29 @@
                     farmer_id: '',
                     harvest_date: new Date().toISOString().split('T')[0],
                     location: '',
-                    wet_weight_kg: 0,
-                    price_per_kg: 0,
+                    gross_weight_kg: 0,
                     sack_count: 0,
-                    cash_payout: 0,
+                    sack_deduction_kg: 0,
+                    net_weight_kg: 0,
+                    price_per_kg: 0,
                     total_harvest_value: 0,
+                    cash_payout: 0,
                     debt_deduction: 0,
                 }),
 
+                get totalDeduction() {
+                    const sacks = parseInt(this.form.data.sack_count) || 0;
+                    const deductionPerSack = parseFloat(this.form.data.sack_deduction_kg) || 0;
+                    return sacks * deductionPerSack;
+                },
+
+                get netWeight() {
+                    const gross = parseFloat(this.form.data.gross_weight_kg) || 0;
+                    return gross - this.totalDeduction;
+                },
+
                 get totalHarvestValue() {
-                    const weight = parseFloat(this.form.data.wet_weight_kg) || 0;
+                    const weight = this.netWeight;
                     const price = parseFloat(this.form.data.price_per_kg) || 0;
                     return weight * price;
                 },
@@ -90,6 +113,7 @@
                 },
 
                 init() {
+                    this.$watch('netWeight', (val) => this.form.data.net_weight_kg = val.toFixed(2));
                     this.$watch('totalHarvestValue', (val) => this.form.data.total_harvest_value = val);
                     this.$watch('debtDeduction', (val) => this.form.data.debt_deduction = val);
 
@@ -129,11 +153,13 @@
                         farmer_id: item.farmer_id || '',
                         harvest_date: item.harvest_date ? item.harvest_date.split('T')[0] : '',
                         location: item.location || '',
-                        wet_weight_kg: item.wet_weight_kg || 0,
-                        price_per_kg: item.price_per_kg || 0,
+                        gross_weight_kg: item.gross_weight_kg || 0,
                         sack_count: item.sack_count || 0,
-                        cash_payout: item.cash_payout || 0,
+                        sack_deduction_kg: item.sack_deduction_kg || 0,
+                        net_weight_kg: item.net_weight_kg || 0,
+                        price_per_kg: item.price_per_kg || 0,
                         total_harvest_value: item.total_harvest_value || 0,
+                        cash_payout: item.cash_payout || 0,
                         debt_deduction: item.debt_deduction || 0,
                     };
 

@@ -25,7 +25,7 @@ class HarvestTransactionController extends Controller
             ['key' => 'batch_code', 'label' => 'Kode Batch', 'sortable' => true],
             ['key' => 'harvest_date', 'label' => 'Tanggal Panen', 'render' => 'longDate', 'sortable' => true],
             ['key' => 'farmer.name', 'label' => 'Petani', 'sortable' => true],
-            ['key' => 'wet_weight_kg', 'label' => 'Berat (Kg)', 'sortable' => true],
+            ['key' => 'net_weight_kg', 'label' => 'Berat Bersih (Kg)', 'sortable' => true],
             ['key' => 'total_harvest_value', 'label' => 'Total Nilai', 'render' => 'total_harvest_value', 'sortable' => true],
             ['key' => 'debt_deduction', 'label' => 'Potong Hutang', 'render' => 'debt_deduction', 'sortable' => true],
             ['key' => 'action', 'label' => 'Aksi', 'width' => '170px', 'render' => 'action'],

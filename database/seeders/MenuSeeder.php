@@ -25,8 +25,8 @@ class MenuSeeder extends Seeder
                 'is_active' => true
             ],
             [
-                'name' => 'Setting',
-                'icon' => 'settings',
+                'name' => 'Transaksi',
+                'icon' => 'circle-dollar-sign',
                 'route' => null,
                 'url' => null,
                 'permission' => null,
@@ -36,7 +36,7 @@ class MenuSeeder extends Seeder
             ],
             [
                 'name' => 'Master',
-                'icon' => 'users-round',
+                'icon' => 'database',
                 'route' => null,
                 'url' => null,
                 'permission' => null,
@@ -45,8 +45,8 @@ class MenuSeeder extends Seeder
                 'is_active' => true
             ],
             [
-                'name' => 'Transaksi',
-                'icon' => 'circle-dollar-sign',
+                'name' => 'Setting',
+                'icon' => 'settings',
                 'route' => null,
                 'url' => null,
                 'permission' => null,
@@ -65,7 +65,7 @@ class MenuSeeder extends Seeder
         $childMenus = [
             [
                 'name' => 'Manajemen Menu',
-                'icon' => 'menu',
+                'icon' => null,
                 'route' => 'manajemen-menu.index',
                 'url' => 'manajemen-menu',
                 'permission' => 'menu.read',
@@ -75,7 +75,7 @@ class MenuSeeder extends Seeder
             ],
             [
                 'name' => 'Manajemen Permission',
-                'icon' => 'key',
+                'icon' => null,
                 'route' => 'manajemen-permission.index',
                 'url' => 'manajemen-permission',
                 'permission' => 'permission.read',
@@ -85,7 +85,7 @@ class MenuSeeder extends Seeder
             ],
             [
                 'name' => 'Manajemen Role',
-                'icon' => 'users',
+                'icon' => null,
                 'route' => 'manajemen-role.index',
                 'url' => 'manajemen-role',
                 'permission' => 'role.read',
@@ -106,9 +106,20 @@ class MenuSeeder extends Seeder
             'icon' => 'user-square',
             'route' => 'manajemen-petani.index',
             'url' => 'manajemen-petani',
-            'permission' => 'farmer-data.read',
+            'permission' => 'manajemen-petani.read',
             'parent_id' => $master->id,
             'order' => 1,
+            'is_active' => true
+        ]);
+
+        Menu::create([
+            'name' => 'Data Kategori Pengeluaran',
+            'icon' => null,
+            'route' => 'manajemen-kategori-pengeluaran.index',
+            'url' => 'manajemen-kategori-pengeluaran',
+            'permission' => 'manajemen-kategori-pengeluaran.read',
+            'parent_id' => $master->id,
+            'order' => 2,
             'is_active' => true
         ]);
 
@@ -116,12 +127,34 @@ class MenuSeeder extends Seeder
         $transaksi = Menu::where('name', 'Transaksi')->first();
         Menu::create([
             'name' => 'Manajemen Pinjaman',
-            'icon' => 'hand-coins',
+            'icon' => null,
             'route' => 'manajemen-pinjaman.index',
             'url' => 'manajemen-pinjaman',
             'permission' => 'manajemen-pinjaman.read',
             'parent_id' => $transaksi->id,
             'order' => 1,
+            'is_active' => true
+        ]);
+
+        Menu::create([
+            'name' => 'Manajemen Panen',
+            'icon' => null,
+            'route' => 'manajemen-panen.index',
+            'url' => 'manajemen-panen',
+            'permission' => 'manajemen-panen.read',
+            'parent_id' => $transaksi->id,
+            'order' => 2,
+            'is_active' => true
+        ]);
+
+        Menu::create([
+            'name' => 'Manajemen Pengeluaran',
+            'icon' => null,
+            'route' => 'manajemen-pengeluaran.index',
+            'url' => 'manajemen-pengeluaran',
+            'permission' => 'manajemen-pengeluaran.read',
+            'parent_id' => $transaksi->id,
+            'order' => 3,
             'is_active' => true
         ]);
     }
