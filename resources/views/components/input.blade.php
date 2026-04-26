@@ -38,14 +38,18 @@
             $hasSsrError ||
             $alpineError,
     ]) @if ($type === 'password') x-data="{ showPassword: false }" @endif
-        @if ($isCurrency) x-data="{ 
-                formatValue(val) {
-                    if (!val) return '';
-                    let number = val.toString().replace(/[^0-9]/g, '');
-                    if (!number) return '';
-                    return new Intl.NumberFormat('id-ID').format(number);
+        @if ($isCurrency) 
+            x-data="{ 
+                internalValue: '',
+                get formattedValue() {
+                    return this.internalValue ? new Intl.NumberFormat('id-ID').format(this.internalValue) : '';
                 }
-            }" @endif>
+            }" 
+            @if($attributes->has('x-model')) 
+                x-modelable="internalValue" 
+                {{ $attributes->only('x-model') }}
+            @endif
+        @endif>
 
         @if ($prefix)
             <span
@@ -60,6 +64,7 @@
                 'id' => $id,
                 'name' => $name,
                 'placeholder' => $placeholder,
+                'inputmode' => $isCurrency ? 'numeric' : null,
                 'class' =>
                     'dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:outline-hidden dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ' .
                     ($hasSsrError
@@ -67,13 +72,16 @@
                         : 'border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:border-gray-700 dark:focus:border-brand-800 dark:focus:ring-brand-500/5') .
                     ($prefix ? ' pl-16' : '') .
                     ($suffix || $type === 'password' || in_array($type, ['date', 'time']) || $hasSsrError ? ' pr-11' : ''),
-            ]) }}
+            ])->except($isCurrency && $attributes->has('x-model') ? ['x-model'] : []) }}
             @if ($alpineError) :class="{
                 'border-error-300! focus:border-error-300! dark:border-error-700! dark:focus:border-error-800! pr-11!': {!! $alpineError !!}
             }" @endif
             @if ($type === 'password') :type="showPassword ? 'text' : 'password'" @endif
             @if ($type === 'time') onclick="this.showPicker()" @endif
-            @if ($isCurrency) x-on:input="$el.value = formatValue($el.value)" @endif>
+            @if ($isCurrency) 
+                :value="formattedValue"
+                x-on:input="internalValue = $event.target.value.replace(/[^0-9]/g, '')"
+            @endif>
 
         @if ($type === 'password')
             <span @click="showPassword = !showPassword"

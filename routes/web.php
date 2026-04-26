@@ -25,6 +25,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('manajemen-role', App\Http\Controllers\Setting\RoleController::class);
     Route::get('role-data', [App\Http\Controllers\Setting\RoleController::class, 'data'])->name('role-data');
 
+    Route::resource('manajemen-petani', App\Http\Controllers\Master\FarmerController::class);
+    Route::get('farmer-data', [App\Http\Controllers\Master\FarmerController::class, 'data'])->name('farmer-data');
+
     Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout'])->name('logout');
 });
 
