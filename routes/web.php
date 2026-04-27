@@ -58,6 +58,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('manajemen-penjualan', App\Http\Controllers\Transaction\SalesController::class);
     Route::get('sales-data', [App\Http\Controllers\Transaction\SalesController::class, 'data'])->name('manajemen-penjualan.data');
 
+    // Cash Flow
+    Route::get('laporan-arus-kas', [App\Http\Controllers\CashFlow\CashFlowController::class, 'index'])->name('cash-flow.index');
+    Route::get('laporan-arus-kas/data', [App\Http\Controllers\CashFlow\CashFlowController::class, 'data'])->name('cash-flow.data');
+
     Route::post('/logout', [App\Http\Controllers\Auth\AuthController::class, 'logout'])->name('logout');
 });
 

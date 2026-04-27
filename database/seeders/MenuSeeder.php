@@ -35,13 +35,23 @@ class MenuSeeder extends Seeder
                 'is_active' => true
             ],
             [
+                'name' => 'Laporan Arus Kas',
+                'icon' => 'file-text',
+                'route' => 'cash-flow.index',
+                'url' => 'laporan-arus-kas',
+                'permission' => 'cash-flow.read',
+                'parent_id' => null,
+                'order' => 4,
+                'is_active' => true
+            ],
+            [
                 'name' => 'Master',
                 'icon' => 'database',
                 'route' => null,
                 'url' => null,
                 'permission' => null,
                 'parent_id' => null,
-                'order' => 3,
+                'order' => 4,
                 'is_active' => true
             ],
             [
@@ -51,7 +61,7 @@ class MenuSeeder extends Seeder
                 'url' => null,
                 'permission' => null,
                 'parent_id' => null,
-                'order' => 4,
+                'order' => 5,
                 'is_active' => true
             ]
         ];
@@ -124,7 +134,7 @@ class MenuSeeder extends Seeder
         ]);
 
         Menu::create([
-            'name' => 'Manajemen Pabrik',
+            'name' => 'Data Pabrik',
             'icon' => null,
             'route' => 'manajemen-pabrik.index',
             'url' => 'manajemen-pabrik',

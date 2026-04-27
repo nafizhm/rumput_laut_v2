@@ -78,6 +78,8 @@ class RolePermissionSeeder extends Seeder
             'manajemen-penjualan.create',
             'manajemen-penjualan.update',
             'manajemen-penjualan.delete',
+
+            'cash-flow.read',
         ];
 
         foreach ($permissions as $permission) {
@@ -134,6 +136,8 @@ class RolePermissionSeeder extends Seeder
             'manajemen-penjualan.create',
             'manajemen-penjualan.update',
             'manajemen-penjualan.delete',
+
+            'cash-flow.read',
         ]);
     }
 }
