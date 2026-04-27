@@ -74,11 +74,12 @@
 
             <x-slot:typeBadge>
                 <span
-                    :class="item.type === 'Cash In' ? 'bg-green-50 text-green-700 ring-1 ring-green-600/20' :
-                        'bg-red-50 text-red-700 ring-1 ring-red-600/20'"
+                    :class="item.type === 'Cash In' ?
+                        'inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20' :
+                        'inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20'"
                     class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium" x-text="item.type"></span>
             </x-slot:typeBadge>
-
+            `
             <x-slot:action>
                 <div class="flex items-center gap-2">
                     <button type="button" @click="$dispatch('set-cash-flow-detail', item)"
