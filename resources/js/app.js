@@ -2,6 +2,7 @@ import "./bootstrap";
 
 import Alpine from "alpinejs";
 import persist from "@alpinejs/persist";
+import collapse from "@alpinejs/collapse";
 
 import { createIcons, icons } from "lucide";
 import { useForm } from "./lib/form";
@@ -9,6 +10,7 @@ import { useForm } from "./lib/form";
 window.useForm = useForm;
 
 Alpine.plugin(persist);
+Alpine.plugin(collapse);
 
 document.addEventListener("DOMContentLoaded", () => {
     createIcons({
