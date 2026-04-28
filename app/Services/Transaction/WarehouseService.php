@@ -39,7 +39,7 @@ class WarehouseService
 
             $actualWeight = $data['actual_weight_kg'];
             $actualSacks = $data['actual_sacks'];
-            $discrepancy = $harvest->net_weight_kg - $actualWeight;
+            $discrepancy = $harvest->warehouse_weight - $actualWeight;
 
             $inventory->current_stock_kg += $actualWeight;
             $inventory->current_sack_count += $actualSacks;
@@ -52,7 +52,7 @@ class WarehouseService
                 'direction' => 'in',
                 'type' => 'in',
                 'weight_kg' => $actualWeight,
-                'note_weight_kg' => $harvest->net_weight_kg,
+                'note_weight_kg' => $harvest->warehouse_weight,
                 'discrepancy_kg' => $discrepancy,
                 'sack_count' => $actualSacks,
                 'balance_after_kg' => $inventory->current_stock_kg,

@@ -26,6 +26,14 @@
             <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="item.harvest_date ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date(item.harvest_date)) : '-'"></span>
         </x-slot:longDate>
 
+        <x-slot:warehouse_weight>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="Number(item.warehouse_weight).toFixed(2) + ' Kg'"></span>
+        </x-slot:warehouse_weight>
+
+        <x-slot:total_weight>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="Number(item.total_weight).toFixed(2) + ' Kg'"></span>
+        </x-slot:total_weight>
+
         <x-slot:total_harvest_value>
             <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="'Rp ' + Number(item.total_harvest_value).toLocaleString('id-ID')"></span>
         </x-slot:total_harvest_value>

@@ -17,10 +17,10 @@ class UpdateHarvestTransactionRequest extends FormRequest
             'farmer_id' => 'required|exists:farmers,id',
             'harvest_date' => 'required|date',
             'location' => 'required|string|max:255',
-            'gross_weight_kg' => 'required|numeric|min:0',
+            'total_weight' => 'required|numeric|min:0',
             'sack_count' => 'required|integer|min:0',
-            'sack_deduction_kg' => 'required|numeric|min:0',
-            'net_weight_kg' => 'required|numeric|min:0',
+            'extra_per_sack' => 'required|numeric|min:0',
+            'warehouse_weight' => 'required|numeric|min:0',
             'price_per_kg' => 'required|numeric|min:0',
             'cash_payout' => 'required|numeric|min:0',
         ];
@@ -29,9 +29,15 @@ class UpdateHarvestTransactionRequest extends FormRequest
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
-            $totalValue = $this->net_weight_kg * $this->price_per_kg;
-            if ($this->cash_payout > $totalValue) {
-                $validator->errors()->add('cash_payout', 'Pembayaran tunai tidak boleh melebihi total nilai panen.');
+            $totalWeight = $this->input('total_weight');
+            $price = $this->input('price_per_kg');
+            $cash = $this->input('cash_payout');
+
+            if (is_numeric($totalWeight) && is_numeric($price)) {
+                $totalValue = $totalWeight * $price;
+                if (is_numeric($cash) && $cash > $totalValue) {
+                    $validator->errors()->add('cash_payout', 'Pembayaran tunai tidak boleh melebihi total nilai panen.');
+                }
             }
         });
     }

@@ -43,8 +43,8 @@ class WarehouseController extends Controller
             ->get()
             ->map(fn($h) => [
                 'value' => $h->id,
-                'label' => $h->batch_code . ' (' . $h->farmer->name . ' - ' . $h->net_weight_kg . ' Kg)',
-                'net_weight' => $h->net_weight_kg,
+                'label' => $h->batch_code . ' (' . $h->farmer->name . ' - ' . $h->warehouse_weight . ' Kg)',
+                'net_weight' => $h->warehouse_weight,
                 'sack_count' => $h->sack_count
             ]);
 

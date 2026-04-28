@@ -31,8 +31,8 @@ class HarvestTransactionService
             $data['batch_code'] = $this->generateBatchCode();
             
             // Recalculate server-side to be safe
-            $data['net_weight_kg'] = $data['gross_weight_kg'] - ($data['sack_count'] * $data['sack_deduction_kg']);
-            $data['total_harvest_value'] = $data['net_weight_kg'] * $data['price_per_kg'];
+            $data['warehouse_weight'] = $data['total_weight'] + ($data['sack_count'] * $data['extra_per_sack']);
+            $data['total_harvest_value'] = $data['total_weight'] * $data['price_per_kg'];
             $data['debt_deduction'] = $data['total_harvest_value'] - $data['cash_payout'];
             
             $harvest = HarvestTransaction::create($data);
@@ -63,8 +63,8 @@ class HarvestTransactionService
             $oldDeduction = $harvest->debt_deduction;
             
             // Recalculate server-side
-            $data['net_weight_kg'] = $data['gross_weight_kg'] - ($data['sack_count'] * $data['sack_deduction_kg']);
-            $data['total_harvest_value'] = $data['net_weight_kg'] * $data['price_per_kg'];
+            $data['warehouse_weight'] = $data['total_weight'] + ($data['sack_count'] * $data['extra_per_sack']);
+            $data['total_harvest_value'] = $data['total_weight'] * $data['price_per_kg'];
             $data['debt_deduction'] = $data['total_harvest_value'] - $data['cash_payout'];
             
             $newDeduction = $data['debt_deduction'];

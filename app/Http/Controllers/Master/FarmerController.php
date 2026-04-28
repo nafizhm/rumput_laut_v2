@@ -67,6 +67,16 @@ class FarmerController extends Controller
     }
 
     /**
+     * Display the specified resource.
+     */
+    public function show($id)
+    {
+        $farmer = Farmer::findOrFail($id);
+
+        return $this->successResponse('Data petani berhasil diambil', $farmer);
+    }
+
+    /**
      * Update the specified resource in storage.
      */
     public function update(UpdateFarmerRequest $request, Farmer $manajemen_petani)

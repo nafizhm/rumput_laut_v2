@@ -17,10 +17,10 @@ return new class extends Migration
             $table->string('batch_code')->unique();
             $table->date('harvest_date');
             $table->string('location')->nullable();
-            $table->decimal('gross_weight_kg', 12, 2);
+            $table->decimal('total_weight', 12, 2);
             $table->integer('sack_count');
-            $table->decimal('sack_deduction_kg', 12, 2);
-            $table->decimal('net_weight_kg', 12, 2);
+            $table->decimal('extra_per_sack', 12, 2);
+            $table->decimal('warehouse_weight', 12, 2);
             $table->bigInteger('price_per_kg');
             $table->bigInteger('total_harvest_value');
             $table->bigInteger('cash_payout')->default(0);
