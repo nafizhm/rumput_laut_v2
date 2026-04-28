@@ -30,36 +30,21 @@ class WarehouseService
     public function receive(array $data): StockMovement
     {
         return $this->transaction(function () use ($data) {
-            $movementDate = $data['movement_date'];
-            
-            // Get all pending harvests for this date
-            $harvests = HarvestTransaction::whereDate('harvest_date', $movementDate)
-                ->where('is_received', false)
-                ->get();
-
-            if ($harvests->isEmpty()) {
-                throw new Exception('Tidak ada transaksi panen yang belum diterima pada tanggal ini.');
-            }
-
             $inventory = Inventory::lockForUpdate()->findOrFail($data['inventory_id']);
 
             $actualWeight = $data['actual_weight_kg'];
             $actualSacks = $data['actual_sacks'];
-            $noteWeight = $data['note_weight_kg'];
+            $noteWeight = $data['note_weight_kg'] ?? $actualWeight;
             $discrepancy = $noteWeight - $actualWeight;
 
             $inventory->current_stock_kg += $actualWeight;
             $inventory->current_sack_count += $actualSacks;
             $inventory->save();
 
-            // Mark all transactions as received
-            HarvestTransaction::whereDate('harvest_date', $movementDate)
-                ->where('is_received', false)
-                ->update(['is_received' => true]);
-
             return StockMovement::create([
                 'inventory_id' => $inventory->id,
-                'movement_date' => $movementDate,
+                'harvest_transaction_id' => null,
+                'movement_date' => $data['movement_date'],
                 'direction' => 'in',
                 'type' => 'in',
                 'weight_kg' => $actualWeight,
@@ -67,7 +52,7 @@ class WarehouseService
                 'discrepancy_kg' => $discrepancy,
                 'sack_count' => $actualSacks,
                 'balance_after_kg' => $inventory->current_stock_kg,
-                'description' => 'Penerimaan kolektif tanggal ' . $movementDate
+                'description' => $data['description'] ?? 'Penerimaan stok manual'
             ]);
         });
     }

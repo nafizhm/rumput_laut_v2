@@ -49,7 +49,6 @@ Route::middleware('auth')->group(function () {
 
     // Warehouse
     Route::get('manajemen-gudang', [App\Http\Controllers\Transaction\WarehouseController::class, 'index'])->name('manajemen-gudang.index');
-    Route::get('manajemen-gudang/summary-by-date', [App\Http\Controllers\Transaction\WarehouseController::class, 'summaryByDate'])->name('manajemen-gudang.summary-by-date');
     Route::get('warehouse-data', [App\Http\Controllers\Transaction\WarehouseController::class, 'data'])->name('manajemen-gudang.data');
     Route::post('manajemen-gudang/receive', [App\Http\Controllers\Transaction\WarehouseController::class, 'receive'])->name('manajemen-gudang.receive');
     Route::post('manajemen-gudang/shrinkage', [App\Http\Controllers\Transaction\WarehouseController::class, 'shrinkage'])->name('manajemen-gudang.shrinkage');

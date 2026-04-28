@@ -12,6 +12,15 @@
                     x-on:change="$dispatch('update-sales-field', { field: 'inventory_id', value: $event.detail })"
                     alpine-error="form.getError('inventory_id')" required />
 
+                <div x-show="selectedInventory" class="mt-2 flex items-center gap-2" x-cloak>
+                    <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                        Stok Saat Ini: <span x-text="selectedInventory ? selectedInventory.current_stock : 0" class="ml-1 font-bold"></span> Kg
+                    </span>
+                    <span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                        <span x-text="selectedInventory ? selectedInventory.current_sacks : 0" class="mr-1 font-bold"></span> Karung
+                    </span>
+                </div>
+
                 <x-input label="Tanggal Penjualan" name="sale_date" type="date" x-model="form.data.sale_date"
                     alpine-error="form.getError('sale_date')" required />
 
@@ -44,6 +53,8 @@
 <script>
 function salesFormComponent() {
     return {
+        inventories: @json($inventories),
+
         form: useForm({
             factory_id: '',
             inventory_id: '',
@@ -55,6 +66,10 @@ function salesFormComponent() {
 
         get totalSaleValue() {
             return (parseFloat(this.form.data.sold_weight_kg) || 0) * (parseFloat(this.form.data.price_per_kg) || 0);
+        },
+
+        get selectedInventory() {
+            return this.inventories.find(i => i.value == this.form.data.inventory_id);
         },
 
         init() {

@@ -12,8 +12,8 @@ class ReceiveStockRequest extends FormRequest
         return [
             'inventory_id' => 'required|exists:inventories,id',
             'movement_date' => 'required|date',
-            'note_weight_kg' => 'required|numeric|min:0',
-            'note_sacks' => 'required|integer|min:0',
+            'note_weight_kg' => 'nullable|numeric|min:0',
+            'note_sacks' => 'nullable|integer|min:0',
             'actual_weight_kg' => 'required|numeric|min:0',
             'actual_sacks' => 'required|integer|min:0',
         ];

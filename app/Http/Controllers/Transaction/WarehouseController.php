@@ -35,27 +35,8 @@ class WarehouseController extends Controller
 
         $data = $this->service->getAllMovements();
         $inventories = Inventory::orderBy('item_name')->get()->map(fn($i) => ['value' => $i->id, 'label' => $i->item_name]);
-
+        
         return view('pages.transaction.warehouse.index', compact('data', 'columns', 'inventories'));
-    }
-
-    public function summaryByDate(Request $request)
-    {
-        $date = $request->date;
-        if (!$date) {
-            return $this->errorResponse('Tanggal harus diisi', 422);
-        }
-
-        $summary = HarvestTransaction::whereDate('harvest_date', $date)
-            ->where('is_received', false)
-            ->selectRaw('SUM(warehouse_weight) as total_weight, SUM(sack_count) as total_sacks, COUNT(*) as transaction_count')
-            ->first();
-
-        return $this->successResponse('Summary panen berhasil diambil', [
-            'total_weight' => (float) ($summary->total_weight ?? 0),
-            'total_sacks' => (int) ($summary->total_sacks ?? 0),
-            'transaction_count' => (int) ($summary->transaction_count ?? 0)
-        ]);
     }
 
     public function data()

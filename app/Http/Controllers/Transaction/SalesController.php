@@ -32,7 +32,12 @@ class SalesController extends Controller
 
         $data = $this->service->getAllSales();
         $factories = Factory::orderBy('name')->get()->map(fn($f) => ['value' => $f->id, 'label' => $f->name]);
-        $inventories = Inventory::orderBy('item_name')->get()->map(fn($i) => ['value' => $i->id, 'label' => $i->item_name]);
+        $inventories = Inventory::orderBy('item_name')->get()->map(fn($i) => [
+            'value' => $i->id, 
+            'label' => $i->item_name,
+            'current_stock' => (float) $i->current_stock_kg,
+            'current_sacks' => (int) $i->current_sack_count
+        ]);
 
         return view('pages.transaction.sales.index', compact('data', 'columns', 'factories', 'inventories'));
     }

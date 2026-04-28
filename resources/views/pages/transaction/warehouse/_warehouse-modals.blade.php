@@ -1,41 +1,29 @@
 <div x-data="warehouseModals()">
     <!-- Modal Terima Stok -->
     <x-modal name="receive-modal">
-        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Terima Stok dari Panen</h4>
+        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Terima Stok Gudang</h4>
         <form @submit.prevent="submitReceive">
             <div class="space-y-4">
                 <x-select label="Gudang / Barang" name="inventory_id" :options="$inventories" x-model="receiveForm.data.inventory_id" 
                     x-on:change="$dispatch('update-receive-field', { field: 'inventory_id', value: $event.detail })"
                     alpine-error="receiveForm.getError('inventory_id')" required />
 
-                <x-input label="Tanggal Mutasi" name="movement_date" type="date" x-model="receiveForm.data.movement_date" 
+                <x-input label="Tanggal" name="movement_date" type="date" x-model="receiveForm.data.movement_date" 
                     alpine-error="receiveForm.getError('movement_date')" required />
 
-                <div x-show="pendingHarvestCount > 0" class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p class="text-sm text-blue-700">Ditemukan <span class="font-bold" x-text="pendingHarvestCount"></span> transaksi panen yang belum diterima pada tanggal ini.</p>
-                </div>
-
-                <div x-show="receiveForm.data.movement_date && pendingHarvestCount === 0" class="p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <p class="text-sm text-red-700">Tidak ada transaksi panen yang belum diterima pada tanggal ini.</p>
-                </div>
-
                 <div class="grid grid-cols-2 gap-4">
-                    <x-input label="Berat Nota (Kg)" x-model="receiveForm.data.note_weight_kg" readonly class="bg-gray-50!" />
-                    <x-input label="Jumlah Karung Nota" x-model="receiveForm.data.note_sacks" readonly class="bg-gray-50!" />
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <x-input label="Berat Aktual (Kg)" name="actual_weight_kg" type="number" step="0.01" x-model="receiveForm.data.actual_weight_kg"
+                    <x-input label="Berat (Kg)" name="actual_weight_kg" type="number" step="0.01" x-model="receiveForm.data.actual_weight_kg"
                         alpine-error="receiveForm.getError('actual_weight_kg')" required />
-                    <x-input label="Jumlah Karung Aktual" name="actual_sacks" type="number" x-model="receiveForm.data.actual_sacks"
+                    <x-input label="Jumlah Karung" name="actual_sacks" type="number" x-model="receiveForm.data.actual_sacks"
                         alpine-error="receiveForm.getError('actual_sacks')" required />
                 </div>
 
-                <x-input label="Selisih (Kg)" x-model="receiveDiscrepancy" readonly class="bg-gray-50!" />
+                <x-input label="Keterangan" name="description" placeholder="Contoh: Penerimaan manual" x-model="receiveForm.data.description"
+                    alpine-error="receiveForm.getError('description')" />
             </div>
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" @click="$dispatch('close-modal', 'receive-modal')" class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Batal</button>
-                <button type="submit" :disabled="receiveForm.processing || pendingHarvestCount === 0" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">
+                <button type="submit" :disabled="receiveForm.processing" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">
                     <span x-show="!receiveForm.processing">Simpan</span>
                     <span x-show="receiveForm.processing">Menyimpan...</span>
                 </button>
@@ -99,15 +87,12 @@
 <script>
 function warehouseModals() {
     return {
-        pendingHarvestCount: 0,
-        
         receiveForm: useForm({
             inventory_id: '',
             movement_date: new Date().toISOString().split('T')[0],
             actual_weight_kg: 0,
             actual_sacks: 0,
-            note_weight_kg: 0,
-            note_sacks: 0
+            description: ''
         }),
 
         shrinkageForm: useForm({
@@ -122,21 +107,9 @@ function warehouseModals() {
             description: ''
         }),
 
-        get receiveDiscrepancy() {
-            return ((parseFloat(this.receiveForm.data.note_weight_kg) || 0) - (parseFloat(this.receiveForm.data.actual_weight_kg) || 0)).toFixed(2);
-        },
-
         init() {
-            // Watch for movement_date change to fetch summary
-            this.$watch('receiveForm.data.movement_date', (val) => {
-                if (val) this.fetchSummaryByDate(val);
-            });
-
             window.addEventListener('open-receive-modal', () => {
                 this.receiveForm.reset();
-                if (this.receiveForm.data.movement_date) {
-                    this.fetchSummaryByDate(this.receiveForm.data.movement_date);
-                }
                 this.$dispatch('open-modal', 'receive-modal');
             });
             window.addEventListener('open-shrinkage-modal', () => {
@@ -151,21 +124,6 @@ function warehouseModals() {
             window.addEventListener('update-receive-field', (e) => this.receiveForm.data[e.detail.field] = e.detail.value);
             window.addEventListener('update-shrinkage-field', (e) => this.shrinkageForm.data[e.detail.field] = e.detail.value);
             window.addEventListener('update-adjustment-field', (e) => this.adjustmentForm.data[e.detail.field] = e.detail.value);
-        },
-
-        async fetchSummaryByDate(date) {
-            try {
-                const response = await axios.get(`{{ route('manajemen-gudang.summary-by-date') }}?date=${date}`);
-                const data = response.data.data;
-                this.pendingHarvestCount = data.transaction_count;
-                this.receiveForm.data.note_weight_kg = data.total_weight;
-                this.receiveForm.data.note_sacks = data.total_sacks;
-                this.receiveForm.data.actual_weight_kg = data.total_weight;
-                this.receiveForm.data.actual_sacks = data.total_sacks;
-            } catch (error) {
-                console.error('Failed to fetch summary', error);
-                toast.error('Gagal', 'Gagal mengambil ringkasan panen');
-            }
         },
 
         async submitReceive() {
