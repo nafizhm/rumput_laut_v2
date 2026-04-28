@@ -21,6 +21,7 @@ class HarvestTransaction extends Model
         'total_harvest_value',
         'cash_payout',
         'debt_deduction',
+        'is_received',
     ];
 
     protected $casts = [

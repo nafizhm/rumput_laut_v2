@@ -30,33 +30,44 @@ class WarehouseService
     public function receive(array $data): StockMovement
     {
         return $this->transaction(function () use ($data) {
-            if (StockMovement::where('harvest_transaction_id', $data['harvest_transaction_id'])->exists()) {
-                throw new Exception('Transaksi panen ini sudah diterima di gudang.');
+            $movementDate = $data['movement_date'];
+            
+            // Get all pending harvests for this date
+            $harvests = HarvestTransaction::whereDate('harvest_date', $movementDate)
+                ->where('is_received', false)
+                ->get();
+
+            if ($harvests->isEmpty()) {
+                throw new Exception('Tidak ada transaksi panen yang belum diterima pada tanggal ini.');
             }
 
-            $harvest = HarvestTransaction::findOrFail($data['harvest_transaction_id']);
             $inventory = Inventory::lockForUpdate()->findOrFail($data['inventory_id']);
 
             $actualWeight = $data['actual_weight_kg'];
             $actualSacks = $data['actual_sacks'];
-            $discrepancy = $harvest->warehouse_weight - $actualWeight;
+            $noteWeight = $data['note_weight_kg'];
+            $discrepancy = $noteWeight - $actualWeight;
 
             $inventory->current_stock_kg += $actualWeight;
             $inventory->current_sack_count += $actualSacks;
             $inventory->save();
 
+            // Mark all transactions as received
+            HarvestTransaction::whereDate('harvest_date', $movementDate)
+                ->where('is_received', false)
+                ->update(['is_received' => true]);
+
             return StockMovement::create([
                 'inventory_id' => $inventory->id,
-                'harvest_transaction_id' => $harvest->id,
-                'movement_date' => now(),
+                'movement_date' => $movementDate,
                 'direction' => 'in',
                 'type' => 'in',
                 'weight_kg' => $actualWeight,
-                'note_weight_kg' => $harvest->warehouse_weight,
+                'note_weight_kg' => $noteWeight,
                 'discrepancy_kg' => $discrepancy,
                 'sack_count' => $actualSacks,
                 'balance_after_kg' => $inventory->current_stock_kg,
-                'description' => 'Penerimaan dari panen ' . $harvest->batch_code
+                'description' => 'Penerimaan kolektif tanggal ' . $movementDate
             ]);
         });
     }

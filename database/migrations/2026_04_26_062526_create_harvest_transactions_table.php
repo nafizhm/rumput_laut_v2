@@ -25,6 +25,7 @@ return new class extends Migration
             $table->bigInteger('total_harvest_value');
             $table->bigInteger('cash_payout')->default(0);
             $table->bigInteger('debt_deduction');
+            $table->boolean('is_received')->default(false);
             $table->timestamps();
         });
     }

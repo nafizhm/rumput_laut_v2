@@ -36,19 +36,26 @@ class WarehouseController extends Controller
         $data = $this->service->getAllMovements();
         $inventories = Inventory::orderBy('item_name')->get()->map(fn($i) => ['value' => $i->id, 'label' => $i->item_name]);
 
-        // Get harvest transactions that haven't been received yet
-        $receivedIds = \App\Models\StockMovement::whereNotNull('harvest_transaction_id')->pluck('harvest_transaction_id');
-        $harvests = HarvestTransaction::whereNotIn('id', $receivedIds)
-            ->orderBy('harvest_date', 'desc')
-            ->get()
-            ->map(fn($h) => [
-                'value' => $h->id,
-                'label' => $h->batch_code . ' (' . $h->farmer->name . ' - ' . $h->warehouse_weight . ' Kg)',
-                'net_weight' => $h->warehouse_weight,
-                'sack_count' => $h->sack_count
-            ]);
+        return view('pages.transaction.warehouse.index', compact('data', 'columns', 'inventories'));
+    }
 
-        return view('pages.transaction.warehouse.index', compact('data', 'columns', 'inventories', 'harvests'));
+    public function summaryByDate(Request $request)
+    {
+        $date = $request->date;
+        if (!$date) {
+            return $this->errorResponse('Tanggal harus diisi', 422);
+        }
+
+        $summary = HarvestTransaction::whereDate('harvest_date', $date)
+            ->where('is_received', false)
+            ->selectRaw('SUM(warehouse_weight) as total_weight, SUM(sack_count) as total_sacks, COUNT(*) as transaction_count')
+            ->first();
+
+        return $this->successResponse('Summary panen berhasil diambil', [
+            'total_weight' => (float) ($summary->total_weight ?? 0),
+            'total_sacks' => (int) ($summary->total_sacks ?? 0),
+            'transaction_count' => (int) ($summary->transaction_count ?? 0)
+        ]);
     }
 
     public function data()
