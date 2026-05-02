@@ -16,7 +16,7 @@
         ]">
             <x-slot:headerAction>
                 <div class="flex flex-wrap items-center gap-3">
-                    <div class="flex items-center space-x-2">
+                    <div class="flex items-center gap-2">
                         <x-input name="cashflow_start_date" type="date" x-model="filters.startDate"
                             @change="updateTable()" />
                         <p>s/d</p>

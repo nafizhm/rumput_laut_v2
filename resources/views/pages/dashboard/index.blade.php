@@ -11,7 +11,7 @@
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Ringkasan</h3>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <div class="flex items-center space-x-2">
+                    <div class="flex items-center gap-2">
                         <x-input name="dashboard_start_date" type="date" x-model="filters.startDate" />
                         <p>s/d</p>
                         <x-input name="dashboard_end_date" type="date" x-model="filters.endDate" />
