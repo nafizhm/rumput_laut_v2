@@ -100,7 +100,11 @@
                     </p>
                 </div>
                 @foreach ($columns as $column)
-                    <div class="flex items-center border-r border-gray-200 px-4 py-3 dark:border-gray-800">
+                            <div @class([
+                                'flex items-center border-r border-gray-200 px-4 py-3 dark:border-gray-800',
+                                'justify-end text-right' => ($column['align'] ?? null) === 'right',
+                                'justify-center text-center' => ($column['align'] ?? null) === 'center',
+                            ])>
                         @if (isset($column['sortable']) && $column['sortable'])
                             <div class="flex w-full cursor-pointer items-center justify-between"
                                 @click="sortBy('{{ $column['key'] }}')">
@@ -146,7 +150,11 @@
                                 x-text="(currentPage - 1) * perPage + index + 1"></p>
                         </div>
                         @foreach ($columns as $column)
-                            <div class="flex items-center border-r border-gray-100 px-4 py-3 dark:border-gray-800">
+                            <div @class([
+                                'flex items-center border-r border-gray-100 px-4 py-3 dark:border-gray-800',
+                                'justify-end text-right' => ($column['align'] ?? null) === 'right',
+                                'justify-center text-center' => ($column['align'] ?? null) === 'center',
+                            ])>
                                 @if (isset($column['render']) && isset(${$column['render']}))
                                     {{ ${$column['render']} }}
                                 @else

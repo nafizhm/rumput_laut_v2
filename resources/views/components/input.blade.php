@@ -7,6 +7,8 @@
     'prefix' => null,
     'suffix' => null,
     'isCurrency' => false,
+    'isNumeric' => false,
+    'numericDecimals' => 2,
     'required' => false,
     'error' => null,
     'alpineError' => null,
@@ -14,7 +16,7 @@
 
 @php
     $id = $id ?? ($name ?? 'input-' . Str::random(8));
-    $realType = $isCurrency ? 'text' : $type;
+    $realType = ($isCurrency || $isNumeric) ? 'text' : $type;
     $hasSsrError = $name && $errors->has($name);
 @endphp
 
@@ -35,18 +37,68 @@
             $suffix ||
             in_array($type, ['date', 'time']) ||
             $isCurrency ||
+            $isNumeric ||
             $hasSsrError ||
             $alpineError,
     ]) @if ($type === 'password') x-data="{ showPassword: false }" @endif
         @if ($isCurrency) 
             x-data="{ 
                 internalValue: '',
-                get formattedValue() {
+                isFocused: false,
+                get displayValue() {
                     return this.internalValue ? new Intl.NumberFormat('id-ID').format(this.internalValue) : '';
                 }
             }" 
             @if($attributes->has('x-model')) 
                 x-modelable="internalValue" 
+                {{ $attributes->only('x-model') }}
+            @endif
+        @elseif ($isNumeric)
+            x-data="{
+                internalValue: '',
+                isFocused: false,
+                decimals: {{ (int) $numericDecimals }},
+                normalize(value) {
+                    if (value === null || value === undefined || value === '') {
+                        return '';
+                    }
+
+                    return String(value).replace(/[^0-9.,-]/g, '').replace(',', '.');
+                },
+                get displayValue() {
+                    if (this.internalValue === '' || this.internalValue === null) {
+                        return '';
+                    }
+
+                    if (this.isFocused) {
+                        const parts = String(this.internalValue).split('.');
+                        const integerPart = parts[0];
+                        const decimalPart = parts.length > 1 ? parts[1] : null;
+                        const formattedInt = new Intl.NumberFormat('id-ID').format(integerPart);
+                        
+                        let result = formattedInt;
+                        if (decimalPart !== null) {
+                            result += ',' + decimalPart;
+                        } else if (String(this.internalValue).endsWith('.')) {
+                            result += ',';
+                        }
+                        return result;
+                    }
+
+                    const numericValue = Number(this.internalValue);
+                    if (Number.isNaN(numericValue)) {
+                        return '';
+                    }
+
+                    return numericValue.toLocaleString('id-ID', {
+                        minimumFractionDigits: this.decimals,
+                        maximumFractionDigits: this.decimals,
+                    });
+                }
+            }"
+            x-init="internalValue = normalize(@js($attributes->get('value')) ?? '')"
+            @if($attributes->has('x-model'))
+                x-modelable="internalValue"
                 {{ $attributes->only('x-model') }}
             @endif
         @endif>
@@ -64,7 +116,7 @@
                 'id' => $id,
                 'name' => $name,
                 'placeholder' => $placeholder,
-                'inputmode' => $isCurrency ? 'numeric' : null,
+                'inputmode' => ($isCurrency || $isNumeric) ? 'decimal' : null,
                 'class' =>
                     'dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-2 focus:outline-hidden dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 ' .
                     ($hasSsrError
@@ -72,15 +124,75 @@
                         : 'border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:border-gray-700 dark:focus:border-brand-800 dark:focus:ring-brand-500/5') .
                     ($prefix ? ' pl-16' : '') .
                     ($suffix || $type === 'password' || in_array($type, ['date', 'time']) || $hasSsrError ? ' pr-11' : ''),
-            ])->except($isCurrency && $attributes->has('x-model') ? ['x-model'] : []) }}
+            ])->except(($isCurrency || $isNumeric) && $attributes->has('x-model') ? ['x-model'] : []) }}
             @if ($alpineError) :class="{
                 'border-error-300! focus:border-error-300! dark:border-error-700! dark:focus:border-error-800! pr-11!': {!! $alpineError !!}
             }" @endif
             @if ($type === 'password') :type="showPassword ? 'text' : 'password'" @endif
             @if ($type === 'time') onclick="this.showPicker()" @endif
             @if ($isCurrency) 
-                :value="formattedValue"
-                x-on:input="internalValue = $event.target.value.replace(/[^0-9]/g, '')"
+                :value="displayValue"
+                x-on:focus="isFocused = true"
+                x-on:blur="isFocused = false"
+                x-on:input="
+                    let el = $event.target;
+                    let oldVal = el.value;
+                    let cursor = el.selectionStart;
+                    let digitsBefore = oldVal.slice(0, cursor).replace(/[^0-9]/g, '').length;
+                    
+                    internalValue = oldVal.replace(/[^0-9]/g, '');
+                    
+                    $nextTick(() => {
+                        let newVal = displayValue;
+                        let newCursor = 0;
+                        let digitsFound = 0;
+                        for (let i = 0; i < newVal.length; i++) {
+                            if (/[0-9]/.test(newVal[i])) {
+                                digitsFound++;
+                            }
+                            newCursor = i + 1;
+                            if (digitsFound >= digitsBefore) break;
+                        }
+                        el.setSelectionRange(newCursor, newCursor);
+                    });
+                "
+            @elseif ($isNumeric)
+                :value="displayValue"
+                x-on:focus="isFocused = true"
+                x-on:blur="internalValue = normalize(internalValue); isFocused = false"
+                x-on:input="
+                    let el = $event.target;
+                    let oldVal = el.value;
+                    let cursor = el.selectionStart;
+                    
+                    // sigBefore should count digits and comma, but NOT dots
+                    let sigBefore = oldVal.slice(0, cursor).replace(/[^0-9,]/g, '').length;
+                    
+                    // 1. Remove thousand separators (dots)
+                    let clean = oldVal.replace(/\./g, '');
+                    // 2. Replace comma (decimal) with dot
+                    let raw = clean.replace(',', '.').replace(/[^0-9.-]/g, '');
+
+                    const parts = raw.split('.');
+                    if (parts.length > 2) {
+                        raw = parts.shift() + '.' + parts.join('');
+                    }
+                    internalValue = raw;
+                    
+                    $nextTick(() => {
+                        let newVal = displayValue;
+                        let newCursor = 0;
+                        let sigFound = 0;
+                        for (let i = 0; i < newVal.length; i++) {
+                            if (/[0-9,]/.test(newVal[i])) {
+                                sigFound++;
+                            }
+                            newCursor = i + 1;
+                            if (sigFound >= sigBefore) break;
+                        }
+                        el.setSelectionRange(newCursor, newCursor);
+                    });
+                "
             @endif>
 
         @if ($type === 'password')

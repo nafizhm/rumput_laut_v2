@@ -8,7 +8,6 @@
 
 @section('content')
     <x-data-table id="harvestTransactionTable" :rows="$data" :columns="$columns" :url="route('harvest-data')">
-        
         <x-slot:headerAction>
             <button type="button" @click="$dispatch('create-harvest-transaction')"
                 class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto hover:bg-gray-50 dark:hover:bg-white/3 transition-colors">
@@ -23,23 +22,23 @@
         </x-slot:headerAction>
 
         <x-slot:longDate>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="item.harvest_date ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date(item.harvest_date)) : '-'"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatDisplayDate(item.harvest_date)"></span>
         </x-slot:longDate>
 
         <x-slot:warehouse_weight>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="Number(item.warehouse_weight).toFixed(2) + ' Kg'"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatWeight(item.warehouse_weight)"></span>
         </x-slot:warehouse_weight>
 
         <x-slot:total_weight>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="Number(item.total_weight).toFixed(2) + ' Kg'"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatWeight(item.total_weight)"></span>
         </x-slot:total_weight>
 
         <x-slot:total_harvest_value>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="'Rp ' + Number(item.total_harvest_value).toLocaleString('id-ID')"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.total_harvest_value)"></span>
         </x-slot:total_harvest_value>
 
         <x-slot:debt_deduction>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="'Rp ' + Number(item.debt_deduction).toLocaleString('id-ID')"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.debt_deduction)"></span>
         </x-slot:debt_deduction>
 
         <x-slot:action>

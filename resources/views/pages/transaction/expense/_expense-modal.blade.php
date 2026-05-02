@@ -76,7 +76,7 @@
 
             form: useForm({
                 expense_category_id: '',
-                expense_date: new Date().toISOString().split('T')[0],
+                expense_date: window.getLocalDateInputValue(),
                 amount: 0,
                 description: '',
             }),
@@ -97,6 +97,7 @@
                 this.editId = null;
                 this.form.reset();
                 this.form.clearErrors();
+                this.form.data.expense_date = window.getLocalDateInputValue();
 
                 window.dispatchEvent(new CustomEvent('set-selected-expense_category_id', { detail: null }));
 

@@ -1,46 +1,49 @@
 @extends('layouts.app')
 
-@section('title', 'Manajemen Gudang')
+@section('title', $pageTitle ?? 'Manajemen Gudang')
 
 @section('breadcrumb')
-    <x-breadcrumb 
-        pageTitle="Manajemen Gudang" 
-        :links="[
-            ['name' => 'Transaksi', 'url' => '#'],
-            ['name' => 'Manajemen Gudang', 'url' => route('manajemen-gudang.index')]
-        ]" 
-    />
+    <x-breadcrumb :pageTitle="$pageTitle ?? 'Manajemen Gudang'" :links="[
+        ['name' => 'Transaksi', 'url' => '#'],
+        ['name' => $pageTitle ?? 'Manajemen Gudang', 'url' => route('manajemen-gudang.index')],
+    ]" />
 @endsection
 
 @section('content')
-    <x-data-table 
-        id="movementTable" 
-        :rows="$data" 
-        :columns="$columns" 
-        :url="route('manajemen-gudang.data')" 
-    >
+    <x-data-table id="movementTable" :rows="$data" :columns="$columns" :url="$inventoryId
+        ? route('manajemen-gudang.data', ['inventory_id' => $inventoryId])
+        : route('manajemen-gudang.data')">
         <x-slot:headerAction>
             <div class="flex flex-wrap gap-2">
-                <button type="button" @click="$dispatch('open-receive-modal')" 
-                    class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    Terima Stok
-                </button>
-                <button type="button" @click="$dispatch('open-shrinkage-modal')" 
-                    class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    Penyusutan
-                </button>
-                <button type="button" @click="$dispatch('open-adjustment-modal')" 
-                    class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    Penyesuaian
-                </button>
+                @if ($showActions)
+                    <button type="button" @click="$dispatch('open-receive-modal')"
+                        class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        Terima Stok
+                    </button>
+                    <button type="button" @click="$dispatch('open-shrinkage-modal')"
+                        class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        Penyusutan
+                    </button>
+                    <button type="button" @click="$dispatch('open-adjustment-modal')"
+                        class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        Penyesuaian
+                    </button>
+                @endif
             </div>
         </x-slot:headerAction>
 
-         <x-slot:date>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date(item.movement_date))"></span>
+        <x-slot:date>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium"
+                x-text="formatDisplayDate(item.movement_date)"></span>
         </x-slot:date>
 
         <x-slot:type_badge>
@@ -64,7 +67,18 @@
                 </span>
             </template>
         </x-slot:direction_badge>
+
+        <x-slot:weight>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatWeight(item.weight_kg)"></span>
+        </x-slot:weight>
+
+        <x-slot:balance_after_kg>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium"
+                x-text="formatWeight(item.balance_after_kg)"></span>
+        </x-slot:balance_after_kg>
     </x-data-table>
 
-    @include('pages.transaction.warehouse._warehouse-modals')
+    @if ($showActions)
+        @include('pages.transaction.warehouse._warehouse-modals')
+    @endif
 @endsection

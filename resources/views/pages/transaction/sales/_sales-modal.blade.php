@@ -14,10 +14,10 @@
 
                 <div x-show="selectedInventory" class="mt-2 flex items-center gap-2" x-cloak>
                     <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                        Stok Saat Ini: <span x-text="selectedInventory ? selectedInventory.current_stock : 0" class="ml-1 font-bold"></span> Kg
+                        Stok Saat Ini: <span x-text="selectedInventory ? formatWeight(selectedInventory.current_stock) : '0 Kg'" class="ml-1 font-bold"></span>
                     </span>
                     <span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
-                        <span x-text="selectedInventory ? selectedInventory.current_sacks : 0" class="mr-1 font-bold"></span> Karung
+                        <span x-text="selectedInventory ? Number(selectedInventory.current_sacks || 0).toLocaleString('id-ID') : 0" class="mr-1 font-bold"></span> Karung
                     </span>
                 </div>
 
@@ -25,7 +25,7 @@
                     alpine-error="form.getError('sale_date')" required />
 
                 <div class="grid grid-cols-2 gap-4">
-                    <x-input label="Berat Terjual (Kg)" name="sold_weight_kg" type="number" step="0.01" x-model="form.data.sold_weight_kg"
+                    <x-input label="Berat Terjual (Kg)" name="sold_weight_kg" x-model="form.data.sold_weight_kg" :isNumeric="true" :numericDecimals="2"
                         alpine-error="form.getError('sold_weight_kg')" required />
                     <x-input label="Jumlah Karung (Opsional)" name="sold_sacks" type="number" x-model="form.data.sold_sacks"
                         alpine-error="form.getError('sold_sacks')" />
@@ -47,6 +47,49 @@
             </div>
         </form>
     </x-modal>
+
+    <x-modal name="pay-sale-modal">
+        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Bayar Penjualan</h4>
+
+        <form @submit.prevent="submitPayment">
+            <div class="space-y-4">
+                <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/70">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-500 dark:text-gray-400">Invoice</span>
+                        <span class="font-semibold text-gray-900 dark:text-white/90" x-text="paymentItem?.invoice_number || '-'"></span>
+                    </div>
+                    <div class="mt-2 flex items-center justify-between text-sm">
+                        <span class="text-gray-500 dark:text-gray-400">Total Penjualan</span>
+                        <span class="font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(paymentItem?.total_sale_value || 0)"></span>
+                    </div>
+                </div>
+
+                <x-input label="Tanggal Bayar" name="payment_date" type="date" x-model="paymentForm.data.payment_date"
+                    alpine-error="paymentForm.getError('payment_date')" required />
+                <x-input label="Nominal Bayar" name="paid_amount" x-model="paymentForm.data.paid_amount" :isCurrency="true"
+                    alpine-error="paymentForm.getError('paid_amount')" required />
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bukti Bayar <span class="text-error-500">*</span></label>
+                    <input type="file" @change="paymentForm.data.payment_proof = $event.target.files[0]"
+                        class="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
+                    <p x-show="paymentForm.getError('payment_proof')" x-text="paymentForm.getError('payment_proof')" class="mt-1.5 text-xs text-error-500"></p>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Catatan</label>
+                    <textarea x-model="paymentForm.data.payment_notes"
+                        class="block min-h-[96px] w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"></textarea>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" @click="$dispatch('close-modal', 'pay-sale-modal')" class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Batal</button>
+                <button type="submit" :disabled="paymentForm.processing" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">
+                    <span x-show="!paymentForm.processing">Simpan Pembayaran</span>
+                    <span x-show="paymentForm.processing">Menyimpan...</span>
+                </button>
+            </div>
+        </form>
+    </x-modal>
 </div>
 
 @push('scripts')
@@ -54,14 +97,22 @@
 function salesFormComponent() {
     return {
         inventories: @json($inventories),
+        paymentItem: null,
 
         form: useForm({
             factory_id: '',
             inventory_id: '',
-            sale_date: new Date().toISOString().split('T')[0],
+            sale_date: window.getLocalDateInputValue(),
             sold_weight_kg: 0,
             price_per_kg: 0,
             sold_sacks: 0
+        }),
+
+        paymentForm: useForm({
+            payment_date: window.getLocalDateInputValue(),
+            paid_amount: 0,
+            payment_notes: '',
+            payment_proof: null,
         }),
 
         get totalSaleValue() {
@@ -75,10 +126,22 @@ function salesFormComponent() {
         init() {
             window.addEventListener('create-entity', () => {
                 this.form.reset();
+                this.form.data.sale_date = window.getLocalDateInputValue();
                 this.$dispatch('open-modal', 'sales-modal');
             });
 
             window.addEventListener('update-sales-field', (e) => this.form.data[e.detail.field] = e.detail.value);
+            window.addEventListener('open-pay-sale', (e) => this.openPaymentModal(e.detail));
+        },
+
+        openPaymentModal(item) {
+            this.paymentItem = item;
+            this.paymentForm.reset();
+            this.paymentForm.clearErrors();
+            this.paymentForm.data.payment_date = window.getLocalDateInputValue();
+            this.paymentForm.data.paid_amount = item.total_sale_value || 0;
+            this.paymentForm.data.payment_proof = null;
+            this.$dispatch('open-modal', 'pay-sale-modal');
         },
 
         async submit() {
@@ -87,7 +150,30 @@ function salesFormComponent() {
                     toast.success('Berhasil', res.data.message);
                     refreshDataTable('salesTable');
                     this.$dispatch('close-modal', 'sales-modal');
-                    setTimeout(() => window.location.reload(), 1000);
+                },
+                onError: (err) => {
+                    if (err.response?.status !== 422) {
+                        toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan sistem');
+                    }
+                }
+            });
+        },
+
+        async submitPayment() {
+            await this.paymentForm.submit('post', `{{ url('manajemen-penjualan') }}/${this.paymentItem.id}/pay`, {
+                transform: (data) => {
+                    const formData = new FormData();
+                    Object.entries(data).forEach(([key, value]) => {
+                        if (value !== null && value !== undefined) {
+                            formData.append(key, value);
+                        }
+                    });
+                    return formData;
+                },
+                onSuccess: (res) => {
+                    toast.success('Berhasil', res.data.message);
+                    refreshDataTable('salesTable');
+                    this.$dispatch('close-modal', 'pay-sale-modal');
                 },
                 onError: (err) => {
                     if (err.response?.status !== 422) {

@@ -20,9 +20,9 @@ class InventoryController extends Controller
     {
         $columns = [
             ['key' => 'item_name', 'label' => 'Nama Barang', 'sortable' => true],
-            ['key' => 'current_stock_kg', 'label' => 'Stok Saat Ini (Kg)', 'sortable' => true],
-            ['key' => 'current_sack_count', 'label' => 'Jumlah Karung', 'sortable' => true],
-            ['key' => 'action', 'label' => 'Aksi', 'width' => '170px', 'render' => 'action'],
+            ['key' => 'current_stock_kg', 'label' => 'Stok Saat Ini (Kg)', 'render' => 'weight', 'sortable' => true, 'align' => 'right'],
+            ['key' => 'current_sack_count', 'label' => 'Jumlah Karung', 'render' => 'sacks', 'sortable' => true, 'align' => 'right'],
+            ['key' => 'action', 'label' => 'Aksi', 'width' => '260px', 'render' => 'action'],
         ];
 
         $data = $this->service->getAllInventories();

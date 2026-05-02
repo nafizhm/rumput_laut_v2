@@ -11,6 +11,7 @@ class ShrinkageRequest extends FormRequest
     {
         return [
             'inventory_id' => 'required|exists:inventories,id',
+            'movement_date' => 'required|date',
             'lost_weight_kg' => 'required|numeric|min:0.01',
             'description' => 'nullable|string|max:255',
         ];

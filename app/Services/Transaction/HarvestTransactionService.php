@@ -27,19 +27,15 @@ class HarvestTransactionService
     {
         return $this->transaction(function () use ($data) {
             $farmer = Farmer::lockForUpdate()->findOrFail($data['farmer_id']);
-            
+
             $data['batch_code'] = $this->generateBatchCode();
-            
-            // Recalculate server-side to be safe
-            $data['warehouse_weight'] = $data['total_weight'] + ($data['sack_count'] * $data['extra_per_sack']);
-            $data['total_harvest_value'] = $data['total_weight'] * $data['price_per_kg'];
-            $data['debt_deduction'] = $data['total_harvest_value'] - $data['cash_payout'];
-            
+
+            $data = $this->prepareHarvestData($data);
             $harvest = HarvestTransaction::create($data);
-            
+
             if ($harvest->debt_deduction > 0) {
                 $farmer->decrement('current_debt', $harvest->debt_deduction);
-                
+
                 $harvest->ledgers()->create([
                     'farmer_id' => $farmer->id,
                     'type' => 'credit',
@@ -47,7 +43,7 @@ class HarvestTransactionService
                     'balance_after' => $farmer->current_debt,
                 ]);
             }
-            
+
             return $harvest;
         });
     }
@@ -59,24 +55,18 @@ class HarvestTransactionService
     {
         return $this->transaction(function () use ($harvest, $data) {
             $farmer = Farmer::lockForUpdate()->findOrFail($harvest->farmer_id);
-            
+
             $oldDeduction = $harvest->debt_deduction;
-            
-            // Recalculate server-side
-            $data['warehouse_weight'] = $data['total_weight'] + ($data['sack_count'] * $data['extra_per_sack']);
-            $data['total_harvest_value'] = $data['total_weight'] * $data['price_per_kg'];
-            $data['debt_deduction'] = $data['total_harvest_value'] - $data['cash_payout'];
-            
+
+            $data = $this->prepareHarvestData($data);
             $newDeduction = $data['debt_deduction'];
-            $diff = $newDeduction - $oldDeduction; // Positive means more debt reduced (more credit)
-            
+            $diff = $newDeduction - $oldDeduction;
+
             $harvest->update($data);
-            
+
             if ($diff != 0) {
-                // If diff > 0, we reduce debt more (credit)
-                // If diff < 0, we increase debt back (debit)
                 $farmer->decrement('current_debt', $diff);
-                
+
                 $harvest->ledgers()->create([
                     'farmer_id' => $farmer->id,
                     'type' => $diff > 0 ? 'credit' : 'debit',
@@ -119,19 +109,50 @@ class HarvestTransactionService
     {
         $today = Carbon::today();
         $dateStr = $today->format('Ymd');
-        
+
         $count = HarvestTransaction::whereDate('created_at', $today)->count() + 1;
         $sequence = str_pad($count, 4, '0', STR_PAD_LEFT);
-        
+
         $code = "HRV-{$dateStr}-{$sequence}";
-        
-        // Ensure uniqueness just in case
+
         while (HarvestTransaction::where('batch_code', $code)->exists()) {
             $count++;
             $sequence = str_pad($count, 4, '0', STR_PAD_LEFT);
             $code = "HRV-{$dateStr}-{$sequence}";
         }
-        
+
         return $code;
+    }
+
+    protected function prepareHarvestData(array $data): array
+    {
+        $totalWeight = (float) $data['total_weight'];
+        $sackCount = (int) $data['sack_count'];
+        $extraPerSack = (float) ($data['extra_per_sack'] ?? 1);
+        $pricePerKg = (float) $data['price_per_kg'];
+        $baseValue = $totalWeight * $pricePerKg;
+        $deductionType = $data['sale_deduction_type'] ?? 'none';
+        $deductionValue = (float) ($data['sale_deduction_value'] ?? 0);
+
+        $saleDeductionAmount = 0;
+        if ($deductionType === 'percentage') {
+            $saleDeductionAmount = (int) round($baseValue * ($deductionValue / 100));
+        } elseif ($deductionType === 'nominal') {
+            $saleDeductionAmount = (int) round($deductionValue);
+        }
+
+        $netHarvestValue = max(0, (int) round($baseValue) - $saleDeductionAmount);
+        $cashPayout = min((int) round($data['cash_payout']), $netHarvestValue);
+
+        $data['extra_per_sack'] = $extraPerSack;
+        $data['warehouse_weight'] = $totalWeight + ($sackCount * $extraPerSack);
+        $data['sale_deduction_type'] = $deductionType;
+        $data['sale_deduction_value'] = $deductionValue;
+        $data['sale_deduction_amount'] = $saleDeductionAmount;
+        $data['total_harvest_value'] = $netHarvestValue;
+        $data['cash_payout'] = $cashPayout;
+        $data['debt_deduction'] = $netHarvestValue - $cashPayout;
+
+        return $data;
     }
 }

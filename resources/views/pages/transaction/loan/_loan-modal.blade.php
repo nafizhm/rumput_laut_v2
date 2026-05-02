@@ -48,7 +48,7 @@
                 deleteId: null,
                 form: useForm({
                     farmer_id: '',
-                    loan_date: new Date().toISOString().split('T')[0],
+                    loan_date: window.getLocalDateInputValue(),
                     amount: 0,
                     description: ''
                 }),
@@ -69,6 +69,7 @@
                     this.editId = null;
                     this.form.reset();
                     this.form.clearErrors();
+                    this.form.data.loan_date = window.getLocalDateInputValue();
                     
                     window.dispatchEvent(new CustomEvent('set-selected-farmer_id', { detail: null }));
 

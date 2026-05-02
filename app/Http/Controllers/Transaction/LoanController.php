@@ -24,7 +24,7 @@ class LoanController extends Controller
         $columns = [
             ['key' => 'loan_date', 'label' => 'Tanggal Pinjam', 'render' => 'longDate', 'sortable' => true],
             ['key' => 'farmer.name', 'label' => 'Petani', 'sortable' => true],
-            ['key' => 'amount', 'label' => 'Jumlah', 'render' => 'currency', 'sortable' => true],
+            ['key' => 'amount', 'label' => 'Jumlah', 'render' => 'currency', 'sortable' => true, 'align' => 'right'],
             ['key' => 'description', 'label' => 'Keterangan'],
             ['key' => 'action', 'label' => 'Aksi', 'width' => '170px', 'render' => 'action'],
         ];

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Transaction\PaySaleRequest;
 use App\Http\Requests\Transaction\StoreSaleRequest;
 use App\Models\Factory;
 use App\Models\Inventory;
+use App\Models\SalesTransaction;
 use App\Services\Transaction\SalesService;
 use App\Traits\JsonResponser;
 use Exception;
@@ -25,9 +27,11 @@ class SalesController extends Controller
             ['key' => 'sale_date', 'label' => 'Tanggal', 'render' => 'date', 'sortable' => true],
             ['key' => 'factory.name', 'label' => 'Pabrik'],
             ['key' => 'inventory.item_name', 'label' => 'Barang'],
-            ['key' => 'total_weight_kg', 'label' => 'Berat (Kg)', 'sortable' => true],
-            ['key' => 'price_per_kg', 'label' => 'Harga / Kg', 'render' => 'currency'],
-            ['key' => 'total_sale_value', 'label' => 'Total Nilai', 'render' => 'total_sale_value', 'sortable' => true],
+            ['key' => 'total_weight_kg', 'label' => 'Berat (Kg)', 'render' => 'weight', 'sortable' => true, 'align' => 'right'],
+            ['key' => 'price_per_kg', 'label' => 'Harga / Kg', 'render' => 'currency', 'align' => 'right'],
+            ['key' => 'total_sale_value', 'label' => 'Total Nilai', 'render' => 'total_sale_value', 'sortable' => true, 'align' => 'right'],
+            ['key' => 'payment_status', 'label' => 'Status', 'render' => 'payment_status', 'align' => 'center'],
+            ['key' => 'action', 'label' => 'Aksi', 'render' => 'action', 'width' => '200px'],
         ];
 
         $data = $this->service->getAllSales();
@@ -53,6 +57,16 @@ class SalesController extends Controller
         try {
             $this->service->createSale($request->validated());
             return $this->successResponse('Penjualan berhasil dicatat');
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    public function pay(PaySaleRequest $request, SalesTransaction $manajemen_penjualan)
+    {
+        try {
+            $this->service->paySale($manajemen_penjualan, $request->validated());
+            return $this->successResponse('Pembayaran penjualan berhasil dicatat');
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

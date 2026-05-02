@@ -18,6 +18,9 @@ class HarvestTransaction extends Model
         'extra_per_sack',
         'warehouse_weight',
         'price_per_kg',
+        'sale_deduction_type',
+        'sale_deduction_value',
+        'sale_deduction_amount',
         'total_harvest_value',
         'cash_payout',
         'debt_deduction',
@@ -28,6 +31,10 @@ class HarvestTransaction extends Model
         'harvest_date' => 'date',
     ];
 
+    protected $appends = [
+        'remaining_debt_after_payment',
+    ];
+
     public function farmer(): BelongsTo
     {
         return $this->belongsTo(Farmer::class);
@@ -36,5 +43,11 @@ class HarvestTransaction extends Model
     public function ledgers(): MorphMany
     {
         return $this->morphMany(FarmerLedger::class, 'reference');
+    }
+
+    public function getRemainingDebtAfterPaymentAttribute(): int
+    {
+        $currentDebt = (int) ($this->farmer?->current_debt ?? 0);
+        return max(0, $currentDebt);
     }
 }

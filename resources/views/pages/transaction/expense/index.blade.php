@@ -30,7 +30,7 @@
         </x-slot:headerAction>
 
         <x-slot:date>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="item.expense_date ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date(item.expense_date)) : '-'"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatDisplayDate(item.expense_date)"></span>
         </x-slot:date>
 
         <x-slot:amount>

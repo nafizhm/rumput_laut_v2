@@ -25,10 +25,10 @@ class HarvestTransactionController extends Controller
             ['key' => 'batch_code', 'label' => 'Kode Batch', 'sortable' => true],
             ['key' => 'harvest_date', 'label' => 'Tanggal Panen', 'render' => 'longDate', 'sortable' => true],
             ['key' => 'farmer.name', 'label' => 'Petani', 'sortable' => true],
-            ['key' => 'total_weight', 'label' => 'Berat Bayar (Kg)', 'sortable' => true],
-            ['key' => 'warehouse_weight', 'label' => 'Total Berat Gudang (Kg)', 'sortable' => true],
-            ['key' => 'total_harvest_value', 'label' => 'Total Nilai', 'render' => 'total_harvest_value', 'sortable' => true],
-            ['key' => 'debt_deduction', 'label' => 'Potong Hutang', 'render' => 'debt_deduction', 'sortable' => true],
+            ['key' => 'total_weight', 'label' => 'Berat Bayar (Kg)', 'render' => 'total_weight', 'sortable' => true, 'align' => 'right'],
+            ['key' => 'warehouse_weight', 'label' => 'Total Berat Gudang (Kg)', 'render' => 'warehouse_weight', 'sortable' => true, 'align' => 'right'],
+            ['key' => 'total_harvest_value', 'label' => 'Total Nilai', 'render' => 'total_harvest_value', 'sortable' => true, 'align' => 'right'],
+            ['key' => 'debt_deduction', 'label' => 'Potong Hutang', 'render' => 'debt_deduction', 'sortable' => true, 'align' => 'right'],
             ['key' => 'action', 'label' => 'Aksi', 'width' => '170px', 'render' => 'action'],
         ];
 

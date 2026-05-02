@@ -1,5 +1,4 @@
 <div x-data="warehouseModals()">
-    <!-- Modal Terima Stok -->
     <x-modal name="receive-modal">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Terima Stok Gudang</h4>
         <form @submit.prevent="submitReceive">
@@ -12,7 +11,7 @@
                     alpine-error="receiveForm.getError('movement_date')" required />
 
                 <div class="grid grid-cols-2 gap-4">
-                    <x-input label="Berat (Kg)" name="actual_weight_kg" type="number" step="0.01" x-model="receiveForm.data.actual_weight_kg"
+                    <x-input label="Berat (Kg)" name="actual_weight_kg" x-model="receiveForm.data.actual_weight_kg" :isNumeric="true" :numericDecimals="2"
                         alpine-error="receiveForm.getError('actual_weight_kg')" required />
                     <x-input label="Jumlah Karung" name="actual_sacks" type="number" x-model="receiveForm.data.actual_sacks"
                         alpine-error="receiveForm.getError('actual_sacks')" required />
@@ -31,7 +30,6 @@
         </form>
     </x-modal>
 
-    <!-- Modal Penyusutan -->
     <x-modal name="shrinkage-modal">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Pencatatan Penyusutan Stok</h4>
         <form @submit.prevent="submitShrinkage">
@@ -40,7 +38,10 @@
                     x-on:change="$dispatch('update-shrinkage-field', { field: 'inventory_id', value: $event.detail })"
                     alpine-error="shrinkageForm.getError('inventory_id')" required />
 
-                <x-input label="Berat Penyusutan (Kg)" name="lost_weight_kg" type="number" step="0.01" x-model="shrinkageForm.data.lost_weight_kg"
+                <x-input label="Tanggal" name="movement_date" type="date" x-model="shrinkageForm.data.movement_date"
+                    alpine-error="shrinkageForm.getError('movement_date')" required />
+
+                <x-input label="Berat Penyusutan (Kg)" name="lost_weight_kg" x-model="shrinkageForm.data.lost_weight_kg" :isNumeric="true" :numericDecimals="2"
                     alpine-error="shrinkageForm.getError('lost_weight_kg')" required />
 
                 <x-input label="Keterangan" name="description" x-model="shrinkageForm.data.description"
@@ -56,7 +57,6 @@
         </form>
     </x-modal>
 
-    <!-- Modal Penyesuaian -->
     <x-modal name="adjustment-modal">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Penyesuaian Stok (Stock Opname)</h4>
         <form @submit.prevent="submitAdjustment">
@@ -65,7 +65,10 @@
                     x-on:change="$dispatch('update-adjustment-field', { field: 'inventory_id', value: $event.detail })"
                     alpine-error="adjustmentForm.getError('inventory_id')" required />
 
-                <x-input label="Berat Penyesuaian (Kg)" name="adjustment_weight_kg" type="number" step="0.01" x-model="adjustmentForm.data.adjustment_weight_kg"
+                <x-input label="Tanggal" name="movement_date" type="date" x-model="adjustmentForm.data.movement_date"
+                    alpine-error="adjustmentForm.getError('movement_date')" required />
+
+                <x-input label="Berat Penyesuaian (Kg)" name="adjustment_weight_kg" x-model="adjustmentForm.data.adjustment_weight_kg" :isNumeric="true" :numericDecimals="2"
                     placeholder="Gunakan tanda (-) untuk mengurangi stok"
                     alpine-error="adjustmentForm.getError('adjustment_weight_kg')" required />
 
@@ -89,7 +92,7 @@ function warehouseModals() {
     return {
         receiveForm: useForm({
             inventory_id: '',
-            movement_date: new Date().toISOString().split('T')[0],
+            movement_date: window.getLocalDateInputValue(),
             actual_weight_kg: 0,
             actual_sacks: 0,
             description: ''
@@ -97,12 +100,14 @@ function warehouseModals() {
 
         shrinkageForm: useForm({
             inventory_id: '',
+            movement_date: window.getLocalDateInputValue(),
             lost_weight_kg: 0,
             description: ''
         }),
 
         adjustmentForm: useForm({
             inventory_id: '',
+            movement_date: window.getLocalDateInputValue(),
             adjustment_weight_kg: 0,
             description: ''
         }),
@@ -110,14 +115,17 @@ function warehouseModals() {
         init() {
             window.addEventListener('open-receive-modal', () => {
                 this.receiveForm.reset();
+                this.receiveForm.data.movement_date = window.getLocalDateInputValue();
                 this.$dispatch('open-modal', 'receive-modal');
             });
             window.addEventListener('open-shrinkage-modal', () => {
                 this.shrinkageForm.reset();
+                this.shrinkageForm.data.movement_date = window.getLocalDateInputValue();
                 this.$dispatch('open-modal', 'shrinkage-modal');
             });
             window.addEventListener('open-adjustment-modal', () => {
                 this.adjustmentForm.reset();
+                this.adjustmentForm.data.movement_date = window.getLocalDateInputValue();
                 this.$dispatch('open-modal', 'adjustment-modal');
             });
 
@@ -131,7 +139,7 @@ function warehouseModals() {
                 onSuccess: (res) => {
                     toast.success('Berhasil', res.data.message);
                     this.$dispatch('close-modal', 'receive-modal');
-                    setTimeout(() => window.location.reload(), 1000);
+                    refreshDataTable('movementTable');
                 },
                 onError: (err) => {
                     if (err.response?.status !== 422) {
@@ -146,7 +154,7 @@ function warehouseModals() {
                 onSuccess: (res) => {
                     toast.success('Berhasil', res.data.message);
                     this.$dispatch('close-modal', 'shrinkage-modal');
-                    setTimeout(() => window.location.reload(), 1000);
+                    refreshDataTable('movementTable');
                 },
                 onError: (err) => {
                     if (err.response?.status !== 422) {
@@ -161,7 +169,7 @@ function warehouseModals() {
                 onSuccess: (res) => {
                     toast.success('Berhasil', res.data.message);
                     this.$dispatch('close-modal', 'adjustment-modal');
-                    setTimeout(() => window.location.reload(), 1000);
+                    refreshDataTable('movementTable');
                 },
                 onError: (err) => {
                     if (err.response?.status !== 422) {

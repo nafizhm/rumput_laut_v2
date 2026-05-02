@@ -11,24 +11,17 @@
         <x-data-table id="cashFlowTable" :rows="[]" :url="route('cash-flow.data')" :columns="[
             ['key' => 'category', 'label' => 'Kategori', 'sortable' => true],
             ['key' => 'type', 'label' => 'Tipe', 'sortable' => true, 'render' => 'typeBadge'],
-            ['key' => 'amount_formatted', 'label' => 'Total Nominal', 'sortable' => true],
+            ['key' => 'amount_formatted', 'label' => 'Total Nominal', 'sortable' => true, 'align' => 'right'],
             ['key' => 'id', 'label' => 'Aksi', 'render' => 'action', 'width' => '120px'],
         ]">
             <x-slot:headerAction>
                 <div class="flex flex-wrap items-center gap-3">
-                    <!-- Date Range Filter -->
-                    <div class="relative">
-                        <select x-model="filters.range" @change="updateTable()"
-                            class="h-11 w-full appearance-none rounded-lg border border-gray-300 bg-white pl-4 pr-10 text-sm font-medium text-gray-700 shadow-theme-xs transition-colors focus:border-brand-500 focus:ring focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
-                            <option value="daily">Harian</option>
-                            <option value="weekly">Mingguan</option>
-                            <option value="monthly">Bulanan</option>
-                        </select>
-                        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path d="m19 9-7 7-7-7" />
-                            </svg>
-                        </span>
+                    <div class="flex items-center space-x-2">
+                        <x-input name="cashflow_start_date" type="date" x-model="filters.startDate"
+                            @change="updateTable()" />
+                        <p>s/d</p>
+                        <x-input name="cashflow_end_date" type="date" x-model="filters.endDate"
+                            @change="updateTable()" />
                     </div>
 
                     <!-- Transaction Type Filter -->
@@ -47,7 +40,7 @@
                     </div>
 
                     <!-- Export Buttons -->
-                    <div class="flex items-center gap-2">
+                    {{-- <div class="flex items-center gap-2">
                         <button type="button"
                             class="flex h-11 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -68,7 +61,7 @@
                             </svg>
                             Excel
                         </button>
-                    </div>
+                    </div> --}}
                 </div>
             </x-slot:headerAction>
 
@@ -79,7 +72,6 @@
                         'inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/20'"
                     class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium" x-text="item.type"></span>
             </x-slot:typeBadge>
-            `
             <x-slot:action>
                 <div class="flex items-center gap-2">
                     <button type="button" @click="$dispatch('set-cash-flow-detail', item)"
@@ -98,7 +90,8 @@
             function cashFlowPage() {
                 return {
                     filters: {
-                        range: 'monthly',
+                        startDate: window.getMonthStartDateInputValue(),
+                        endDate: window.getLocalDateInputValue(),
                         type: 'all'
                     },
                     tableData: [],
@@ -115,7 +108,8 @@
                     updateTable() {
                         const table = window.getDataTableInstances()['cashFlowTable'];
                         if (table) {
-                            table.url = `/laporan-arus-kas/data?range=${this.filters.range}&type=${this.filters.type}`;
+                            table.url =
+                                `/laporan-arus-kas/data?start_date=${this.filters.startDate}&end_date=${this.filters.endDate}&type=${this.filters.type}`;
                             table.refreshData();
                         }
                     },

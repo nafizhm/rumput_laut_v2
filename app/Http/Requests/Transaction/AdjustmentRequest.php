@@ -11,6 +11,7 @@ class AdjustmentRequest extends FormRequest
     {
         return [
             'inventory_id' => 'required|exists:inventories,id',
+            'movement_date' => 'required|date',
             'adjustment_weight_kg' => 'required|numeric',
             'description' => 'required|string|max:255',
         ];

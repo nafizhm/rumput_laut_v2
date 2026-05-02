@@ -82,6 +82,69 @@ window.toast = {
     },
 };
 
+window.getLocalDateInputValue = function () {
+    const now = new Date();
+    const timezoneOffset = now.getTimezoneOffset() * 60000;
+    return new Date(now.getTime() - timezoneOffset).toISOString().split("T")[0];
+};
+
+window.getMonthStartDateInputValue = function () {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const timezoneOffset = firstDay.getTimezoneOffset() * 60000;
+    return new Date(firstDay.getTime() - timezoneOffset)
+        .toISOString()
+        .split("T")[0];
+};
+
+window.parseDateValue = function (value) {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+        return value;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return new Date(`${value}T00:00:00`);
+    }
+
+    return new Date(value);
+};
+
+window.formatDisplayDate = function (value, options = { dateStyle: "full" }) {
+    const date = window.parseDateValue(value);
+    if (!date || Number.isNaN(date.getTime())) {
+        return "-";
+    }
+
+    return new Intl.DateTimeFormat("id-ID", options).format(date);
+};
+
+window.formatNumberInput = function (value, decimals = 2) {
+    const number = Number(value || 0);
+    return number.toLocaleString("id-ID", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    });
+};
+
+window.formatWeight = function (value, decimals = 2) {
+    const number = Number(value || 0);
+    return `${number.toLocaleString("id-ID", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    })} Kg`;
+};
+
+window.formatCurrency = function (value) {
+    return new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    }).format(Number(value || 0));
+};
+
 window.Alpine = Alpine;
 
 Alpine.start();

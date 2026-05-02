@@ -49,6 +49,9 @@ Route::middleware('auth')->group(function () {
 
     // Warehouse
     Route::get('manajemen-gudang', [App\Http\Controllers\Transaction\WarehouseController::class, 'index'])->name('manajemen-gudang.index');
+    Route::get('manajemen-gudang/basah', [App\Http\Controllers\Transaction\WarehouseController::class, 'wet'])->name('manajemen-gudang.wet');
+    Route::get('manajemen-gudang/kering', [App\Http\Controllers\Transaction\WarehouseController::class, 'dry'])->name('manajemen-gudang.dry');
+    Route::get('manajemen-gudang/inventori/{inventory}', [App\Http\Controllers\Transaction\WarehouseController::class, 'inventory'])->name('manajemen-gudang.inventory');
     Route::get('warehouse-data', [App\Http\Controllers\Transaction\WarehouseController::class, 'data'])->name('manajemen-gudang.data');
     Route::post('manajemen-gudang/receive', [App\Http\Controllers\Transaction\WarehouseController::class, 'receive'])->name('manajemen-gudang.receive');
     Route::post('manajemen-gudang/shrinkage', [App\Http\Controllers\Transaction\WarehouseController::class, 'shrinkage'])->name('manajemen-gudang.shrinkage');
@@ -57,6 +60,7 @@ Route::middleware('auth')->group(function () {
     // Sales
     Route::resource('manajemen-penjualan', App\Http\Controllers\Transaction\SalesController::class);
     Route::get('sales-data', [App\Http\Controllers\Transaction\SalesController::class, 'data'])->name('manajemen-penjualan.data');
+    Route::post('manajemen-penjualan/{manajemen_penjualan}/pay', [App\Http\Controllers\Transaction\SalesController::class, 'pay'])->name('manajemen-penjualan.pay');
 
     // Cash Flow
     Route::get('laporan-arus-kas', [App\Http\Controllers\CashFlow\CashFlowController::class, 'index'])->name('cash-flow.index');

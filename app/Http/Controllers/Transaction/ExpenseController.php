@@ -23,7 +23,7 @@ class ExpenseController extends Controller
         $columns = [
             ['key' => 'expense_date', 'label' => 'Tanggal', 'render' => 'date', 'sortable' => true],
             ['key' => 'category.name', 'label' => 'Kategori', 'sortable' => true],
-            ['key' => 'amount', 'label' => 'Jumlah', 'render' => 'amount', 'sortable' => true],
+            ['key' => 'amount', 'label' => 'Jumlah', 'render' => 'amount', 'sortable' => true, 'align' => 'right'],
             ['key' => 'description', 'label' => 'Keterangan'],
             ['key' => 'action', 'label' => 'Aksi', 'width' => '170px', 'render' => 'action'],
         ];

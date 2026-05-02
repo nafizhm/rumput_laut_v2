@@ -2,12 +2,11 @@
 
 namespace App\Services\Transaction;
 
-use App\Models\HarvestTransaction;
 use App\Models\Inventory;
 use App\Models\StockMovement;
 use App\Traits\HandlesTransaction;
 use Exception;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Collection;
 
 class WarehouseService
 {
@@ -16,9 +15,10 @@ class WarehouseService
     /**
      * Get all stock movements.
      */
-    public function getAllMovements()
+    public function getAllMovements(?int $inventoryId = null): Collection
     {
         return StockMovement::with(['inventory', 'harvestTransaction', 'salesTransaction'])
+            ->when($inventoryId, fn($query) => $query->where('inventory_id', $inventoryId))
             ->orderBy('movement_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -75,10 +75,11 @@ class WarehouseService
 
             return StockMovement::create([
                 'inventory_id' => $inventory->id,
-                'movement_date' => now(),
+                'movement_date' => $data['movement_date'] ?? now(),
                 'direction' => 'out',
                 'type' => 'shrinkage',
                 'weight_kg' => $lostWeight,
+                'sack_count' => 0,
                 'balance_after_kg' => $inventory->current_stock_kg,
                 'description' => $data['description'] ?? 'Penyusutan stok'
             ]);
@@ -104,10 +105,11 @@ class WarehouseService
 
             return StockMovement::create([
                 'inventory_id' => $inventory->id,
-                'movement_date' => now(),
+                'movement_date' => $data['movement_date'] ?? now(),
                 'direction' => $adjWeight >= 0 ? 'in' : 'out',
                 'type' => 'adjustment',
                 'weight_kg' => abs($adjWeight),
+                'sack_count' => 0,
                 'balance_after_kg' => $inventory->current_stock_kg,
                 'description' => $data['description']
             ]);

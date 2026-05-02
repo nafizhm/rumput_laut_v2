@@ -1,60 +1,178 @@
 <div x-data="harvestForm()">
-    <x-modal name="harvest-modal">
+    <x-modal name="harvest-modal" maxWidth="max-w-6xl">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90"
             x-text="editMode ? 'Edit Transaksi Panen' : 'Tambah Transaksi Panen'"></h4>
-        
+
         <form @submit.prevent="submit">
-            <div class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <x-select label="Petani" name="farmer_id" :options="$farmers" placeholder="Pilih Petani"
-                        x-on:change="$dispatch('update-field', { field: 'farmer_id', value: $event.detail })"
-                        alpine-error="form.getError('farmer_id')" required />
+            <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+                <div class="space-y-4 xl:col-span-8">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <x-select label="Petani" name="farmer_id" :options="$farmers" placeholder="Pilih Petani"
+                            x-on:change="$dispatch('update-field', { field: 'farmer_id', value: $event.detail })"
+                            alpine-error="form.getError('farmer_id')" required />
 
-                    <x-input label="Tanggal Panen" name="harvest_date" type="date" x-model="form.data.harvest_date"
-                        alpine-error="form.getError('harvest_date')" required />
+                        <x-input label="Tanggal Panen" name="harvest_date" type="date"
+                            x-model="form.data.harvest_date" alpine-error="form.getError('harvest_date')" required />
+                    </div>
+
+                    <x-input label="Lokasi" name="location" placeholder="Contoh: Sawah Blok A"
+                        x-model="form.data.location" alpine-error="form.getError('location')" required />
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <x-input label="Total Berat Bayar (Kg)" name="total_weight" placeholder="0"
+                            x-model="form.data.total_weight" :isNumeric="true" :numericDecimals="2"
+                            alpine-error="form.getError('total_weight')" required />
+
+                        <x-input label="Jumlah Karung" name="sack_count" type="number" placeholder="0"
+                            x-model="form.data.sack_count" alpine-error="form.getError('sack_count')" required />
+
+                        <x-input label="Bonus / Karung (Kg)" name="extra_per_sack" x-model="form.data.extra_per_sack"
+                            :isNumeric="true" :numericDecimals="2" alpine-error="form.getError('extra_per_sack')"
+                            required />
+
+                        <x-input label="Total Berat Gudang (Kg)" name="warehouse_weight"
+                            x-model="form.data.warehouse_weight" :isNumeric="true" :numericDecimals="2"
+                            alpine-error="form.getError('warehouse_weight')" readonly />
+                    </div>
+
+                    <div
+                        class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-gray-700 dark:bg-gray-800/70">
+                        <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Rumus Bonus Karung</span>
+                            <span class="font-semibold text-gray-900 dark:text-white/90"
+                                x-text="`${Number(form.data.sack_count || 0).toLocaleString('id-ID')} x ${formatNumberValue(form.data.extra_per_sack)} Kg = ${formatWeight(totalBonusWeight)}`"></span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <x-input label="Harga / Kg" name="price_per_kg" placeholder="0" x-model="form.data.price_per_kg"
+                            :isCurrency="true" alpine-error="form.getError('price_per_kg')" required />
+
+                        <x-input label="Total Berat Timbang (Kg)" name="warehouse_weight_preview"
+                            x-model="form.data.warehouse_weight" :isNumeric="true" :numericDecimals="2" readonly />
+
+                        <x-select label="Potongan Penjualan" name="sale_deduction_type" :options="[
+                            ['label' => 'Tidak Ada', 'value' => 'none'],
+                            ['label' => 'Persentase', 'value' => 'percentage'],
+                            ['label' => 'Nominal', 'value' => 'nominal'],
+                        ]"
+                            x-model="form.data.sale_deduction_type"
+                            x-on:change="$dispatch('update-field', { field: 'sale_deduction_type', value: $event.detail })"
+                            alpine-error="form.getError('sale_deduction_type')" required />
+
+                        <div>
+                            <template x-if="form.data.sale_deduction_type !== 'none'">
+                                <div>
+                                    <x-input label="Nilai Potongan" name="sale_deduction_value"
+                                        x-model="form.data.sale_deduction_value" :isNumeric="true" :numericDecimals="2"
+                                        alpine-error="form.getError('sale_deduction_value')" />
+                                </div>
+                            </template>
+                            <template x-if="form.data.sale_deduction_type === 'none'">
+                                <div>
+                                    <label
+                                        class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Nilai
+                                        Potongan</label>
+                                    <div
+                                        class="flex h-11 items-center rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm text-gray-400 dark:border-gray-700 dark:bg-gray-800/50">
+                                        -</div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Potongan
+                                Penjualan</label>
+                            <div class="flex h-11 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                                x-text="formatCurrency(saleDeductionAmount)"></div>
+                        </div>
+
+                        <x-input label="Total Nilai Panen" name="total_harvest_value"
+                            x-model="form.data.total_harvest_value" :isCurrency="true" readonly />
+
+                        <x-input label="Bayar Tunai (Cash Payout)" name="cash_payout" placeholder="0"
+                            x-model="form.data.cash_payout" :isCurrency="true"
+                            alpine-error="form.getError('cash_payout')" />
+
+                        <x-input label="Potong Hutang (Otomatis)" name="debt_deduction"
+                            x-model="form.data.debt_deduction" :isCurrency="true" readonly />
+                    </div>
                 </div>
 
-                <x-input label="Lokasi" name="location" placeholder="Contoh: Sawah Blok A" x-model="form.data.location"
-                    alpine-error="form.getError('location')" required />
+                <div class="space-y-4 xl:col-span-4 mt-6">
+                    <div
+                        class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/70">
+                        <h5 class="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Ringkasan Hutang</h5>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-500 dark:text-gray-400">Sisa Hutang Saat Ini</span>
+                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                    x-text="formatCurrency(farmer_current_debt)"></span>
+                            </div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-500 dark:text-gray-400">Sisa Hutang Setelah Potongan</span>
+                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                    x-text="formatCurrency(remainingDebtAfterCut)"></span>
+                            </div>
+                        </div>
+                    </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <x-input label="Total Berat Bayar (Kg)" name="total_weight" type="number" step="0.01" placeholder="0" x-model="form.data.total_weight"
-                        alpine-error="form.getError('total_weight')" required />
+                    <div
+                        class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/70">
+                        <h5 class="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Ringkasan Timbangan</h5>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500 dark:text-gray-400">Total Berat Dibayar</span>
+                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                    x-text="formatWeight(form.data.total_weight)"></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500 dark:text-gray-400">Bonus Karung</span>
+                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                    x-text="formatWeight(totalBonusWeight)"></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500 dark:text-gray-400">Total Berat Timbang</span>
+                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                    x-text="formatWeight(form.data.warehouse_weight)"></span>
+                            </div>
+                        </div>
+                    </div>
 
-                    <x-input label="Jumlah Karung" name="sack_count" type="number" placeholder="0" x-model="form.data.sack_count"
-                        alpine-error="form.getError('sack_count')" required />
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <x-input label="Bonus / Karung (Kg)" name="extra_per_sack" type="number" step="0.01" placeholder="0" x-model="form.data.extra_per_sack"
-                        alpine-error="form.getError('extra_per_sack')" required />
-
-                    <x-input label="Total Berat Gudang (Kg)" name="warehouse_weight" type="number" step="0.01" x-model="form.data.warehouse_weight"
-                        alpine-error="form.getError('warehouse_weight')" readonly />
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <x-input label="Harga / Kg" name="price_per_kg" placeholder="0" x-model="form.data.price_per_kg" :isCurrency="true"
-                        alpine-error="form.getError('price_per_kg')" required />
-
-                    <x-input label="Total Nilai Panen" name="total_harvest_value" x-model="form.data.total_harvest_value" :isCurrency="true" readonly />
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <x-input label="Bayar Tunai (Cash Payout)" name="cash_payout" placeholder="0" x-model="form.data.cash_payout" :isCurrency="true"
-                        alpine-error="form.getError('cash_payout')" />
-
-                    <x-input label="Potong Hutang (Otomatis)" name="debt_deduction" x-model="form.data.debt_deduction" :isCurrency="true" readonly />
+                    <div
+                        class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/70">
+                        <h5 class="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Ringkasan Pembayaran
+                        </h5>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500 dark:text-gray-400">Nilai Kotor</span>
+                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                    x-text="formatCurrency(baseHarvestValue)"></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500 dark:text-gray-400">Potongan Penjualan</span>
+                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                    x-text="formatCurrency(saleDeductionAmount)"></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-500 dark:text-gray-400">Bayar Tunai</span>
+                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                    x-text="formatCurrency(form.data.cash_payout)"></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="flex justify-end gap-3 mt-6">
+            <div class="mt-6 flex justify-end gap-3">
                 <button type="button" @click="$dispatch('close-modal', 'harvest-modal')"
                     class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">
                     Batal
                 </button>
 
-                <button type="submit" class="px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600"
+                <button type="submit" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600"
                     :disabled="form.processing || form.data.debt_deduction < 0">
                     <span x-show="!form.processing">Simpan</span>
                     <span x-show="form.processing">Menyimpan...</span>
@@ -78,50 +196,71 @@
                 farmer_current_debt: 0,
                 form: useForm({
                     farmer_id: '',
-                    harvest_date: new Date().toISOString().split('T')[0],
+                    harvest_date: window.getLocalDateInputValue(),
                     location: '',
                     total_weight: 0,
                     sack_count: 0,
-                    extra_per_sack: 0,
+                    extra_per_sack: 1,
                     warehouse_weight: 0,
                     price_per_kg: 0,
+                    sale_deduction_type: 'none',
+                    sale_deduction_value: 0,
                     total_harvest_value: 0,
                     cash_payout: 0,
                     debt_deduction: 0,
                 }),
 
-                get warehouseWeight() {
-                    const total = parseFloat(this.form.data.total_weight) || 0;
-                    const sacks = parseInt(this.form.data.sack_count) || 0;
-                    const extra = parseFloat(this.form.data.extra_per_sack) || 0;
-                    return total + (sacks * extra);
+                get totalBonusWeight() {
+                    return (parseInt(this.form.data.sack_count) || 0) * (parseFloat(this.form.data.extra_per_sack) ||
+                        0);
                 },
 
-                get totalHarvestValue() {
-                    const totalWeight = parseFloat(this.form.data.total_weight) || 0;
-                    const price = parseFloat(this.form.data.price_per_kg) || 0;
-                    return totalWeight * price;
+                get baseHarvestValue() {
+                    return (parseFloat(this.form.data.total_weight) || 0) * (parseFloat(this.form.data.price_per_kg) ||
+                        0);
                 },
 
-                get maxDebtDeduction() {
-                    return Math.min(this.totalHarvestValue, this.farmer_current_debt);
+                get saleDeductionAmount() {
+                    const deductionValue = parseFloat(this.form.data.sale_deduction_value) || 0;
+                    if (this.form.data.sale_deduction_type === 'percentage') {
+                        return this.baseHarvestValue * (deductionValue / 100);
+                    }
+                    if (this.form.data.sale_deduction_type === 'nominal') {
+                        return deductionValue;
+                    }
+                    return 0;
+                },
+
+                get netHarvestValue() {
+                    return Math.max(0, this.baseHarvestValue - this.saleDeductionAmount);
+                },
+
+                get remainingDebtAfterCut() {
+                    return Math.max(0, this.farmer_current_debt - (parseFloat(this.form.data.debt_deduction) || 0));
+                },
+
+                formatNumberValue(value) {
+                    return Number(value || 0).toLocaleString('id-ID', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    });
                 },
 
                 init() {
-                    // Watch farmer_id to fetch current debt
-                    this.$watch('form.data.farmer_id', (val) => {
-                        this.fetchFarmerDebt(val);
-                    });
-
-                    // Watch inputs to calculate values
+                    this.$watch('form.data.farmer_id', (val) => this.fetchFarmerDebt(val));
                     this.$watch('form.data.total_weight', () => this.calculateValues());
                     this.$watch('form.data.sack_count', () => this.calculateValues());
                     this.$watch('form.data.extra_per_sack', () => this.calculateValues());
                     this.$watch('form.data.price_per_kg', () => this.calculateValues());
+                    this.$watch('form.data.sale_deduction_type', () => this.calculateValues());
+                    this.$watch('form.data.sale_deduction_value', () => this.calculateValues());
                     this.$watch('form.data.cash_payout', () => this.calculateDeductionFromCash());
 
                     window.addEventListener('update-field', (event) => {
-                        const { field, value } = event.detail;
+                        const {
+                            field,
+                            value
+                        } = event.detail;
                         this.form.data[field] = value;
                     });
 
@@ -134,44 +273,37 @@
                     const totalWeight = parseFloat(this.form.data.total_weight) || 0;
                     const sacks = parseInt(this.form.data.sack_count) || 0;
                     const extra = parseFloat(this.form.data.extra_per_sack) || 0;
-                    const price = parseFloat(this.form.data.price_per_kg) || 0;
 
                     this.form.data.warehouse_weight = (totalWeight + (sacks * extra)).toFixed(2);
-                    const harvestValue = totalWeight * price;
-                    this.form.data.total_harvest_value = harvestValue;
+                    this.form.data.total_harvest_value = Math.round(this.netHarvestValue);
 
-                    // Update deduction and cash
-                    const bestDeduction = Math.min(harvestValue, this.farmer_current_debt);
-                    this.form.data.debt_deduction = bestDeduction;
-                    this.form.data.cash_payout = harvestValue - bestDeduction;
+                    const bestDeduction = Math.min(this.netHarvestValue, this.farmer_current_debt);
+                    this.form.data.debt_deduction = Math.round(bestDeduction);
+                    this.form.data.cash_payout = Math.round(this.netHarvestValue - bestDeduction);
                 },
 
                 calculateDeductionFromCash() {
                     const cash = parseFloat(this.form.data.cash_payout) || 0;
                     const total = parseFloat(this.form.data.total_harvest_value) || 0;
-                    
+
                     if (cash > total) {
-                        this.form.data.cash_payout = total;
+                        this.form.data.cash_payout = Math.round(total);
                         this.form.data.debt_deduction = 0;
                     } else {
-                        this.form.data.debt_deduction = total - cash;
+                        this.form.data.debt_deduction = Math.round(total - cash);
                     }
                 },
 
                 async fetchFarmerDebt(farmerId) {
                     if (!farmerId) {
                         this.farmer_current_debt = 0;
+                        this.calculateValues();
                         return;
                     }
                     try {
                         const response = await axios.get(`/manajemen-petani/${farmerId}`);
-                        this.farmer_current_debt = response.data.data.current_debt;
-                        
-                        // Re-calculate deduction if farmer changes
-                        const total = this.totalHarvestValue;
-                        const bestDeduction = Math.min(total, this.farmer_current_debt);
-                        this.form.data.debt_deduction = bestDeduction;
-                        this.form.data.cash_payout = total - bestDeduction;
+                        this.farmer_current_debt = response.data.data.current_debt || 0;
+                        this.calculateValues();
                     } catch (error) {
                         console.error('Failed to fetch farmer debt', error);
                         toast.error('Gagal', 'Gagal mengambil data hutang petani');
@@ -183,9 +315,12 @@
                     this.editId = null;
                     this.form.reset();
                     this.form.clearErrors();
-                    
-                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', { detail: null }));
-
+                    this.form.data.harvest_date = window.getLocalDateInputValue();
+                    this.form.data.extra_per_sack = 1;
+                    this.farmer_current_debt = 0;
+                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', {
+                        detail: null
+                    }));
                     this.$dispatch('open-modal', 'harvest-modal');
                 },
 
@@ -200,16 +335,20 @@
                         location: item.location || '',
                         total_weight: item.total_weight || 0,
                         sack_count: item.sack_count || 0,
-                        extra_per_sack: item.extra_per_sack || 0,
+                        extra_per_sack: item.extra_per_sack || 1,
                         warehouse_weight: item.warehouse_weight || 0,
                         price_per_kg: item.price_per_kg || 0,
+                        sale_deduction_type: item.sale_deduction_type || 'none',
+                        sale_deduction_value: item.sale_deduction_value || 0,
                         total_harvest_value: item.total_harvest_value || 0,
                         cash_payout: item.cash_payout || 0,
                         debt_deduction: item.debt_deduction || 0,
                     };
 
-                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', { detail: item.farmer_id }));
-
+                    this.farmer_current_debt = (item.farmer?.current_debt || 0) + (item.debt_deduction || 0);
+                    window.dispatchEvent(new CustomEvent('set-selected-farmer_id', {
+                        detail: item.farmer_id
+                    }));
                     this.$dispatch('open-modal', 'harvest-modal');
                 },
 
@@ -227,16 +366,17 @@
                             this.deleteId = null;
                         },
                         onError: (error) => {
-                            toast.error('Gagal', error.response?.data?.message || 'Terjadi kesalahan saat menghapus data');
+                            toast.error('Gagal', error.response?.data?.message ||
+                                'Terjadi kesalahan saat menghapus data');
                         }
                     });
                 },
 
                 async submit() {
-                    const url = this.editMode 
-                        ? `{{ url('manajemen-panen') }}/${this.editId}`
-                        : `{{ url('manajemen-panen') }}`;
-                    
+                    const url = this.editMode ?
+                        `{{ url('manajemen-panen') }}/${this.editId}` :
+                        `{{ url('manajemen-panen') }}`;
+
                     const method = this.editMode ? 'put' : 'post';
 
                     await this.form.submit(method, url, {
@@ -247,7 +387,8 @@
                         },
                         onError: (error) => {
                             if (!this.form.hasErrors()) {
-                                toast.error('Gagal', error.response?.data?.message || 'Terjadi kesalahan sistem');
+                                toast.error('Gagal', error.response?.data?.message ||
+                                    'Terjadi kesalahan sistem');
                             }
                         }
                     });

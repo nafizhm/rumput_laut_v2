@@ -14,11 +14,9 @@ class ReceiveStockRequest extends FormRequest
             'movement_date' => 'required|date',
             'note_weight_kg' => 'nullable|numeric|min:0',
             'note_sacks' => 'nullable|integer|min:0',
-            'actual_weight_kg' => 'required|numeric|min:0',
+            'actual_weight_kg' => 'required|numeric|min:0.01',
             'actual_sacks' => 'required|integer|min:0',
+            'description' => 'nullable|string|max:255',
         ];
     }
 }
-
-// Separate files would be better, but I'll create them one by one if needed.
-// Actually, I'll create them in separate files as per Laravel convention.

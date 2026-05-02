@@ -6,11 +6,11 @@ use App\Models\Expense;
 use App\Models\Farmer;
 use App\Models\HarvestTransaction;
 use App\Models\Inventory;
+use App\Models\Loan;
 use App\Models\SalesTransaction;
 use App\Models\StockMovement;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
@@ -19,18 +19,25 @@ class DashboardController extends Controller
         return view('pages.dashboard.index');
     }
 
-    public function stats()
+    public function stats(Request $request)
     {
-        Carbon::setLocale('id');
-        $totalSales = SalesTransaction::sum('total_sale_value');
-        $totalHarvest = HarvestTransaction::sum('total_harvest_value');
-        $totalExpenses = Expense::sum('amount');
-        
+        [$startDate, $endDate] = $this->resolveDateRange($request);
+
+        $salesQuery = SalesTransaction::with('factory')->whereBetween('sale_date', [$startDate, $endDate]);
+        $harvestQuery = HarvestTransaction::with('farmer')->whereBetween('harvest_date', [$startDate, $endDate]);
+        $expenseQuery = Expense::with('category')->whereBetween('expense_date', [$startDate, $endDate]);
+        $loanQuery = Loan::with('farmer')->whereBetween('loan_date', [$startDate, $endDate]);
+        $movementQuery = StockMovement::whereBetween('movement_date', [$startDate, $endDate]);
+
+        $totalSales = (clone $salesQuery)->sum('total_sale_value');
+        $totalHarvest = (clone $harvestQuery)->sum('total_harvest_value');
+        $totalExpenses = (clone $expenseQuery)->sum('amount');
+
         $netProfit = $totalSales - $totalHarvest - $totalExpenses;
         $farmerDebt = Farmer::sum('current_debt');
         $warehouseStock = Inventory::sum('current_stock_kg');
 
-        $recentInvoices = SalesTransaction::with('factory')
+        $recentInvoices = (clone $salesQuery)
             ->orderBy('sale_date', 'desc')
             ->limit(5)
             ->get()
@@ -40,41 +47,27 @@ class DashboardController extends Controller
                     'sale_date' => $sale->sale_date->format('d M Y'),
                     'factory_name' => $sale->factory->name,
                     'total_sale_value' => $sale->total_sale_value,
-                    'status' => 'Complete', // For now hardcoded as complete
+                    'status' => $sale->payment_status_label,
+                    'payment_status' => $sale->payment_status,
                 ];
             });
 
-        $activities = StockMovement::orderBy('created_at', 'desc')
-            ->limit(5)
-            ->get()
-            ->map(function ($movement) {
-                return [
-                    'type' => $movement->type,
-                    'direction' => $movement->direction,
-                    'weight' => $movement->weight_kg,
-                    'time' => $movement->created_at->diffForHumans(),
-                    'description' => $this->getActivityDescription($movement),
-                ];
-            });
-
-        $startOfWeek = Carbon::now()->startOfWeek();
-
-        $weeklyHarvestCount = HarvestTransaction::where('harvest_date', '>=', $startOfWeek)->count();
-        $weeklyHarvestValue = HarvestTransaction::where('harvest_date', '>=', $startOfWeek)->sum('total_harvest_value');
-        $recentHarvests = HarvestTransaction::with('farmer')
+        $weeklyHarvestCount = (clone $harvestQuery)->count();
+        $weeklyHarvestValue = (clone $harvestQuery)->sum('total_harvest_value');
+        $recentHarvests = (clone $harvestQuery)
             ->orderBy('harvest_date', 'desc')
             ->limit(5)
             ->get()
             ->map(fn($h) => [
                 'name' => $h->farmer->name,
-                'weight' => $h->net_weight_kg,
+                'weight' => $h->warehouse_weight,
                 'value' => $h->total_harvest_value,
                 'date' => $h->harvest_date->format('d/m'),
             ]);
 
-        $weeklyExpenseCount = Expense::where('expense_date', '>=', $startOfWeek)->count();
-        $weeklyExpenseValue = Expense::where('expense_date', '>=', $startOfWeek)->sum('amount');
-        $recentExpenses = Expense::with('category')
+        $weeklyExpenseCount = (clone $expenseQuery)->count();
+        $weeklyExpenseValue = (clone $expenseQuery)->sum('amount');
+        $recentExpenses = (clone $expenseQuery)
             ->orderBy('expense_date', 'desc')
             ->limit(5)
             ->get()
@@ -84,9 +77,9 @@ class DashboardController extends Controller
                 'date' => $e->expense_date->format('d/m'),
             ]);
 
-        $weeklySalesCount = SalesTransaction::where('sale_date', '>=', $startOfWeek)->count();
-        $weeklySalesValue = SalesTransaction::where('sale_date', '>=', $startOfWeek)->sum('total_sale_value');
-        $recentSales = SalesTransaction::with('factory')
+        $weeklySalesCount = (clone $salesQuery)->count();
+        $weeklySalesValue = (clone $salesQuery)->sum('total_sale_value');
+        $recentSales = (clone $salesQuery)
             ->orderBy('sale_date', 'desc')
             ->limit(5)
             ->get()
@@ -97,11 +90,18 @@ class DashboardController extends Controller
                 'date' => $s->sale_date->format('d/m'),
             ]);
 
+        $totalShrinkage = (clone $movementQuery)->where('type', 'shrinkage')->sum('weight_kg');
+        $totalReceived = (clone $movementQuery)->where('type', 'in')->sum('weight_kg');
+        $shrinkageRate = $totalReceived > 0 ? ($totalShrinkage / $totalReceived) * 100 : 0;
+        $totalDiscrepancy = (clone $movementQuery)->sum('discrepancy_kg');
+
         return response()->json([
             'netProfit' => $netProfit,
             'totalSales' => $totalSales,
             'farmerDebt' => $farmerDebt,
             'warehouseStock' => $warehouseStock,
+            'shrinkageRate' => round($shrinkageRate, 2),
+            'logisticsDiscrepancy' => round($totalDiscrepancy, 2),
             'recentInvoices' => $recentInvoices,
             'weeklyHarvest' => [
                 'count' => $weeklyHarvestCount,
@@ -118,7 +118,7 @@ class DashboardController extends Controller
                 'value' => $weeklySalesValue,
                 'recent' => $recentSales,
             ],
-            'recentLoans' => \App\Models\Loan::with('farmer')
+            'recentLoans' => (clone $loanQuery)
                 ->orderBy('loan_date', 'desc')
                 ->limit(5)
                 ->get()
@@ -132,64 +132,48 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function getActivityDescription($movement)
+    public function chartData(Request $request)
     {
-        switch ($movement->type) {
-            case 'in':
-                return "Penerimaan barang masuk sebesar " . number_format($movement->weight_kg, 2) . " kg";
-            case 'out':
-                return "Pengiriman barang keluar sebesar " . number_format($movement->weight_kg, 2) . " kg";
-            case 'shrinkage':
-                return "Penyusutan stok sebesar " . number_format($movement->weight_kg, 2) . " kg";
-            case 'adjustment':
-                return "Penyesuaian stok sebesar " . number_format($movement->weight_kg, 2) . " kg";
-            default:
-                return "Aktivitas stok lainnya";
-        }
-    }
+        [$startDate, $endDate] = $this->resolveDateRange($request);
 
-    public function chartData()
-    {
         $months = [];
         $incomeData = [];
         $expenseData = [];
+        $cursor = $startDate->copy()->startOfMonth();
+        $lastMonth = $endDate->copy()->startOfMonth();
 
-        for ($i = 5; $i >= 0; $i--) {
-            $date = Carbon::now()->subMonths($i);
-            $monthName = $date->format('M');
-            $months[] = $monthName;
-
-            // Income: Sales
-            $income = SalesTransaction::whereMonth('sale_date', $date->month)
-                ->whereYear('sale_date', $date->year)
+        while ($cursor <= $lastMonth) {
+            $months[] = $cursor->translatedFormat('M Y');
+            $incomeData[] = SalesTransaction::whereBetween('sale_date', [$cursor->copy()->startOfMonth(), $cursor->copy()->endOfMonth()])
                 ->sum('total_sale_value');
-            $incomeData[] = $income;
-
-            // Expenses: Harvest + General Expenses
-            $harvestExp = HarvestTransaction::whereMonth('harvest_date', $date->month)
-                ->whereYear('harvest_date', $date->year)
-                ->sum('total_harvest_value');
-            
-            $generalExp = Expense::whereMonth('expense_date', $date->month)
-                ->whereYear('expense_date', $date->year)
+            $expenseData[] = HarvestTransaction::whereBetween('harvest_date', [$cursor->copy()->startOfMonth(), $cursor->copy()->endOfMonth()])
+                ->sum('total_harvest_value')
+                + Expense::whereBetween('expense_date', [$cursor->copy()->startOfMonth(), $cursor->copy()->endOfMonth()])
                 ->sum('amount');
-
-            $expenseData[] = $harvestExp + $generalExp;
+            $cursor->addMonth();
         }
-
-        // Summary Stats
-        $totalShrinkage = StockMovement::where('type', 'shrinkage')->sum('weight_kg');
-        $totalReceived = StockMovement::where('type', 'in')->sum('weight_kg');
-        $shrinkageRate = $totalReceived > 0 ? ($totalShrinkage / $totalReceived) * 100 : 0;
-        
-        $totalDiscrepancy = StockMovement::sum('discrepancy_kg');
 
         return response()->json([
             'months' => $months,
             'income' => $incomeData,
             'expenses' => $expenseData,
-            'shrinkageRate' => round($shrinkageRate, 2),
-            'logisticsDiscrepancy' => round($totalDiscrepancy, 2),
         ]);
+    }
+
+    protected function resolveDateRange(Request $request): array
+    {
+        $startDate = $request->filled('start_date')
+            ? Carbon::parse($request->query('start_date'))->startOfDay()
+            : Carbon::now()->startOfMonth();
+
+        $endDate = $request->filled('end_date')
+            ? Carbon::parse($request->query('end_date'))->endOfDay()
+            : Carbon::now()->endOfMonth();
+
+        if ($startDate->gt($endDate)) {
+            [$startDate, $endDate] = [$endDate->copy()->startOfDay(), $startDate->copy()->endOfDay()];
+        }
+
+        return [$startDate, $endDate];
     }
 }

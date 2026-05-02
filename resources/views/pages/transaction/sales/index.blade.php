@@ -33,16 +33,47 @@
         </x-slot:headerAction>
 
         <x-slot:date>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date(item.sale_date))"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatDisplayDate(item.sale_date)"></span>
         </x-slot:date>
 
+        <x-slot:weight>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatWeight(item.total_weight_kg)"></span>
+        </x-slot:weight>
+
         <x-slot:currency>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="'Rp ' + Number(item.price_per_kg).toLocaleString('id-ID')"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.price_per_kg)"></span>
         </x-slot:currency>
 
         <x-slot:total_sale_value>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="'Rp ' + Number(item.total_sale_value).toLocaleString('id-ID')"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.total_sale_value)"></span>
         </x-slot:total_sale_value>
+
+        <x-slot:payment_status>
+            <span
+                :class="item.payment_status === 'paid'
+                    ? 'bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-500/10 dark:text-green-400'
+                    : 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400'"
+                class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset"
+                x-text="item.payment_status_label">
+            </span>
+        </x-slot:payment_status>
+
+        <x-slot:action>
+            <div class="flex items-center gap-2">
+                <template x-if="item.payment_status !== 'paid'">
+                    <button type="button" @click="$dispatch('open-pay-sale', item)"
+                        class="flex w-full items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600">
+                        Bayar
+                    </button>
+                </template>
+                <template x-if="item.payment_status === 'paid' && item.payment_proof_url">
+                    <a :href="item.payment_proof_url" target="_blank"
+                        class="flex w-full items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                        Bukti Bayar
+                    </a>
+                </template>
+            </div>
+        </x-slot:action>
     </x-data-table>
 
     @include('pages.transaction.sales._sales-modal')

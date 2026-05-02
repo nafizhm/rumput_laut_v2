@@ -32,8 +32,23 @@
             </button>
         </x-slot:headerAction>
 
+        <x-slot:weight>
+            <span class="text-sm font-medium text-gray-900 dark:text-gray-400" x-text="formatWeight(item.current_stock_kg)"></span>
+        </x-slot:weight>
+
+        <x-slot:sacks>
+            <span class="text-sm font-medium text-gray-900 dark:text-gray-400" x-text="Number(item.current_sack_count || 0).toLocaleString('id-ID')"></span>
+        </x-slot:sacks>
+
         <x-slot:action>
             <div class="flex items-center gap-2">
+                <a 
+                    :href="`{{ url('manajemen-gudang/inventori') }}/${item.id}`"
+                    class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                    Detail
+                </a>
+
                 <button 
                     type="button" 
                     @click="$dispatch('edit-entity', item)" 

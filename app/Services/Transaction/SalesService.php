@@ -8,6 +8,8 @@ use App\Models\StockMovement;
 use App\Traits\HandlesTransaction;
 use Exception;
 use Illuminate\Support\Carbon;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class SalesService
 {
@@ -44,6 +46,7 @@ class SalesService
             $data['invoice_number'] = $this->generateInvoiceNumber();
             $data['total_sale_value'] = $soldWeight * $data['price_per_kg'];
             $data['total_weight_kg'] = $soldWeight;
+            $data['payment_status'] = $data['payment_status'] ?? 'unpaid';
 
             $sale = SalesTransaction::create($data);
 
@@ -59,6 +62,36 @@ class SalesService
             ]);
 
             return $sale;
+        });
+    }
+
+    public function paySale(SalesTransaction $sale, array $data): SalesTransaction
+    {
+        return $this->transaction(function () use ($sale, $data) {
+            $paidAmount = (int) round($data['paid_amount']);
+
+            if ($paidAmount < (int) $sale->total_sale_value) {
+                throw new Exception('Nominal bayar tidak boleh lebih kecil dari total penjualan.');
+            }
+
+            $proofPath = null;
+            if (($data['payment_proof'] ?? null) instanceof UploadedFile) {
+                $proofPath = $data['payment_proof']->store('sales-payments', 'public');
+            }
+
+            if ($sale->payment_proof_path && $proofPath) {
+                Storage::disk('public')->delete($sale->payment_proof_path);
+            }
+
+            $sale->update([
+                'payment_status' => 'paid',
+                'payment_date' => $data['payment_date'],
+                'paid_amount' => $paidAmount,
+                'payment_proof_path' => $proofPath ?? $sale->payment_proof_path,
+                'payment_notes' => $data['payment_notes'] ?? null,
+            ]);
+
+            return $sale->fresh(['factory', 'inventory']);
         });
     }
 

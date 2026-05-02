@@ -23,7 +23,7 @@
         </x-slot:headerAction>
 
         <x-slot:longDate>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date(item.loan_date))"></span>
+            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatDisplayDate(item.loan_date)"></span>
         </x-slot:longDate>
 
         <x-slot:currency>

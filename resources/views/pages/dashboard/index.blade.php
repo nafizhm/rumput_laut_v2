@@ -10,27 +10,16 @@
                 <div>
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Ringkasan</h3>
                 </div>
-                <div class="flex gap-x-3.5">
-                    <!-- Filter button (optional) -->
-                    <div>
-                        <button
-                            class="text-theme-sm shadow-theme-xs inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
-                            <svg class="fill-white stroke-current dark:fill-gray-800" width="20" height="20"
-                                viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M2.29004 5.90393H17.7067" stroke="" stroke-width="1.5" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                                <path d="M17.7075 14.0961H2.29085" stroke="" stroke-width="1.5" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                                <path
-                                    d="M12.0826 3.33331C13.5024 3.33331 14.6534 4.48431 14.6534 5.90414C14.6534 7.32398 13.5024 8.47498 12.0826 8.47498C10.6627 8.47498 9.51172 7.32398 9.51172 5.90415C9.51172 4.48432 10.6627 3.33331 12.0826 3.33331Z"
-                                    fill="" stroke="" stroke-width="1.5" />
-                                <path
-                                    d="M7.91745 11.525C6.49762 11.525 5.34662 12.676 5.34662 14.0959C5.34661 15.5157 6.49762 16.6667 7.91745 16.6667C9.33728 16.6667 10.4883 15.5157 10.4883 14.0959C10.4883 12.676 9.33728 11.525 7.91745 11.525Z"
-                                    fill="" stroke="" stroke-width="1.5" />
-                            </svg>
-                            <span class="hidden sm:block">Filter</span>
-                        </button>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center space-x-2">
+                        <x-input name="dashboard_start_date" type="date" x-model="filters.startDate" />
+                        <p>s/d</p>
+                        <x-input name="dashboard_end_date" type="date" x-model="filters.endDate" />
                     </div>
+                    <button @click="applyFilters()"
+                        class="text-theme-sm shadow-theme-xs inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200">
+                        Terapkan
+                    </button>
                 </div>
             </div>
             <div
@@ -166,10 +155,13 @@
                                             <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400"
                                                 x-text="invoice.factory_name"></td>
                                             <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400"
-                                                x-text="formatIDR(invoice.total_sale_value)"></td>
+                                                x-text="formatCurrency(invoice.total_sale_value)"></td>
                                             <td class="px-6 py-4 text-left">
                                                 <span
-                                                    class="bg-success-50 text-theme-xs text-success-600 dark:bg-success-500/15 dark:text-success-500 rounded-full px-2 py-0.5 font-medium"
+                                                    :class="invoice.payment_status === 'paid' ?
+                                                        'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500' :
+                                                        'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'"
+                                                    class="text-theme-xs rounded-full px-2 py-0.5 font-medium"
                                                     x-text="invoice.status"></span>
                                             </td>
                                         </tr>
@@ -395,15 +387,33 @@
                     recentLoans: []
                 },
                 financialChart: null,
+                filters: {
+                    startDate: window.getMonthStartDateInputValue(),
+                    endDate: window.getLocalDateInputValue(),
+                },
 
                 async init() {
+                    this.filters.startDate = window.getMonthStartDateInputValue();
+                    this.filters.endDate = window.getLocalDateInputValue();
+                    await Promise.all([this.fetchStats(), this.initChart()]);
+                },
+
+                buildQuery() {
+                    const params = new URLSearchParams({
+                        start_date: this.filters.startDate,
+                        end_date: this.filters.endDate,
+                    });
+                    return params.toString();
+                },
+
+                async applyFilters() {
                     await Promise.all([this.fetchStats(), this.initChart()]);
                 },
 
                 async fetchStats() {
                     this.loading = true;
                     try {
-                        const response = await fetch('/dashboard/stats');
+                        const response = await fetch(`/dashboard/stats?${this.buildQuery()}`);
                         if (!response.ok) throw new Error('Stats API error');
                         const data = await response.json();
                         this.stats = {
@@ -419,7 +429,7 @@
 
                 async initChart() {
                     try {
-                        const response = await fetch('/dashboard/chart-data');
+                        const response = await fetch(`/dashboard/chart-data?${this.buildQuery()}`);
                         if (!response.ok) throw new Error('Chart API error');
                         const data = await response.json();
 
@@ -487,7 +497,7 @@
                             },
                             tooltip: {
                                 y: {
-                                    formatter: (val) => this.formatIDR(val)
+                                    formatter: (val) => this.formatCurrency(val)
                                 }
                             }
                         };
@@ -509,12 +519,7 @@
                 },
 
                 formatIDR(value) {
-                    return new Intl.NumberFormat('id-ID', {
-                        style: 'currency',
-                        currency: 'IDR',
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0
-                    }).format(value);
+                    return formatCurrency(value);
                 },
 
                 formatIDRShort(value) {
@@ -525,10 +530,11 @@
                 },
 
                 formatWeight(value) {
-                    return new Intl.NumberFormat('id-ID', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    }).format(value) + ' kg';
+                    return window.formatWeight(value);
+                },
+
+                formatCurrency(value) {
+                    return window.formatCurrency(value);
                 }
             }
         }

@@ -202,13 +202,35 @@ class MenuSeeder extends Seeder
         ]);
 
         Menu::create([
+            'name' => 'Gudang Basah',
+            'icon' => null,
+            'route' => 'manajemen-gudang.wet',
+            'url' => 'manajemen-gudang/basah',
+            'permission' => 'manajemen-gudang.read',
+            'parent_id' => $transaksi->id,
+            'order' => 5,
+            'is_active' => true
+        ]);
+
+        Menu::create([
+            'name' => 'Gudang Kering',
+            'icon' => null,
+            'route' => 'manajemen-gudang.dry',
+            'url' => 'manajemen-gudang/kering',
+            'permission' => 'manajemen-gudang.read',
+            'parent_id' => $transaksi->id,
+            'order' => 6,
+            'is_active' => true
+        ]);
+
+        Menu::create([
             'name' => 'Manajemen Penjualan',
             'icon' => null,
             'route' => 'manajemen-penjualan.index',
             'url' => 'manajemen-penjualan',
             'permission' => 'manajemen-penjualan.read',
             'parent_id' => $transaksi->id,
-            'order' => 5,
+            'order' => 7,
             'is_active' => true
         ]);
     }

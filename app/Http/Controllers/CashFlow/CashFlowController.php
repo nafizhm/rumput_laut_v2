@@ -7,8 +7,8 @@ use App\Models\Expense;
 use App\Models\HarvestTransaction;
 use App\Models\Loan;
 use App\Models\SalesTransaction;
-use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class CashFlowController extends Controller
 {
@@ -19,25 +19,20 @@ class CashFlowController extends Controller
 
     public function data(Request $request)
     {
-        $range = $request->query('range', 'monthly');
         $type = $request->query('type', 'all');
+        $startDate = $request->filled('start_date')
+            ? Carbon::parse($request->query('start_date'))->startOfDay()
+            : Carbon::now()->startOfMonth();
+        $endDate = $request->filled('end_date')
+            ? Carbon::parse($request->query('end_date'))->endOfDay()
+            : Carbon::now()->endOfMonth();
 
-        $now = Carbon::now();
-        $startDate = $now->copy()->startOfMonth();
-        $endDate = $now->copy()->endOfMonth();
-
-        if ($range === 'daily') {
-            $startDate = $now->copy()->startOfDay();
-            $endDate = $now->copy()->endOfDay();
-        } elseif ($range === 'weekly') {
-            $startDate = $now->copy()->startOfWeek();
-            $endDate = $now->copy()->endOfWeek();
+        if ($startDate->gt($endDate)) {
+            [$startDate, $endDate] = [$endDate->copy()->startOfDay(), $startDate->copy()->endOfDay()];
         }
 
-        // Fetch Categories
         $summary = [];
 
-        // 1. Penjualan Rumput Laut (Sales)
         $salesQuery = SalesTransaction::with('factory')
             ->whereBetween('sale_date', [$startDate, $endDate])
             ->where('total_sale_value', '>', 0);
@@ -59,8 +54,7 @@ class CashFlowController extends Controller
             ];
         }
 
-        // 2. Pembayaran Tunai Panen (Harvest)
-        $harvestQuery = HarvestTransaction::whereBetween('harvest_date', [$startDate, $endDate])
+        $harvestQuery = HarvestTransaction::with('farmer')->whereBetween('harvest_date', [$startDate, $endDate])
             ->where('cash_payout', '>', 0);
         $harvestCashOut = $harvestQuery->sum('cash_payout');
 
@@ -79,9 +73,7 @@ class CashFlowController extends Controller
                 ])
             ];
 
-            // 3. Pinjaman Petani (Loan)
-            $loanQuery = Loan::whereBetween('loan_date', [$startDate, $endDate])
-                ->where('amount', '>', 0);
+            $loanQuery = Loan::with('farmer')->whereBetween('loan_date', [$startDate, $endDate])->where('amount', '>', 0);
             $loanCashOut = $loanQuery->sum('amount');
             $summary[] = [
                 'id' => 3,
@@ -97,7 +89,6 @@ class CashFlowController extends Controller
                 ])
             ];
 
-            // 4. Biaya Operasional (Expense)
             $expenseQuery = Expense::with('category')
                 ->whereBetween('expense_date', [$startDate, $endDate])
                 ->where('amount', '>', 0);
