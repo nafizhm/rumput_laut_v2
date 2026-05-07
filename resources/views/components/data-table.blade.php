@@ -31,8 +31,7 @@
                 <select
                     class="dark:bg-dark-900 h-9 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none py-2 pl-3 pr-8 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                     :class="isOptionSelected && 'text-gray-500 dark:text-gray-400'" @click="isOptionSelected = true"
-                    x-model="perPage"
-                    @change="currentPage = 1">
+                    x-model="perPage" @change="currentPage = 1">
                     <option value="5" class="text-gray-500 dark:bg-gray-900 dark:text-gray-400">
                         5
                     </option>
@@ -58,8 +57,9 @@
             <span class="text-gray-500 dark:text-gray-400"> entries </span>
         </div>
 
-        <div class="flex items-center gap-3">
-            <div class="relative">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-nowrap">
+            <!-- Search Container (flexible on mobile) -->
+            <div class="relative flex-grow sm:flex-none">
                 <button class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                     <svg class="fill-current" width="20" height="20" viewBox="0 0 20 20" fill="none"
                         xmlns="http://www.w3.org/2000/svg">
@@ -70,24 +70,32 @@
                 </button>
 
                 <input type="text" x-model="search" placeholder="Search..." @input.debounce.300ms="currentPage = 1"
-                    class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pl-11 pr-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 xl:w-[300px]" />
+                    class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 pl-11 pr-4 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 sm:w-64 xl:w-[300px]" />
             </div>
 
-            @if (isset($showRefreshButton) && $showRefreshButton)
-                <button @click="refreshData()"
-                    class="flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3"
-                    :class="{ 'opacity-50 cursor-not-allowed': isLoading }" :disabled="isLoading">
-                    <svg class="h-4 w-4" :class="{ 'animate-spin': isLoading }" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span class="ml-2" x-text="isLoading ? 'Loading...' : 'Refresh'"></span>
-                </button>
-            @endif
+            <!-- Header Action (40% on mobile or wraps to below if multiple) -->
+            @if (isset($headerAction) || (isset($showRefreshButton) && $showRefreshButton))
+                <div @class([
+                    'flex items-center gap-2 sm:basis-auto sm:flex-none sm:gap-3',
+                    'has-[button+button]:basis-full has-[button+a]:basis-full [&_button]:w-auto [&_button]:flex-none'
+                ])>
+                    @if (isset($showRefreshButton) && $showRefreshButton)
+                        <button @click="refreshData()"
+                            class="flex h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3"
+                            :class="{ 'opacity-50 cursor-not-allowed': isLoading }" :disabled="isLoading">
+                            <svg class="h-4 w-4" :class="{ 'animate-spin': isLoading }" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span class="ml-2 hidden lg:inline" x-text="isLoading ? 'Loading...' : 'Refresh'"></span>
+                        </button>
+                    @endif
 
-            @if (isset($headerAction))
-                {{ $headerAction }}
+                    @if (isset($headerAction))
+                        {{ $headerAction }}
+                    @endif
+                </div>
             @endif
         </div>
     </div>
