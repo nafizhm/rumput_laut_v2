@@ -26,7 +26,6 @@ class SalesController extends Controller
             ['key' => 'invoice_number', 'label' => 'No. Invoice', 'sortable' => true],
             ['key' => 'sale_date', 'label' => 'Tanggal', 'render' => 'date', 'sortable' => true],
             ['key' => 'factory.name', 'label' => 'Pabrik'],
-            ['key' => 'inventory.item_name', 'label' => 'Barang'],
             ['key' => 'total_weight_kg', 'label' => 'Berat (Kg)', 'render' => 'weight', 'sortable' => true, 'align' => 'right'],
             ['key' => 'price_per_kg', 'label' => 'Harga / Kg', 'render' => 'currency', 'align' => 'right'],
             ['key' => 'total_sale_value', 'label' => 'Total Nilai', 'render' => 'total_sale_value', 'sortable' => true, 'align' => 'right'],
@@ -37,7 +36,7 @@ class SalesController extends Controller
         $data = $this->service->getAllSales();
         $factories = Factory::orderBy('name')->get()->map(fn($f) => ['value' => $f->id, 'label' => $f->name]);
         $inventories = Inventory::orderBy('item_name')->get()->map(fn($i) => [
-            'value' => $i->id, 
+            'value' => $i->id,
             'label' => $i->item_name,
             'current_stock' => (float) $i->current_stock_kg,
             'current_sacks' => (int) $i->current_sack_count

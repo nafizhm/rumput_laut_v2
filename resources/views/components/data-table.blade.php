@@ -8,12 +8,15 @@
     $gridTemplateColumns = '50px ';
     foreach ($columns as $column) {
         $width = $column['width'] ?? '1fr';
-        $gridTemplateColumns .= "minmax(0, $width) ";
+        // Use a binary variable (--is-mobile) to toggle min-width
+        $min = ($width === '1fr') ? 'calc(150px * var(--is-mobile))' : "calc($width * var(--is-mobile))";
+        $gridTemplateColumns .= "minmax($min, $width) ";
     }
 @endphp
 
 <div x-data="dataTable(@js($url), @js($rows), @js($id), @js($perPage))" x-init="init()" x-ref="dataTable" id="{{ $id }}"
-    class="overflow-hidden rounded-xl border border-gray-200 bg-white pt-4 dark:border-gray-800 dark:bg-white/3">
+    style="--is-mobile: 1;"
+    class="overflow-hidden rounded-xl border border-gray-200 bg-white pt-4 dark:border-gray-800 dark:bg-white/3 lg:[--is-mobile:0]">
 
     <!-- Loading Overlay -->
     <div x-show="isLoading" x-transition.opacity
@@ -89,19 +92,19 @@
         </div>
     </div>
 
-    <div class="max-w-full overflow-x-auto">
-        <div class="min-w-full">
+    <div class="custom-scrollbar max-w-full overflow-x-auto">
+        <div class="inline-block min-w-full align-middle lg:block">
             <!-- Table Header -->
-            <div class="grid border-t border-gray-200 dark:border-gray-800"
+            <div class="grid min-w-full w-max border-t border-gray-200 dark:border-gray-800 lg:w-full"
                 style="grid-template-columns: {{ $gridTemplateColumns }};">
-                <div class="flex items-center justify-center border-r border-gray-200 px-4 py-3 dark:border-gray-800">
+                <div class="flex items-center justify-center border-r border-gray-200 px-4 py-3 dark:border-gray-800 overflow-hidden min-w-0">
                     <p class="text-theme-xs font-medium text-gray-700 dark:text-gray-400">
                         No
                     </p>
                 </div>
                 @foreach ($columns as $column)
                             <div @class([
-                                'flex items-center border-r border-gray-200 px-4 py-3 dark:border-gray-800',
+                                'flex items-center border-r border-gray-200 px-4 py-3 dark:border-gray-800 overflow-hidden min-w-0',
                                 'justify-end text-right' => ($column['align'] ?? null) === 'right',
                                 'justify-center text-center' => ($column['align'] ?? null) === 'center',
                             ])>
@@ -142,16 +145,16 @@
             <!-- Table Body -->
             <template x-if="!isLoading && paginatedData.length > 0">
                 <template x-for="(item, index) in paginatedData" :key="item.id">
-                    <div class="grid border-t border-gray-100 dark:border-gray-800"
+                    <div class="grid min-w-full w-max border-t border-gray-100 dark:border-gray-800 lg:w-full"
                         style="grid-template-columns: {{ $gridTemplateColumns }};">
                         <div
-                            class="flex items-center justify-center border-r border-gray-100 px-4 py-3 dark:border-gray-800">
+                            class="flex items-center justify-center border-r border-gray-100 px-4 py-3 dark:border-gray-800 overflow-hidden min-w-0">
                             <p class="text-theme-sm text-gray-700 dark:text-gray-400"
                                 x-text="(currentPage - 1) * perPage + index + 1"></p>
                         </div>
                         @foreach ($columns as $column)
                             <div @class([
-                                'flex items-center border-r border-gray-100 px-4 py-3 dark:border-gray-800',
+                                'flex items-center border-r border-gray-100 px-4 py-3 dark:border-gray-800 overflow-hidden min-w-0',
                                 'justify-end text-right' => ($column['align'] ?? null) === 'right',
                                 'justify-center text-center' => ($column['align'] ?? null) === 'center',
                             ])>
