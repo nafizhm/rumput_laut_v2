@@ -58,8 +58,8 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-nowrap">
-            <!-- Search Container (flexible on mobile) -->
-            <div class="relative flex-grow sm:flex-none">
+            <!-- Search Container (fills remaining width on mobile) -->
+            <div class="relative flex-1 min-w-0 sm:flex-none">
                 <button class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                     <svg class="fill-current" width="20" height="20" viewBox="0 0 20 20" fill="none"
                         xmlns="http://www.w3.org/2000/svg">
@@ -76,8 +76,8 @@
             <!-- Header Action (40% on mobile or wraps to below if multiple) -->
             @if (isset($headerAction) || (isset($showRefreshButton) && $showRefreshButton))
                 <div @class([
-                    'flex items-center gap-2 sm:basis-auto sm:flex-none sm:gap-3',
-                    'has-[button+button]:basis-full has-[button+a]:basis-full [&_button]:w-auto [&_button]:flex-none'
+                    'flex flex-shrink-0 items-center gap-2 sm:basis-auto sm:flex-none sm:gap-3',
+                    'has-[button+button]:basis-full has-[button+a]:basis-full has-[div+div]:basis-full [&_button]:w-auto [&_button]:flex-none'
                 ])>
                     @if (isset($showRefreshButton) && $showRefreshButton)
                         <button @click="refreshData()"
