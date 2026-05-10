@@ -22,6 +22,10 @@ class SalesTransaction extends Model
         'paid_amount',
         'payment_proof_path',
         'payment_notes',
+        'sold_sacks',
+        'deduction_type',
+        'deduction_value',
+        'deduction_weight_kg',
     ];
 
     protected $casts = [

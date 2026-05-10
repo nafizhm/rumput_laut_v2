@@ -22,8 +22,9 @@ class UpdateHarvestTransactionRequest extends FormRequest
             'extra_per_sack' => 'required|numeric|min:0',
             'warehouse_weight' => 'required|numeric|min:0',
             'price_per_kg' => 'required|numeric|min:0',
-            'sale_deduction_type' => 'nullable|in:none,percentage,nominal',
+            'sale_deduction_type' => 'nullable|in:none,percentage,nominal,weight',
             'sale_deduction_value' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
             'cash_payout' => 'required|numeric|min:0',
         ];
     }
@@ -48,6 +49,8 @@ class UpdateHarvestTransactionRequest extends FormRequest
                     $deductionAmount = $baseValue * ($deductionValue / 100);
                 } elseif ($deductionType === 'nominal') {
                     $deductionAmount = $deductionValue;
+                } elseif ($deductionType === 'weight') {
+                    $deductionAmount = $deductionValue * $price;
                 }
 
                 if ($deductionAmount > $baseValue) {

@@ -139,6 +139,8 @@ class HarvestTransactionService
             $saleDeductionAmount = (int) round($baseValue * ($deductionValue / 100));
         } elseif ($deductionType === 'nominal') {
             $saleDeductionAmount = (int) round($deductionValue);
+        } elseif ($deductionType === 'weight') {
+            $saleDeductionAmount = (int) round($deductionValue * $pricePerKg);
         }
 
         $netHarvestValue = max(0, (int) round($baseValue) - $saleDeductionAmount);

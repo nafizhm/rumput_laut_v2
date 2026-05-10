@@ -51,10 +51,11 @@
                         <x-input label="Total Berat Timbang (Kg)" name="warehouse_weight_preview"
                             x-model="form.data.warehouse_weight" :isNumeric="true" :numericDecimals="2" readonly />
 
-                        <x-select label="Potongan Penjualan" name="sale_deduction_type" :options="[
+                        <x-select label="Jenis Potongan" name="sale_deduction_type" :options="[
                             ['label' => 'Tidak Ada', 'value' => 'none'],
                             ['label' => 'Persentase', 'value' => 'percentage'],
                             ['label' => 'Nominal', 'value' => 'nominal'],
+                            ['label' => 'Berat (Kg)', 'value' => 'weight'],
                         ]"
                             x-model="form.data.sale_deduction_type"
                             x-on:change="$dispatch('update-field', { field: 'sale_deduction_type', value: $event.detail })"
@@ -98,6 +99,12 @@
 
                         <x-input label="Potong Hutang (Otomatis)" name="debt_deduction"
                             x-model="form.data.debt_deduction" :isCurrency="true" readonly />
+                    </div>
+
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Catatan</label>
+                        <textarea x-model="form.data.notes" placeholder="Tambahkan catatan di sini..."
+                            class="block min-h-[96px] w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 focus:border-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"></textarea>
                     </div>
                 </div>
 
@@ -200,7 +207,7 @@
                     location: '',
                     total_weight: 0,
                     sack_count: 0,
-                    extra_per_sack: 1,
+                    extra_per_sack: 3,
                     warehouse_weight: 0,
                     price_per_kg: 0,
                     sale_deduction_type: 'none',
@@ -208,6 +215,7 @@
                     total_harvest_value: 0,
                     cash_payout: 0,
                     debt_deduction: 0,
+                    notes: '',
                 }),
 
                 get totalBonusWeight() {
@@ -227,6 +235,9 @@
                     }
                     if (this.form.data.sale_deduction_type === 'nominal') {
                         return deductionValue;
+                    }
+                    if (this.form.data.sale_deduction_type === 'weight') {
+                        return deductionValue * (parseFloat(this.form.data.price_per_kg) || 0);
                     }
                     return 0;
                 },
@@ -316,7 +327,7 @@
                     this.form.reset();
                     this.form.clearErrors();
                     this.form.data.harvest_date = window.getLocalDateInputValue();
-                    this.form.data.extra_per_sack = 1;
+                    this.form.data.extra_per_sack = 3;
                     this.farmer_current_debt = 0;
                     window.dispatchEvent(new CustomEvent('set-selected-farmer_id', {
                         detail: null
@@ -343,6 +354,7 @@
                         total_harvest_value: item.total_harvest_value || 0,
                         cash_payout: item.cash_payout || 0,
                         debt_deduction: item.debt_deduction || 0,
+                        notes: item.notes || '',
                     };
 
                     this.farmer_current_debt = (item.farmer?.current_debt || 0) + (item.debt_deduction || 0);

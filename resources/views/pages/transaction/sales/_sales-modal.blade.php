@@ -13,10 +13,10 @@
                     alpine-error="form.getError('inventory_id')" required />
 
                 <div x-show="selectedInventory" class="mt-2 flex items-center gap-2" x-cloak>
-                    <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                    <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
                         Stok Saat Ini: <span x-text="selectedInventory ? formatWeight(selectedInventory.current_stock) : '0 Kg'" class="ml-1 font-bold"></span>
                     </span>
-                    <span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                    <span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-400/10 dark:text-gray-400 dark:ring-gray-400/20">
                         <span x-text="selectedInventory ? Number(selectedInventory.current_sacks || 0).toLocaleString('id-ID') : 0" class="mr-1 font-bold"></span> Karung
                     </span>
                 </div>
@@ -34,7 +34,52 @@
                 <div class="grid grid-cols-2 gap-4">
                     <x-input label="Harga / Kg" name="price_per_kg" x-model="form.data.price_per_kg" :isCurrency="true"
                         alpine-error="form.getError('price_per_kg')" required />
-                    <x-input label="Total Nilai Jual" x-model="totalSaleValue" :isCurrency="true" disabled />
+                    <x-input label="Bonus / Karung (Kg)" name="deduction_weight_kg" x-model="form.data.deduction_weight_kg" :isNumeric="true" :numericDecimals="2"
+                        alpine-error="form.getError('deduction_weight_kg')" required />
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <x-select label="Jenis Potongan" name="deduction_type" :options="[
+                        ['label' => 'Tidak Ada', 'value' => 'none'],
+                        ['label' => 'Persentase', 'value' => 'percentage'],
+                        ['label' => 'Nominal', 'value' => 'nominal'],
+                        ['label' => 'Berat (Kg)', 'value' => 'weight'],
+                    ]"
+                        x-model="form.data.deduction_type"
+                        x-on:change="$dispatch('update-sales-field', { field: 'deduction_type', value: $event.detail })"
+                        alpine-error="form.getError('deduction_type')" required />
+
+                    <div x-show="form.data.deduction_type === 'nominal'">
+                        <x-input label="Nilai Potongan" name="deduction_value_nominal"
+                            x-model="form.data.deduction_value"
+                            :isCurrency="true"
+                            alpine-error="form.getError('deduction_value')" />
+                    </div>
+                    <div x-show="form.data.deduction_type === 'percentage' || form.data.deduction_type === 'weight'">
+                        <x-input label="Nilai Potongan" name="deduction_value_numeric"
+                            x-model="form.data.deduction_value"
+                            :isNumeric="true"
+                            :numericDecimals="2"
+                            alpine-error="form.getError('deduction_value')" />
+                    </div>
+                </div>
+
+                <div class="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/70">
+                    <h5 class="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Ringkasan Pembayaran</h5>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Nilai Kotor</span>
+                            <span class="font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(grossSaleValue)"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Potongan Penjualan</span>
+                            <span class="font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(totalDeductionAmount)"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Total Nilai Jual</span>
+                            <span class="font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(totalSaleValue)"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -105,7 +150,10 @@ function salesFormComponent() {
             sale_date: window.getLocalDateInputValue(),
             sold_weight_kg: 0,
             price_per_kg: 0,
-            sold_sacks: 0
+            sold_sacks: 0,
+            deduction_type: 'none',
+            deduction_value: 0,
+            deduction_weight_kg: 1,
         }),
 
         paymentForm: useForm({
@@ -115,8 +163,41 @@ function salesFormComponent() {
             payment_proof: null,
         }),
 
-        get totalSaleValue() {
+        get grossSaleValue() {
             return (parseFloat(this.form.data.sold_weight_kg) || 0) * (parseFloat(this.form.data.price_per_kg) || 0);
+        },
+
+        get weightDeductionAmount() {
+            const sacks = parseInt(this.form.data.sold_sacks) || 0;
+            const extra = parseFloat(this.form.data.deduction_weight_kg) || 0;
+            const price = parseFloat(this.form.data.price_per_kg) || 0;
+            return sacks * extra * price;
+        },
+
+        get typeDeductionAmount() {
+            const price = parseFloat(this.form.data.price_per_kg) || 0;
+            const weightDeductionAmount = this.weightDeductionAmount;
+            const valueAfterWeight = Math.max(0, this.grossSaleValue - weightDeductionAmount);
+            const deductionValue = parseFloat(this.form.data.deduction_value) || 0;
+
+            if (this.form.data.deduction_type === 'percentage') {
+                return valueAfterWeight * (deductionValue / 100);
+            }
+            if (this.form.data.deduction_type === 'nominal') {
+                return deductionValue;
+            }
+            if (this.form.data.deduction_type === 'weight') {
+                return deductionValue * price;
+            }
+            return 0;
+        },
+
+        get totalDeductionAmount() {
+            return this.weightDeductionAmount + this.typeDeductionAmount;
+        },
+
+        get totalSaleValue() {
+            return Math.max(0, this.grossSaleValue - this.totalDeductionAmount);
         },
 
         get selectedInventory() {
@@ -127,6 +208,7 @@ function salesFormComponent() {
             window.addEventListener('create-entity', () => {
                 this.form.reset();
                 this.form.data.sale_date = window.getLocalDateInputValue();
+                this.form.data.deduction_weight_kg = 1;
                 this.$dispatch('open-modal', 'sales-modal');
             });
 

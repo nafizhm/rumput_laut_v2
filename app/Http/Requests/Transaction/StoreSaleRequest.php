@@ -16,6 +16,9 @@ class StoreSaleRequest extends FormRequest
             'sold_weight_kg' => 'required|numeric|min:0.01',
             'price_per_kg' => 'required|numeric|min:0',
             'sold_sacks' => 'nullable|integer|min:0',
+            'deduction_type' => 'nullable|in:none,percentage,nominal,weight',
+            'deduction_value' => 'nullable|numeric|min:0',
+            'deduction_weight_kg' => 'nullable|numeric|min:0',
             'payment_status' => 'nullable|in:unpaid,paid',
         ];
     }

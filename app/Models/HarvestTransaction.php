@@ -25,6 +25,7 @@ class HarvestTransaction extends Model
         'cash_payout',
         'debt_deduction',
         'is_received',
+        'notes',
     ];
 
     protected $casts = [

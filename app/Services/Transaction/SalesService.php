@@ -44,7 +44,26 @@ class SalesService
             $inventory->save();
 
             $data['invoice_number'] = $this->generateInvoiceNumber();
-            $data['total_sale_value'] = $soldWeight * $data['price_per_kg'];
+            
+            $soldWeight = $data['sold_weight_kg'];
+            $price = $data['price_per_kg'];
+            $weightDeduction = (float) ($data['deduction_weight_kg'] ?? 0);
+            $deductionType = $data['deduction_type'] ?? 'none';
+            $deductionValue = (float) ($data['deduction_value'] ?? 0);
+
+            $baseWeight = max(0, $soldWeight - $weightDeduction);
+            $baseValue = $baseWeight * $price;
+            $deductionAmount = 0;
+
+            if ($deductionType === 'percentage') {
+                $deductionAmount = (int) round($baseValue * ($deductionValue / 100));
+            } elseif ($deductionType === 'nominal') {
+                $deductionAmount = (int) round($deductionValue);
+            } elseif ($deductionType === 'weight') {
+                $deductionAmount = (int) round($deductionValue * $price);
+            }
+
+            $data['total_sale_value'] = max(0, (int) round($baseValue) - $deductionAmount);
             $data['total_weight_kg'] = $soldWeight;
             $data['payment_status'] = $data['payment_status'] ?? 'unpaid';
 
