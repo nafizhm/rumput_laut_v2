@@ -134,7 +134,13 @@ class DashboardController extends Controller
 
     public function chartData(Request $request)
     {
-        [$startDate, $endDate] = $this->resolveDateRange($request);
+        $startDate = $request->filled('start_date')
+            ? Carbon::parse($request->query('start_date'))->startOfDay()
+            : Carbon::now()->subMonths(5)->startOfMonth();
+
+        $endDate = $request->filled('end_date')
+            ? Carbon::parse($request->query('end_date'))->endOfDay()
+            : Carbon::now()->endOfMonth();
 
         $months = [];
         $incomeData = [];
