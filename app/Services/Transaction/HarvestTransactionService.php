@@ -4,6 +4,8 @@ namespace App\Services\Transaction;
 
 use App\Models\Farmer;
 use App\Models\HarvestTransaction;
+use App\Models\Inventory;
+use App\Models\StockMovement;
 use App\Traits\HandlesTransaction;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -44,6 +46,25 @@ class HarvestTransactionService
                 ]);
             }
 
+            // Update Gudang Basah Stock
+            $inventory = Inventory::lockForUpdate()->where('item_name', 'Gudang Basah')->first();
+            if ($inventory) {
+                $inventory->increment('current_stock_kg', $harvest->warehouse_weight);
+                $inventory->increment('current_sack_count', $harvest->sack_count);
+
+                $harvest->stockMovement()->create([
+                    'inventory_id' => $inventory->id,
+                    'movement_date' => $harvest->harvest_date,
+                    'direction' => 'in',
+                    'type' => 'in',
+                    'weight_kg' => $harvest->warehouse_weight,
+                    'note_weight_kg' => $harvest->warehouse_weight,
+                    'sack_count' => $harvest->sack_count,
+                    'balance_after_kg' => $inventory->current_stock_kg,
+                    'description' => "Hasil Panen: {$harvest->batch_code} - {$farmer->name}",
+                ]);
+            }
+
             return $harvest;
         });
     }
@@ -57,6 +78,8 @@ class HarvestTransactionService
             $farmer = Farmer::lockForUpdate()->findOrFail($harvest->farmer_id);
 
             $oldDeduction = $harvest->debt_deduction;
+            $oldWarehouseWeight = $harvest->warehouse_weight;
+            $oldSackCount = $harvest->sack_count;
 
             $data = $this->prepareHarvestData($data);
             $newDeduction = $data['debt_deduction'];
@@ -73,6 +96,33 @@ class HarvestTransactionService
                     'amount' => abs($diff),
                     'balance_after' => $farmer->current_debt,
                 ]);
+            }
+
+            // Update Gudang Basah Stock if weight or sacks changed
+            $inventory = Inventory::lockForUpdate()->where('item_name', 'Gudang Basah')->first();
+            if ($inventory) {
+                $weightDiff = $harvest->warehouse_weight - $oldWarehouseWeight;
+                $sackDiff = $harvest->sack_count - $oldSackCount;
+
+                if ($weightDiff != 0 || $sackDiff != 0) {
+                    $inventory->increment('current_stock_kg', $weightDiff);
+                    $inventory->increment('current_sack_count', $sackDiff);
+
+                    $harvest->stockMovement()->updateOrCreate(
+                        ['harvest_transaction_id' => $harvest->id],
+                        [
+                            'inventory_id' => $inventory->id,
+                            'movement_date' => $harvest->harvest_date,
+                            'direction' => 'in',
+                            'type' => 'in',
+                            'weight_kg' => $harvest->warehouse_weight,
+                            'note_weight_kg' => $harvest->warehouse_weight,
+                            'sack_count' => $harvest->sack_count,
+                            'balance_after_kg' => $inventory->current_stock_kg,
+                            'description' => "Update Hasil Panen: {$harvest->batch_code} - {$farmer->name}",
+                        ]
+                    );
+                }
             }
             
             return true;
@@ -97,6 +147,17 @@ class HarvestTransactionService
                     'balance_after' => $farmer->current_debt,
                 ]);
             }
+
+            // Revert Gudang Basah Stock
+            $inventory = Inventory::lockForUpdate()->where('item_name', 'Gudang Basah')->first();
+            if ($inventory) {
+                $inventory->decrement('current_stock_kg', $harvest->warehouse_weight);
+                $inventory->decrement('current_sack_count', $harvest->sack_count);
+            }
+
+            // Delete stock movement (will be handled by the decrement above for consistency, 
+            // but we should delete the record too)
+            $harvest->stockMovement()->delete();
             
             return $harvest->delete();
         });

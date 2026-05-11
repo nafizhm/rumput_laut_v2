@@ -46,6 +46,11 @@ class HarvestTransaction extends Model
         return $this->morphMany(FarmerLedger::class, 'reference');
     }
 
+    public function stockMovement()
+    {
+        return $this->hasOne(StockMovement::class);
+    }
+
     public function getRemainingDebtAfterPaymentAttribute(): int
     {
         $currentDebt = (int) ($this->farmer?->current_debt ?? 0);
