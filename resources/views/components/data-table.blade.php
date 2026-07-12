@@ -21,7 +21,7 @@
     <!-- Loading Overlay -->
     <div x-show="isLoading" x-transition.opacity
         class="absolute inset-0 z-50 flex items-center justify-center bg-white/70 dark:bg-gray-900/70">
-        <div class="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+        <div class="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent"></div>
     </div>
 
     <div class="mb-4 flex flex-col gap-4 px-4 sm:flex-row sm:items-center sm:justify-between">
@@ -215,23 +215,23 @@
                 </button>
 
                 <button @click="goToPage(1)"
-                    :class="currentPage === 1 ? 'bg-blue-500/8 text-brand-500' :
+                    :class="currentPage === 1 ? 'bg-brand-500/8 text-brand-500' :
                         'text-gray-700 dark:text-gray-400'"
-                    class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-blue-500/8 hover:text-brand-500 dark:hover:text-brand-500"
+                    class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-brand-500/8 hover:text-brand-500 dark:hover:text-brand-500"
                     :disabled="isLoading">
                     1
                 </button>
 
                 <template x-if="currentPage > 3">
                     <span
-                        class="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-blue-500/8 hover:text-brand-500 dark:hover:text-brand-500">...</span>
+                        class="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-brand-500/8 hover:text-brand-500 dark:hover:text-brand-500">...</span>
                 </template>
 
                 <template x-for="page in pagesAroundCurrent" :key="page">
                     <button @click="goToPage(page)"
-                        :class="currentPage === page ? 'bg-blue-500/8 text-brand-500' :
+                        :class="currentPage === page ? 'bg-brand-500/8 text-brand-500' :
                             'text-gray-700 dark:text-gray-400'"
-                        class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-blue-500/8 hover:text-brand-500 dark:hover:text-brand-500"
+                        class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-brand-500/8 hover:text-brand-500 dark:hover:text-brand-500"
                         :disabled="isLoading">
                         <span x-text="page"></span>
                     </button>
@@ -239,13 +239,13 @@
 
                 <template x-if="currentPage < totalPages - 2">
                     <span
-                        class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-500/8 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-500">...</span>
+                        class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium text-gray-700 hover:bg-brand-500/8 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-500">...</span>
                 </template>
 
                 <button @click="goToPage(totalPages)"
-                    :class="currentPage === totalPages ? 'bg-blue-500/8 text-brand-500' :
+                    :class="currentPage === totalPages ? 'bg-brand-500/8 text-brand-500' :
                         'text-gray-700 dark:text-gray-400'"
-                    class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-blue-500/8 hover:text-brand-500 dark:hover:text-brand-500"
+                    class="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium hover:bg-brand-500/8 hover:text-brand-500 dark:hover:text-brand-500"
                     x-text="totalPages" x-show="totalPages > 1" :disabled="isLoading">
                 </button>
 
