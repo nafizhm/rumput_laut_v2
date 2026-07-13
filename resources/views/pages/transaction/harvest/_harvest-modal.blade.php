@@ -93,12 +93,12 @@
                         <x-input label="Total Nilai Panen" name="total_harvest_value"
                             x-model="form.data.total_harvest_value" :isCurrency="true" readonly />
 
-                        <x-input label="Bayar Tunai (Cash Payout)" name="cash_payout" placeholder="0"
-                            x-model="form.data.cash_payout" :isCurrency="true"
-                            alpine-error="form.getError('cash_payout')" />
+                        <x-input label="Potong Hutang" name="debt_deduction" placeholder="0"
+                            x-model="form.data.debt_deduction" :isCurrency="true"
+                            alpine-error="form.getError('debt_deduction')" />
 
-                        <x-input label="Potong Hutang (Otomatis)" name="debt_deduction"
-                            x-model="form.data.debt_deduction" :isCurrency="true" readonly />
+                        <x-input label="Bayar Tunai (Otomatis)" name="cash_payout"
+                            x-model="form.data.cash_payout" :isCurrency="true" readonly />
                     </div>
 
                     <div>
@@ -158,6 +158,14 @@
                                 <span class="font-semibold text-gray-900 dark:text-white/90"
                                     x-text="formatCurrency(baseHarvestValue)"></span>
                             </div>
+                            <template x-if="form.data.sale_deduction_type !== 'none'">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-500 dark:text-gray-400"
+                                        x-text="deductionTypeLabel"></span>
+                                    <span class="font-semibold text-gray-900 dark:text-white/90"
+                                        x-text="deductionTypeValue"></span>
+                                </div>
+                            </template>
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-500 dark:text-gray-400">Potongan Penjualan</span>
                                 <span class="font-semibold text-gray-900 dark:text-white/90"
@@ -250,6 +258,23 @@
                     return Math.max(0, this.farmer_current_debt - (parseFloat(this.form.data.debt_deduction) || 0));
                 },
 
+                get deductionTypeLabel() {
+                    const type = this.form.data.sale_deduction_type;
+                    if (type === 'weight') return 'Potongan Berat';
+                    if (type === 'percentage') return 'Potongan Persentase';
+                    if (type === 'nominal') return 'Potongan Nominal';
+                    return '';
+                },
+
+                get deductionTypeValue() {
+                    const type = this.form.data.sale_deduction_type;
+                    const value = parseFloat(this.form.data.sale_deduction_value) || 0;
+                    if (type === 'weight') return formatWeight(value);
+                    if (type === 'percentage') return value + '%';
+                    if (type === 'nominal') return formatCurrency(value);
+                    return '';
+                },
+
                 formatNumberValue(value) {
                     return Number(value || 0).toLocaleString('id-ID', {
                         minimumFractionDigits: 2,
@@ -265,7 +290,7 @@
                     this.$watch('form.data.price_per_kg', () => this.calculateValues());
                     this.$watch('form.data.sale_deduction_type', () => this.calculateValues());
                     this.$watch('form.data.sale_deduction_value', () => this.calculateValues());
-                    this.$watch('form.data.cash_payout', () => this.calculateDeductionFromCash());
+                    this.$watch('form.data.debt_deduction', () => this.calculateCashFromDeduction());
 
                     window.addEventListener('update-field', (event) => {
                         const {
@@ -288,21 +313,20 @@
                     this.form.data.warehouse_weight = (totalWeight + (sacks * extra)).toFixed(2);
                     this.form.data.total_harvest_value = Math.round(this.netHarvestValue);
 
-                    const bestDeduction = Math.min(this.netHarvestValue, this.farmer_current_debt);
-                    this.form.data.debt_deduction = Math.round(bestDeduction);
-                    this.form.data.cash_payout = Math.round(this.netHarvestValue - bestDeduction);
+                    this.calculateCashFromDeduction();
                 },
 
-                calculateDeductionFromCash() {
-                    const cash = parseFloat(this.form.data.cash_payout) || 0;
+                calculateCashFromDeduction() {
+                    const deduction = parseFloat(this.form.data.debt_deduction) || 0;
                     const total = parseFloat(this.form.data.total_harvest_value) || 0;
 
-                    if (cash > total) {
-                        this.form.data.cash_payout = Math.round(total);
-                        this.form.data.debt_deduction = 0;
-                    } else {
-                        this.form.data.debt_deduction = Math.round(total - cash);
+                    let capped = deduction;
+                    if (capped > total) {
+                        capped = Math.round(total);
+                        this.form.data.debt_deduction = capped;
                     }
+
+                    this.form.data.cash_payout = Math.round(total - capped);
                 },
 
                 async fetchFarmerDebt(farmerId) {

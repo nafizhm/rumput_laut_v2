@@ -4,11 +4,11 @@
 
         <form @submit.prevent="submit">
             <div class="space-y-4">
-                <x-select label="Pabrik" name="factory_id" :options="$factories" x-model="form.data.factory_id"
+                <x-select label="Pabrik" name="factory_id" :options="$factories"
                     x-on:change="$dispatch('update-sales-field', { field: 'factory_id', value: $event.detail })"
                     alpine-error="form.getError('factory_id')" required />
 
-                <x-select label="Barang / Stok" name="inventory_id" :options="$inventories" x-model="form.data.inventory_id"
+                <x-select label="Barang / Stok" name="inventory_id" :options="$inventories"
                     x-on:change="$dispatch('update-sales-field', { field: 'inventory_id', value: $event.detail })"
                     alpine-error="form.getError('inventory_id')" required />
 
@@ -45,7 +45,6 @@
                         ['label' => 'Nominal', 'value' => 'nominal'],
                         ['label' => 'Berat (Kg)', 'value' => 'weight'],
                     ]"
-                        x-model="form.data.deduction_type"
                         x-on:change="$dispatch('update-sales-field', { field: 'deduction_type', value: $event.detail })"
                         alpine-error="form.getError('deduction_type')" required />
 
@@ -115,7 +114,7 @@
                     alpine-error="paymentForm.getError('paid_amount')" required />
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bukti Bayar <span class="text-error-500">*</span></label>
-                    <input type="file" @change="paymentForm.data.payment_proof = $event.target.files[0]"
+                    <input type="file" x-ref="paymentProofInput" @change="paymentForm.data.payment_proof = $event.target.files[0]"
                         class="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
                     <p x-show="paymentForm.getError('payment_proof')" x-text="paymentForm.getError('payment_proof')" class="mt-1.5 text-xs text-error-500"></p>
                 </div>
@@ -207,8 +206,12 @@ function salesFormComponent() {
         init() {
             window.addEventListener('create-entity', () => {
                 this.form.reset();
+                this.form.clearErrors();
                 this.form.data.sale_date = window.getLocalDateInputValue();
                 this.form.data.deduction_weight_kg = 1;
+                window.dispatchEvent(new CustomEvent('set-selected-factory_id', { detail: null }));
+                window.dispatchEvent(new CustomEvent('set-selected-inventory_id', { detail: null }));
+                window.dispatchEvent(new CustomEvent('set-selected-deduction_type', { detail: null }));
                 this.$dispatch('open-modal', 'sales-modal');
             });
 
@@ -223,6 +226,9 @@ function salesFormComponent() {
             this.paymentForm.data.payment_date = window.getLocalDateInputValue();
             this.paymentForm.data.paid_amount = item.total_sale_value || 0;
             this.paymentForm.data.payment_proof = null;
+            if (this.$refs.paymentProofInput) {
+                this.$refs.paymentProofInput.value = '';
+            }
             this.$dispatch('open-modal', 'pay-sale-modal');
         },
 
