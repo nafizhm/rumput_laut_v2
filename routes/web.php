@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
     Route::get('warehouse-data', [App\Http\Controllers\Transaction\WarehouseController::class, 'data'])->name('manajemen-gudang.data');
     Route::post('manajemen-gudang/receive', [App\Http\Controllers\Transaction\WarehouseController::class, 'receive'])->name('manajemen-gudang.receive');
     Route::post('manajemen-gudang/shrinkage', [App\Http\Controllers\Transaction\WarehouseController::class, 'shrinkage'])->name('manajemen-gudang.shrinkage');
+    Route::post('manajemen-gudang/transfer', [App\Http\Controllers\Transaction\WarehouseController::class, 'transfer'])->name('manajemen-gudang.transfer');
     Route::post('manajemen-gudang/adjustment', [App\Http\Controllers\Transaction\WarehouseController::class, 'adjustment'])->name('manajemen-gudang.adjustment');
 
     // Sales

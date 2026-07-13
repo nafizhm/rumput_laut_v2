@@ -57,6 +57,41 @@
         </form>
     </x-modal>
 
+    <x-modal name="transfer-modal">
+        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Transfer Stok Antar Gudang</h4>
+        <form @submit.prevent="submitTransfer">
+            <div class="space-y-4">
+                <x-select label="Dari Gudang" name="from_inventory_id" :options="$inventories" x-model="transferForm.data.from_inventory_id"
+                    x-on:change="$dispatch('update-transfer-field', { field: 'from_inventory_id', value: $event.detail })"
+                    alpine-error="transferForm.getError('from_inventory_id')" required />
+
+                <x-select label="Ke Gudang" name="to_inventory_id" :options="$inventories" x-model="transferForm.data.to_inventory_id"
+                    x-on:change="$dispatch('update-transfer-field', { field: 'to_inventory_id', value: $event.detail })"
+                    alpine-error="transferForm.getError('to_inventory_id')" required />
+
+                <x-input label="Tanggal Transfer" name="transfer_date" type="date" x-model="transferForm.data.transfer_date"
+                    alpine-error="transferForm.getError('transfer_date')" required />
+
+                <div class="grid grid-cols-2 gap-4">
+                    <x-input label="Berat (Kg)" name="weight_kg" x-model="transferForm.data.weight_kg" :isNumeric="true" :numericDecimals="2"
+                        alpine-error="transferForm.getError('weight_kg')" required />
+                    <x-input label="Jumlah Karung" name="sack_count" type="number" x-model="transferForm.data.sack_count"
+                        alpine-error="transferForm.getError('sack_count')" required />
+                </div>
+
+                <x-input label="Keterangan" name="description" placeholder="Contoh: Transfer basah ke kering" x-model="transferForm.data.description"
+                    alpine-error="transferForm.getError('description')" />
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" @click="$dispatch('close-modal', 'transfer-modal')" class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Batal</button>
+                <button type="submit" :disabled="transferForm.processing" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">
+                    <span x-show="!transferForm.processing">Simpan</span>
+                    <span x-show="transferForm.processing">Menyimpan...</span>
+                </button>
+            </div>
+        </form>
+    </x-modal>
+
     <x-modal name="adjustment-modal">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Penyesuaian Stok (Stock Opname)</h4>
         <form @submit.prevent="submitAdjustment">
@@ -105,6 +140,15 @@ function warehouseModals() {
             description: ''
         }),
 
+        transferForm: useForm({
+            from_inventory_id: '',
+            to_inventory_id: '',
+            transfer_date: window.getLocalDateInputValue(),
+            weight_kg: 0,
+            sack_count: 0,
+            description: ''
+        }),
+
         adjustmentForm: useForm({
             inventory_id: '',
             movement_date: window.getLocalDateInputValue(),
@@ -129,8 +173,15 @@ function warehouseModals() {
                 this.$dispatch('open-modal', 'adjustment-modal');
             });
 
+            window.addEventListener('open-transfer-modal', () => {
+                this.transferForm.reset();
+                this.transferForm.data.transfer_date = window.getLocalDateInputValue();
+                this.$dispatch('open-modal', 'transfer-modal');
+            });
+
             window.addEventListener('update-receive-field', (e) => this.receiveForm.data[e.detail.field] = e.detail.value);
             window.addEventListener('update-shrinkage-field', (e) => this.shrinkageForm.data[e.detail.field] = e.detail.value);
+            window.addEventListener('update-transfer-field', (e) => this.transferForm.data[e.detail.field] = e.detail.value);
             window.addEventListener('update-adjustment-field', (e) => this.adjustmentForm.data[e.detail.field] = e.detail.value);
         },
 
@@ -154,6 +205,21 @@ function warehouseModals() {
                 onSuccess: (res) => {
                     toast.success('Berhasil', res.data.message);
                     this.$dispatch('close-modal', 'shrinkage-modal');
+                    refreshDataTable('movementTable');
+                },
+                onError: (err) => {
+                    if (err.response?.status !== 422) {
+                        toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan sistem');
+                    }
+                }
+            });
+        },
+
+        async submitTransfer() {
+            await this.transferForm.submit('post', '{{ route("manajemen-gudang.transfer") }}', {
+                onSuccess: (res) => {
+                    toast.success('Berhasil', res.data.message);
+                    this.$dispatch('close-modal', 'transfer-modal');
                     refreshDataTable('movementTable');
                 },
                 onError: (err) => {

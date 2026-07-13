@@ -87,6 +87,58 @@ class WarehouseService
     }
 
     /**
+     * Transfer stock between inventories.
+     */
+    public function transfer(array $data): array
+    {
+        return $this->transaction(function () use ($data) {
+            $fromInventory = Inventory::lockForUpdate()->findOrFail($data['from_inventory_id']);
+            $toInventory = Inventory::lockForUpdate()->findOrFail($data['to_inventory_id']);
+
+            $weight = $data['weight_kg'];
+            $sacks = (int) ($data['sack_count'] ?? 0);
+
+            if ($fromInventory->current_stock_kg < $weight) {
+                throw new Exception('Stok tidak mencukupi untuk transfer ini.');
+            }
+
+            if ($fromInventory->current_sack_count < $sacks) {
+                throw new Exception('Jumlah karung tidak mencukupi untuk transfer ini.');
+            }
+
+            $fromInventory->decrement('current_stock_kg', $weight);
+            $fromInventory->decrement('current_sack_count', $sacks);
+
+            $toInventory->increment('current_stock_kg', $weight);
+            $toInventory->increment('current_sack_count', $sacks);
+
+            $outMovement = StockMovement::create([
+                'inventory_id' => $fromInventory->id,
+                'movement_date' => $data['transfer_date'],
+                'direction' => 'out',
+                'type' => 'transfer',
+                'weight_kg' => $weight,
+                'sack_count' => $sacks,
+                'balance_after_kg' => $fromInventory->current_stock_kg,
+                'description' => $data['description'] ?? "Transfer ke {$toInventory->item_name}",
+            ]);
+
+            $inMovement = StockMovement::create([
+                'inventory_id' => $toInventory->id,
+                'movement_date' => $data['transfer_date'],
+                'direction' => 'in',
+                'type' => 'transfer',
+                'weight_kg' => $weight,
+                'sack_count' => $sacks,
+                'balance_after_kg' => $toInventory->current_stock_kg,
+                'description' => $data['description'] ?? "Transfer dari {$fromInventory->item_name}",
+            ]);
+
+            return [$outMovement, $inMovement];
+        });
+    }
+
+    /**
      * Record adjustment.
      */
     public function adjustment(array $data): StockMovement

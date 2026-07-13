@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\AdjustmentRequest;
 use App\Http\Requests\Transaction\ReceiveStockRequest;
 use App\Http\Requests\Transaction\ShrinkageRequest;
+use App\Http\Requests\Transaction\TransferStockRequest;
 use App\Models\Inventory;
 use App\Services\Transaction\WarehouseService;
 use App\Traits\JsonResponser;
@@ -67,6 +68,16 @@ class WarehouseController extends Controller
         try {
             $this->service->shrinkage($request->validated());
             return $this->successResponse('Penyusutan stok berhasil dicatat');
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    public function transfer(TransferStockRequest $request)
+    {
+        try {
+            $this->service->transfer($request->validated());
+            return $this->successResponse('Transfer stok berhasil dicatat');
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
