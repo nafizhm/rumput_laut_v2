@@ -46,6 +46,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('manajemen-panen', App\Http\Controllers\Transaction\HarvestTransactionController::class);
     Route::get('harvest-data', [App\Http\Controllers\Transaction\HarvestTransactionController::class, 'data'])->name('harvest-data');
 
+    Route::resource('manajemen-pemasukan', App\Http\Controllers\Transaction\IncomeController::class);
+    Route::get('income-data', [App\Http\Controllers\Transaction\IncomeController::class, 'data'])->name('income-data');
+
     Route::resource('manajemen-pengeluaran', App\Http\Controllers\Transaction\ExpenseController::class);
     Route::get('expense-data', [App\Http\Controllers\Transaction\ExpenseController::class, 'data'])->name('expense-data');
 

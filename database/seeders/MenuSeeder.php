@@ -180,13 +180,24 @@ class MenuSeeder extends Seeder
         ]);
 
         Menu::create([
+            'name' => 'Manajemen Pemasukan',
+            'icon' => null,
+            'route' => 'manajemen-pemasukan.index',
+            'url' => 'manajemen-pemasukan',
+            'permission' => 'manajemen-pemasukan.read',
+            'parent_id' => $transaksi->id,
+            'order' => 3,
+            'is_active' => true
+        ]);
+
+        Menu::create([
             'name' => 'Manajemen Pengeluaran',
             'icon' => null,
             'route' => 'manajemen-pengeluaran.index',
             'url' => 'manajemen-pengeluaran',
             'permission' => 'manajemen-pengeluaran.read',
             'parent_id' => $transaksi->id,
-            'order' => 3,
+            'order' => 4,
             'is_active' => true
         ]);
 
@@ -197,7 +208,7 @@ class MenuSeeder extends Seeder
             'url' => 'manajemen-gudang',
             'permission' => 'manajemen-gudang.read',
             'parent_id' => $transaksi->id,
-            'order' => 4,
+            'order' => 5,
             'is_active' => true
         ]);
 
@@ -208,7 +219,7 @@ class MenuSeeder extends Seeder
             'url' => 'manajemen-gudang/basah',
             'permission' => 'manajemen-gudang.read',
             'parent_id' => $transaksi->id,
-            'order' => 5,
+            'order' => 6,
             'is_active' => true
         ]);
 
@@ -219,7 +230,7 @@ class MenuSeeder extends Seeder
             'url' => 'manajemen-gudang/kering',
             'permission' => 'manajemen-gudang.read',
             'parent_id' => $transaksi->id,
-            'order' => 6,
+            'order' => 7,
             'is_active' => true
         ]);
 
@@ -230,7 +241,7 @@ class MenuSeeder extends Seeder
             'url' => 'manajemen-penjualan',
             'permission' => 'manajemen-penjualan.read',
             'parent_id' => $transaksi->id,
-            'order' => 7,
+            'order' => 8,
             'is_active' => true
         ]);
     }

@@ -64,6 +64,11 @@ class RolePermissionSeeder extends Seeder
             'manajemen-panen.update',
             'manajemen-panen.delete',
 
+            'manajemen-pemasukan.read',
+            'manajemen-pemasukan.create',
+            'manajemen-pemasukan.update',
+            'manajemen-pemasukan.delete',
+
             'manajemen-pengeluaran.read',
             'manajemen-pengeluaran.create',
             'manajemen-pengeluaran.update',
@@ -121,6 +126,11 @@ class RolePermissionSeeder extends Seeder
             'manajemen-panen.create',
             'manajemen-panen.update',
             'manajemen-panen.delete',
+
+            'manajemen-pemasukan.read',
+            'manajemen-pemasukan.create',
+            'manajemen-pemasukan.update',
+            'manajemen-pemasukan.delete',
 
             'manajemen-pengeluaran.read',
             'manajemen-pengeluaran.create',
