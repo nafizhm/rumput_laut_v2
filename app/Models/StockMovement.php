@@ -23,7 +23,7 @@ class StockMovement extends Model
     ];
 
     protected $casts = [
-        'movement_date' => 'date',
+        'movement_date' => 'date:Y-m-d',
     ];
 
     public function inventory(): BelongsTo

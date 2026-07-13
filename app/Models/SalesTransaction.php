@@ -29,8 +29,8 @@ class SalesTransaction extends Model
     ];
 
     protected $casts = [
-        'sale_date' => 'date',
-        'payment_date' => 'date',
+        'sale_date' => 'date:Y-m-d',
+        'payment_date' => 'date:Y-m-d',
     ];
 
     protected $appends = [

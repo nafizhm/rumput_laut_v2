@@ -16,7 +16,7 @@ class Loan extends Model
     ];
 
     protected $casts = [
-        'loan_date' => 'date',
+        'loan_date' => 'date:Y-m-d',
     ];
 
     public function farmer(): BelongsTo

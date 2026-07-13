@@ -14,6 +14,6 @@ class Income extends Model
     ];
 
     protected $casts = [
-        'income_date' => 'date',
+        'income_date' => 'date:Y-m-d',
     ];
 }

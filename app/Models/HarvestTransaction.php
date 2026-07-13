@@ -29,7 +29,7 @@ class HarvestTransaction extends Model
     ];
 
     protected $casts = [
-        'harvest_date' => 'date',
+        'harvest_date' => 'date:Y-m-d',
     ];
 
     protected $appends = [
