@@ -13,7 +13,7 @@
                 <div class="flex flex-wrap items-center gap-3">
                     <div class="flex items-center gap-2">
                         <x-input name="dashboard_start_date" type="date" x-model="filters.startDate" />
-                        <p>s/d</p>
+                        <p class="text-gray-500 dark:text-gray-400">s/d</p>
                         <x-input name="dashboard_end_date" type="date" x-model="filters.endDate" />
                     </div>
                     <button @click="applyFilters()"
@@ -388,12 +388,12 @@
                 },
                 financialChart: null,
                 filters: {
-                    startDate: window.getMonthStartDateInputValue(),
+                    startDate: window.get3MonthsAgoStartDateInputValue(),
                     endDate: window.getLocalDateInputValue(),
                 },
 
                 async init() {
-                    this.filters.startDate = window.getMonthStartDateInputValue();
+                    this.filters.startDate = window.get3MonthsAgoStartDateInputValue();
                     this.filters.endDate = window.getLocalDateInputValue();
                     await Promise.all([this.fetchStats(), this.initChart()]);
                 },

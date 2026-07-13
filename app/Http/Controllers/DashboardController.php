@@ -37,8 +37,9 @@ class DashboardController extends Controller
         $farmerDebt = Farmer::sum('current_debt');
         $warehouseStock = Inventory::sum('current_stock_kg');
 
-        $recentInvoices = (clone $salesQuery)
+        $recentInvoices = SalesTransaction::with('factory')
             ->orderBy('sale_date', 'desc')
+            ->orderBy('id', 'desc')
             ->limit(5)
             ->get()
             ->map(function ($sale) {

@@ -19,7 +19,7 @@
                     <div class="flex items-center gap-2">
                         <x-input name="cashflow_start_date" type="date" x-model="filters.startDate"
                             @change="updateTable()" />
-                        <p>s/d</p>
+                        <p class="text-gray-500 dark:text-gray-400">s/d</p>
                         <x-input name="cashflow_end_date" type="date" x-model="filters.endDate"
                             @change="updateTable()" />
                     </div>

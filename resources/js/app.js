@@ -97,6 +97,15 @@ window.getMonthStartDateInputValue = function () {
         .split("T")[0];
 };
 
+window.get3MonthsAgoStartDateInputValue = function () {
+    const now = new Date();
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const timezoneOffset = threeMonthsAgo.getTimezoneOffset() * 60000;
+    return new Date(threeMonthsAgo.getTime() - timezoneOffset)
+        .toISOString()
+        .split("T")[0];
+};
+
 window.parseDateValue = function (value) {
     if (!value) return null;
 
