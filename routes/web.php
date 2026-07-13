@@ -28,6 +28,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('manajemen-petani', App\Http\Controllers\Master\FarmerController::class);
     Route::get('farmer-data', [App\Http\Controllers\Master\FarmerController::class, 'data'])->name('farmer-data');
     Route::get('manajemen-petani/{id}/ledgers', [App\Http\Controllers\Master\FarmerController::class, 'ledgers'])->name('farmer.ledgers');
+    Route::post('manajemen-petani/pay', [App\Http\Controllers\Transaction\FarmerPaymentController::class, 'store'])->name('farmer.pay');
+    Route::delete('manajemen-petani/pay/{farmer_payment}', [App\Http\Controllers\Transaction\FarmerPaymentController::class, 'destroy'])->name('farmer.pay.destroy');
 
     Route::resource('manajemen-kategori-pengeluaran', App\Http\Controllers\Master\ExpenseCategoryController::class);
     Route::get('expense-category-data', [App\Http\Controllers\Master\ExpenseCategoryController::class, 'data'])->name('expense-category-data');
