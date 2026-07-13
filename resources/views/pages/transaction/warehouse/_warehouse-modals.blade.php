@@ -64,10 +64,26 @@
                 <x-select label="Dari Gudang" name="from_inventory_id" :options="$inventories" x-model="transferForm.data.from_inventory_id"
                     x-on:change="$dispatch('update-transfer-field', { field: 'from_inventory_id', value: $event.detail })"
                     alpine-error="transferForm.getError('from_inventory_id')" required />
+                <div x-show="selectedFromInventory" class="flex items-center gap-2" x-cloak>
+                    <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
+                        Stok: <span x-text="selectedFromInventory ? formatWeight(selectedFromInventory.current_stock) : '0 Kg'" class="ml-1 font-bold"></span>
+                    </span>
+                    <span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-400/10 dark:text-gray-400 dark:ring-gray-400/20">
+                        <span x-text="selectedFromInventory ? Number(selectedFromInventory.current_sacks || 0).toLocaleString('id-ID') : 0" class="mr-1 font-bold"></span> Karung
+                    </span>
+                </div>
 
                 <x-select label="Ke Gudang" name="to_inventory_id" :options="$inventories" x-model="transferForm.data.to_inventory_id"
                     x-on:change="$dispatch('update-transfer-field', { field: 'to_inventory_id', value: $event.detail })"
                     alpine-error="transferForm.getError('to_inventory_id')" required />
+                <div x-show="selectedToInventory" class="flex items-center gap-2" x-cloak>
+                    <span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20">
+                        Stok: <span x-text="selectedToInventory ? formatWeight(selectedToInventory.current_stock) : '0 Kg'" class="ml-1 font-bold"></span>
+                    </span>
+                    <span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-400/10 dark:text-gray-400 dark:ring-gray-400/20">
+                        <span x-text="selectedToInventory ? Number(selectedToInventory.current_sacks || 0).toLocaleString('id-ID') : 0" class="mr-1 font-bold"></span> Karung
+                    </span>
+                </div>
 
                 <x-input label="Tanggal Transfer" name="transfer_date" type="date" x-model="transferForm.data.transfer_date"
                     alpine-error="transferForm.getError('transfer_date')" required />
@@ -125,6 +141,16 @@
 <script>
 function warehouseModals() {
     return {
+        inventories: @json($inventories),
+
+        get selectedFromInventory() {
+            return this.inventories.find(i => i.value == this.transferForm.data.from_inventory_id);
+        },
+
+        get selectedToInventory() {
+            return this.inventories.find(i => i.value == this.transferForm.data.to_inventory_id);
+        },
+
         receiveForm: useForm({
             inventory_id: '',
             movement_date: window.getLocalDateInputValue(),

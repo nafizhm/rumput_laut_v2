@@ -106,7 +106,12 @@ class WarehouseController extends Controller
         ];
 
         $data = $this->service->getAllMovements($inventoryId);
-        $inventories = Inventory::orderBy('item_name')->get()->map(fn($i) => ['value' => $i->id, 'label' => $i->item_name]);
+        $inventories = Inventory::orderBy('item_name')->get()->map(fn($i) => [
+            'value' => $i->id,
+            'label' => $i->item_name,
+            'current_stock' => (float) $i->current_stock_kg,
+            'current_sacks' => (int) $i->current_sack_count
+        ]);
         $selectedInventory = $inventoryId ? Inventory::find($inventoryId) : null;
 
         return view('pages.transaction.warehouse.index', compact(
