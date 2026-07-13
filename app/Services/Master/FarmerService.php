@@ -71,7 +71,7 @@ class FarmerService
         
         return $farmer->ledgers()
             ->with('reference')
-            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->get();
     }
 }
