@@ -232,12 +232,25 @@ function salesFormComponent() {
             this.$dispatch('open-modal', 'pay-sale-modal');
         },
 
+        async refreshInventories() {
+            try {
+                const res = await fetch('/warehouse-stock');
+                const result = await res.json();
+                if (result.success && result.data) {
+                    this.inventories = result.data.filter(i => i.label === 'Gudang Kering');
+                }
+            } catch (e) {
+                console.error('Gagal refresh stok:', e);
+            }
+        },
+
         async submit() {
             await this.form.submit('post', '{{ route("manajemen-penjualan.store") }}', {
                 onSuccess: (res) => {
                     toast.success('Berhasil', res.data.message);
                     refreshDataTable('salesTable');
                     this.$dispatch('close-modal', 'sales-modal');
+                    this.refreshInventories();
                 },
                 onError: (err) => {
                     if (err.response?.status !== 422) {

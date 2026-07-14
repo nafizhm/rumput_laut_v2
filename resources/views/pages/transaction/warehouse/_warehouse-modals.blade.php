@@ -88,6 +88,14 @@
                 <x-select label="Gudang / Barang" name="inventory_id" :options="$inventories" x-model="adjustmentForm.data.inventory_id"
                     x-on:change="$dispatch('update-adjustment-field', { field: 'inventory_id', value: $event.detail })"
                     alpine-error="adjustmentForm.getError('inventory_id')" required />
+                <div x-show="selectedAdjustmentInventory" class="flex items-center gap-2" x-cloak>
+                    <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
+                        Stok: <span x-text="selectedAdjustmentInventory ? formatWeight(selectedAdjustmentInventory.current_stock) : '0 Kg'" class="ml-1 font-bold"></span>
+                    </span>
+                    <span class="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-400/10 dark:text-gray-400 dark:ring-gray-400/20">
+                        <span x-text="selectedAdjustmentInventory ? Number(selectedAdjustmentInventory.current_sacks || 0).toLocaleString('id-ID') : 0" class="mr-1 font-bold"></span> Karung
+                    </span>
+                </div>
 
                 <x-input label="Tanggal" name="movement_date" type="date" x-model="adjustmentForm.data.movement_date"
                     alpine-error="adjustmentForm.getError('movement_date')" required />
@@ -142,6 +150,10 @@ function warehouseModals() {
             return this.inventories.find(i => i.value == this.transferForm.data.to_inventory_id);
         },
 
+        get selectedAdjustmentInventory() {
+            return this.inventories.find(i => i.value == this.adjustmentForm.data.inventory_id);
+        },
+
         receiveForm: useForm({
             inventory_id: '',
             movement_date: window.getLocalDateInputValue(),
@@ -190,12 +202,25 @@ function warehouseModals() {
             window.addEventListener('update-adjustment-field', (e) => this.adjustmentForm.data[e.detail.field] = e.detail.value);
         },
 
+        async refreshInventories() {
+            try {
+                const res = await fetch('/warehouse-stock');
+                const result = await res.json();
+                if (result.success && result.data) {
+                    this.inventories = result.data;
+                }
+            } catch (e) {
+                console.error('Gagal refresh stok:', e);
+            }
+        },
+
         async submitReceive() {
             await this.receiveForm.submit('post', '{{ route("manajemen-gudang.receive") }}', {
                 onSuccess: (res) => {
                     toast.success('Berhasil', res.data.message);
                     this.$dispatch('close-modal', 'receive-modal');
                     refreshDataTable('movementTable');
+                    this.refreshInventories();
                 },
                 onError: (err) => {
                     if (err.response?.status !== 422) {
@@ -211,6 +236,7 @@ function warehouseModals() {
                     toast.success('Berhasil', res.data.message);
                     this.$dispatch('close-modal', 'transfer-modal');
                     refreshDataTable('movementTable');
+                    this.refreshInventories();
                 },
                 onError: (err) => {
                     if (err.response?.status !== 422) {
@@ -232,6 +258,7 @@ function warehouseModals() {
                     toast.success('Berhasil', res.data.message);
                     this.$dispatch('close-modal', 'adjustment-modal');
                     refreshDataTable('movementTable');
+                    this.refreshInventories();
                 },
                 onError: (err) => {
                     if (err.response?.status !== 422) {

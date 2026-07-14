@@ -50,6 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::get('transaction-data', [App\Http\Controllers\Transaction\TransactionController::class, 'data'])->name('transaction-data');
 
     // Warehouse
+    Route::get('warehouse-stock', [App\Http\Controllers\Transaction\WarehouseController::class, 'stockData'])->name('manajemen-gudang.stock');
     Route::get('manajemen-gudang', [App\Http\Controllers\Transaction\WarehouseController::class, 'index'])->name('manajemen-gudang.index');
     Route::get('manajemen-gudang/basah', [App\Http\Controllers\Transaction\WarehouseController::class, 'wet'])->name('manajemen-gudang.wet');
     Route::get('manajemen-gudang/kering', [App\Http\Controllers\Transaction\WarehouseController::class, 'dry'])->name('manajemen-gudang.dry');

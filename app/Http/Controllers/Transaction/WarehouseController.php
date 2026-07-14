@@ -93,6 +93,17 @@ class WarehouseController extends Controller
         }
     }
 
+    public function stockData()
+    {
+        $inventories = Inventory::orderBy('item_name')->get()->map(fn($i) => [
+            'value' => $i->id,
+            'label' => $i->item_name,
+            'current_stock' => (float) $i->current_stock_kg,
+            'current_sacks' => (int) $i->current_sack_count
+        ]);
+        return $this->successResponse('Data stok berhasil diambil', $inventories);
+    }
+
     protected function renderWarehousePage(string $pageTitle, ?int $inventoryId, bool $showActions)
     {
         $columns = [
