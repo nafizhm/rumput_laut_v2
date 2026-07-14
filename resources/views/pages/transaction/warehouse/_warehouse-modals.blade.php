@@ -30,33 +30,6 @@
         </form>
     </x-modal>
 
-    <x-modal name="shrinkage-modal">
-        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Pencatatan Penyusutan Stok</h4>
-        <form @submit.prevent="submitShrinkage">
-            <div class="space-y-4">
-                <x-select label="Gudang / Barang" name="inventory_id" :options="$inventories" x-model="shrinkageForm.data.inventory_id"
-                    x-on:change="$dispatch('update-shrinkage-field', { field: 'inventory_id', value: $event.detail })"
-                    alpine-error="shrinkageForm.getError('inventory_id')" required />
-
-                <x-input label="Tanggal" name="movement_date" type="date" x-model="shrinkageForm.data.movement_date"
-                    alpine-error="shrinkageForm.getError('movement_date')" required />
-
-                <x-input label="Berat Penyusutan (Kg)" name="lost_weight_kg" x-model="shrinkageForm.data.lost_weight_kg" :isNumeric="true" :numericDecimals="2"
-                    alpine-error="shrinkageForm.getError('lost_weight_kg')" required />
-
-                <x-input label="Keterangan" name="description" x-model="shrinkageForm.data.description"
-                    alpine-error="shrinkageForm.getError('description')" />
-            </div>
-            <div class="mt-6 flex justify-end gap-3">
-                <button type="button" @click="$dispatch('close-modal', 'shrinkage-modal')" class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Batal</button>
-                <button type="submit" :disabled="shrinkageForm.processing" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">
-                    <span x-show="!shrinkageForm.processing">Simpan</span>
-                    <span x-show="shrinkageForm.processing">Menyimpan...</span>
-                </button>
-            </div>
-        </form>
-    </x-modal>
-
     <x-modal name="transfer-modal">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Transfer Stok Antar Gudang</h4>
         <form @submit.prevent="submitTransfer">
@@ -119,8 +92,26 @@
                 <x-input label="Tanggal" name="movement_date" type="date" x-model="adjustmentForm.data.movement_date"
                     alpine-error="adjustmentForm.getError('movement_date')" required />
 
-                <x-input label="Berat Penyesuaian (Kg)" name="adjustment_weight_kg" x-model="adjustmentForm.data.adjustment_weight_kg" :isNumeric="true" :numericDecimals="2"
-                    placeholder="Gunakan tanda (-) untuk mengurangi stok"
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                        Tipe Penyesuaian<span class="text-error-500">*</span>
+                    </label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="adjustment_type" value="addition" x-model="adjustmentForm.data.adjustment_type"
+                                class="w-4 h-4 text-brand-500 border-gray-300 focus:ring-brand-500 dark:border-gray-700">
+                            <span class="text-sm text-gray-700 dark:text-gray-400">Penambahan (+)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="adjustment_type" value="subtraction" x-model="adjustmentForm.data.adjustment_type"
+                                class="w-4 h-4 text-gray-500 border-gray-300 focus:ring-brand-500 dark:border-gray-700">
+                            <span class="text-sm text-gray-700 dark:text-gray-400">Pengurangan (-)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <x-input label="Berat (Kg)" name="weight" x-model="adjustmentForm.data.weight" :isNumeric="true" :numericDecimals="2"
+                    placeholder="Masukkan berat"
                     alpine-error="adjustmentForm.getError('adjustment_weight_kg')" required />
 
                 <x-input label="Keterangan / Alasan" name="description" x-model="adjustmentForm.data.description"
@@ -159,13 +150,6 @@ function warehouseModals() {
             description: ''
         }),
 
-        shrinkageForm: useForm({
-            inventory_id: '',
-            movement_date: window.getLocalDateInputValue(),
-            lost_weight_kg: 0,
-            description: ''
-        }),
-
         transferForm: useForm({
             from_inventory_id: '',
             to_inventory_id: '',
@@ -178,7 +162,8 @@ function warehouseModals() {
         adjustmentForm: useForm({
             inventory_id: '',
             movement_date: window.getLocalDateInputValue(),
-            adjustment_weight_kg: 0,
+            adjustment_type: 'addition',
+            weight: 0,
             description: ''
         }),
 
@@ -187,11 +172,6 @@ function warehouseModals() {
                 this.receiveForm.reset();
                 this.receiveForm.data.movement_date = window.getLocalDateInputValue();
                 this.$dispatch('open-modal', 'receive-modal');
-            });
-            window.addEventListener('open-shrinkage-modal', () => {
-                this.shrinkageForm.reset();
-                this.shrinkageForm.data.movement_date = window.getLocalDateInputValue();
-                this.$dispatch('open-modal', 'shrinkage-modal');
             });
             window.addEventListener('open-adjustment-modal', () => {
                 this.adjustmentForm.reset();
@@ -206,7 +186,6 @@ function warehouseModals() {
             });
 
             window.addEventListener('update-receive-field', (e) => this.receiveForm.data[e.detail.field] = e.detail.value);
-            window.addEventListener('update-shrinkage-field', (e) => this.shrinkageForm.data[e.detail.field] = e.detail.value);
             window.addEventListener('update-transfer-field', (e) => this.transferForm.data[e.detail.field] = e.detail.value);
             window.addEventListener('update-adjustment-field', (e) => this.adjustmentForm.data[e.detail.field] = e.detail.value);
         },
@@ -216,21 +195,6 @@ function warehouseModals() {
                 onSuccess: (res) => {
                     toast.success('Berhasil', res.data.message);
                     this.$dispatch('close-modal', 'receive-modal');
-                    refreshDataTable('movementTable');
-                },
-                onError: (err) => {
-                    if (err.response?.status !== 422) {
-                        toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan sistem');
-                    }
-                }
-            });
-        },
-
-        async submitShrinkage() {
-            await this.shrinkageForm.submit('post', '{{ route("manajemen-gudang.shrinkage") }}', {
-                onSuccess: (res) => {
-                    toast.success('Berhasil', res.data.message);
-                    this.$dispatch('close-modal', 'shrinkage-modal');
                     refreshDataTable('movementTable');
                 },
                 onError: (err) => {
@@ -257,6 +221,12 @@ function warehouseModals() {
         },
 
         async submitAdjustment() {
+            const signedWeight = this.adjustmentForm.data.adjustment_type === 'subtraction'
+                ? -Math.abs(this.adjustmentForm.data.weight || 0)
+                : Math.abs(this.adjustmentForm.data.weight || 0);
+
+            this.adjustmentForm.data.adjustment_weight_kg = signedWeight;
+
             await this.adjustmentForm.submit('post', '{{ route("manajemen-gudang.adjustment") }}', {
                 onSuccess: (res) => {
                     toast.success('Berhasil', res.data.message);
