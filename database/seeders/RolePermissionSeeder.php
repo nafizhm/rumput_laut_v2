@@ -9,9 +9,6 @@ use Spatie\Permission\Models\Role;
 
 class RolePermissionSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
@@ -48,7 +45,7 @@ class RolePermissionSeeder extends Seeder
             'manajemen-pabrik.create',
             'manajemen-pabrik.update',
             'manajemen-pabrik.delete',
-            
+
             'manajemen-inventori.read',
             'manajemen-inventori.create',
             'manajemen-inventori.update',
@@ -88,15 +85,18 @@ class RolePermissionSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::create(['name' => $permission]);
+            Permission::firstOrCreate(['name' => $permission]);
         }
 
-        $superAdmin = Role::create(['name' => 'superadmin']);
-        $superAdmin->givePermissionTo(Permission::all());
+        // Super Admin — all permissions
+        $superAdmin = Role::firstOrCreate(['name' => 'superadmin']);
+        $superAdmin->syncPermissions(Permission::all());
 
-        $admin = Role::create(['name' => 'admin']);
-        $admin->givePermissionTo([
+        // Owner — all except menu, permission, role
+        $owner = Role::firstOrCreate(['name' => 'owner']);
+        $owner->syncPermissions([
             'dashboard.read',
+
             'manajemen-petani.read',
             'manajemen-petani.create',
             'manajemen-petani.update',
@@ -148,6 +148,47 @@ class RolePermissionSeeder extends Seeder
             'manajemen-penjualan.delete',
 
             'cash-flow.read',
+        ]);
+
+        // Admin — only non-financial menus (master data & settings)
+        $admin = Role::firstOrCreate(['name' => 'admin']);
+        $admin->syncPermissions([
+            'dashboard.read',
+
+            'menu.read',
+            'menu.create',
+            'menu.update',
+            'menu.delete',
+
+            'permission.read',
+            'permission.create',
+            'permission.update',
+            'permission.delete',
+
+            'role.read',
+            'role.create',
+            'role.update',
+            'role.delete',
+
+            'manajemen-petani.read',
+            'manajemen-petani.create',
+            'manajemen-petani.update',
+            'manajemen-petani.delete',
+
+            'manajemen-kategori-pengeluaran.read',
+            'manajemen-kategori-pengeluaran.create',
+            'manajemen-kategori-pengeluaran.update',
+            'manajemen-kategori-pengeluaran.delete',
+
+            'manajemen-pabrik.read',
+            'manajemen-pabrik.create',
+            'manajemen-pabrik.update',
+            'manajemen-pabrik.delete',
+
+            'manajemen-inventori.read',
+            'manajemen-inventori.create',
+            'manajemen-inventori.update',
+            'manajemen-inventori.delete',
         ]);
     }
 }

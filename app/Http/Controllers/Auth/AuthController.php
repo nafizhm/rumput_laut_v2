@@ -17,11 +17,10 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email' => 'required|email',
+            'username' => 'required|string',
             'password' => 'required|string',
         ], [
-            'email.required' => 'Email wajib diisi.',
-            'email.email' => 'Email harus berformat email.',
+            'username.required' => 'Username wajib diisi.',
             'password.required' => 'Password wajib diisi.',
         ]);
 
@@ -32,7 +31,7 @@ class AuthController extends Controller
         }
 
         throw ValidationException::withMessages([
-            'email' => ['Email atau password yang anda masukkan salah.'],
+            'username' => ['Username atau password yang anda masukkan salah.'],
         ]);
     }
 

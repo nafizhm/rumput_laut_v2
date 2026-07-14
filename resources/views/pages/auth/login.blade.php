@@ -52,7 +52,7 @@ $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(valu
                             Sign In
                         </h1>
                         <p class="text-sm text-gray-500 dark:text-gray-400">
-                            Enter your email and password to sign in!
+                            Enter your username and password to sign in!
                         </p>
                     </div>
                     <div>
@@ -61,13 +61,13 @@ $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(valu
                             <div class="space-y-5">
                                 <div>
                                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                                        Email<span class="text-error-500">*</span>
+                                        Username<span class="text-error-500">*</span>
                                     </label>
                                     <div class="relative">
-                                        <input type="email" id="email" name="email" value="{{ old('email') }}"
-                                            placeholder="info@gmail.com"
-                                            class="dark:bg-dark-900 h-11 w-full rounded-lg border {{ $errors->has('email') ? 'border-error-300 focus:border-error-300 focus:ring-error-500/10 dark:border-error-700 dark:focus:border-error-800' : 'border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:border-gray-700 dark:focus:border-brand-800' }} bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
-                                        @error('email')
+                                        <input type="text" id="username" name="username" value="{{ old('username') }}"
+                                            placeholder="Enter your username"
+                                            class="dark:bg-dark-900 h-11 w-full rounded-lg border {{ $errors->has('username') ? 'border-error-300 focus:border-error-300 focus:ring-error-500/10 dark:border-error-700 dark:focus:border-error-800' : 'border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:border-gray-700 dark:focus:border-brand-800' }} bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                                        @error('username')
                                             <span class="absolute top-1/2 right-3.5 -translate-y-1/2">
                                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
                                                     xmlns="http://www.w3.org/2000/svg">
@@ -78,7 +78,7 @@ $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(valu
                                             </span>
                                         @enderror
                                     </div>
-                                    @error('email')
+                                    @error('username')
                                         <p class="text-theme-xs text-error-500 mt-1.5">
                                             {{ $message }}
                                         </p>
@@ -165,13 +165,7 @@ $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(valu
                                 </div>
                             </div>
                         </form>
-                        <div class="mt-5">
-                            <p class="text-sm font-normal text-center text-gray-700 dark:text-gray-400">
-                                Don't have an account?
-                                <a href="/signup.html"
-                                    class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Sign Up</a>
-                            </p>
-                        </div>
+
                     </div>
                 </div>
             </div>

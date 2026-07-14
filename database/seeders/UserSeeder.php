@@ -10,29 +10,30 @@ use Spatie\Permission\Models\Role;
 
 class UserSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        $superAdmin = User::create([
+        $superAdmin = User::updateOrCreate(['email' => 'superadmin@example.com'], [
             'name' => 'Super Admin',
-            'email' => 'superadmin@example.com',
+            'username' => 'superadmin',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
         ]);
+        $superAdmin->syncRoles(['superadmin']);
 
-        $superAdminRole = Role::where('name', 'superadmin')->first();
-        $superAdmin->assignRole($superAdminRole);
+        $owner = User::updateOrCreate(['email' => 'owner@example.com'], [
+            'name' => 'Owner',
+            'username' => 'owner',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+        ]);
+        $owner->syncRoles(['owner']);
 
-        $admin = User::create([
+        $admin = User::updateOrCreate(['email' => 'admin@example.com'], [
             'name' => 'Admin',
-            'email' => 'admin@example.com',
+            'username' => 'admin',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
         ]);
-
-        $adminRole = Role::where('name', 'admin')->first();
-        $admin->assignRole($adminRole);
+        $admin->syncRoles(['admin']);
     }
 }
