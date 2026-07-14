@@ -31,25 +31,40 @@
                     name="date"
                     type="date"
                     x-model="form.data.date"
+                    :required="true"
                     alpine-error="form.getError('date')"
                 />
+
+                <template x-if="form.data.type === 'income'">
+                    <x-select 
+                        label="Kategori" 
+                        name="expense_category_id" 
+                        :options="$incomeCategories" 
+                        placeholder="Pilih kategori"
+                        :required="true"
+                        x-on:change="$dispatch('update-field', { field: 'expense_category_id', value: $event.detail })"
+                        alpine-error="form.hasErrors('expense_category_id') ? form.getError('expense_category_id') : null" 
+                    />
+                </template>
 
                 <template x-if="form.data.type === 'expense'">
                     <x-select 
                         label="Kategori" 
                         name="expense_category_id" 
-                        :options="$categories" 
+                        :options="$expenseCategories" 
                         placeholder="Pilih kategori"
+                        :required="true"
                         x-on:change="$dispatch('update-field', { field: 'expense_category_id', value: $event.detail })"
                         alpine-error="form.hasErrors('expense_category_id') ? form.getError('expense_category_id') : null" 
                     />
                 </template>
 
                 <x-input 
-                    label="Jumlah (Amount)"
+                    label="Jumlah"
                     name="amount"
                     x-model="form.data.amount"
                     :isCurrency="true"
+                    :required="true"
                     alpine-error="form.getError('amount')"
                 />
 
@@ -61,15 +76,7 @@
                     alpine-error="form.getError('description')"
                 />
 
-                <template x-if="form.data.type === 'income'">
-                    <x-input 
-                        label="Catatan"
-                        name="notes"
-                        x-model="form.data.notes"
-                        placeholder="Catatan tambahan (opsional)"
-                        alpine-error="form.getError('notes')"
-                    />
-                </template>
+
             </div>
 
             <div class="mt-6 flex justify-end gap-3">
@@ -112,7 +119,6 @@
                 date: window.getLocalDateInputValue(),
                 amount: 0,
                 description: '',
-                notes: '',
                 expense_category_id: '',
             }),
 
@@ -150,7 +156,6 @@
                     date: item.date ? item.date.split('T')[0] : '',
                     amount: item.amount,
                     description: item.description || '',
-                    notes: item.notes || '',
                     expense_category_id: item.expense_category_id || '',
                 };
 

@@ -17,6 +17,7 @@ class UpdateExpenseCategoryRequest extends FormRequest
         
         return [
             'name' => 'required|string|max:255|unique:expense_categories,name,' . $id,
+            'type' => 'required|in:income,expense',
             'is_active' => 'required|boolean',
         ];
     }

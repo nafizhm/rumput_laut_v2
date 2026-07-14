@@ -30,9 +30,10 @@ class TransactionController extends Controller
         ];
 
         $data = $this->service->getAll();
-        $categories = $this->categoryService->getCategoryOptions();
+        $incomeCategories = $this->categoryService->getCategoryOptions('income');
+        $expenseCategories = $this->categoryService->getCategoryOptions('expense');
 
-        return view('pages.transaction.transaction.index', compact('data', 'columns', 'categories'));
+        return view('pages.transaction.transaction.index', compact('data', 'columns', 'incomeCategories', 'expenseCategories'));
     }
 
     public function data()

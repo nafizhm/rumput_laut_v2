@@ -121,7 +121,9 @@ class MenuSeeder extends Seeder
             'is_active' => true
         ]);
 
-        Menu::updateOrCreate(['name' => 'Data Kategori Pengeluaran'], [
+        Menu::where('name', 'Data Kategori Pengeluaran')->delete();
+
+        Menu::updateOrCreate(['name' => 'Data Kategori'], [
             'icon' => null,
             'route' => 'manajemen-kategori-pengeluaran.index',
             'url' => 'manajemen-kategori-pengeluaran',

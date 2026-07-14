@@ -19,12 +19,17 @@ class ExpenseCategoryService
     }
 
     /**
-     * Get active categories for select options.
+     * Get active categories for select options, optionally filtered by type.
      */
-    public function getCategoryOptions(): array
+    public function getCategoryOptions(?string $type = null): array
     {
-        return ExpenseCategory::where('is_active', true)
-            ->orderBy('name', 'asc')
+        $query = ExpenseCategory::where('is_active', true);
+
+        if ($type) {
+            $query->where('type', $type);
+        }
+
+        return $query->orderBy('name', 'asc')
             ->get(['id', 'name'])
             ->map(fn($item) => [
                 'label' => $item->name,

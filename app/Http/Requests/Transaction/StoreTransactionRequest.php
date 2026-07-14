@@ -19,7 +19,7 @@ class StoreTransactionRequest extends FormRequest
             'amount' => 'required|numeric|min:0',
             'description' => 'nullable|string|max:255',
             'notes' => 'nullable|string|max:65535',
-            'expense_category_id' => 'required_if:type,expense|exists:expense_categories,id',
+            'expense_category_id' => 'required|exists:expense_categories,id',
         ];
     }
 }

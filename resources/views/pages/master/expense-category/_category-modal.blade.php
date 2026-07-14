@@ -10,14 +10,37 @@
                     name="name"
                     x-model="form.data.name"
                     placeholder="Contoh: Operasional"
+                    :required="true"
                     alpine-error="form.getError('name')"
                 />
+
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                        Tipe<span class="text-error-500">*</span>
+                    </label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="type" value="income" x-model="form.data.type"
+                                class="w-4 h-4 text-brand-500 border-gray-300 focus:ring-brand-500 dark:border-gray-700">
+                            <span class="text-sm text-gray-700 dark:text-gray-400">Pemasukan</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="type" value="expense" x-model="form.data.type"
+                                class="w-4 h-4 text-brand-500 border-gray-300 focus:ring-brand-500 dark:border-gray-700">
+                            <span class="text-sm text-gray-700 dark:text-gray-400">Pengeluaran</span>
+                        </label>
+                    </div>
+                    <template x-if="form.getError('type')">
+                        <p class="text-theme-xs text-error-500 mt-1.5" x-text="form.getError('type')"></p>
+                    </template>
+                </div>
 
                 <x-select 
                     label="Status" 
                     name="is_active" 
                     :options="[['label' => 'Aktif', 'value' => 1], ['label' => 'Non-Aktif', 'value' => 0]]" 
                     placeholder="Pilih status"
+                    :required="true"
                     x-on:change="$dispatch('update-field', { field: 'is_active', value: $event.detail })"
                     alpine-error="form.hasErrors('is_active') ? form.getError('is_active') : null" 
                 />
@@ -60,6 +83,7 @@
 
             form: useForm({
                 name: '',
+                type: 'expense',
                 is_active: 1,
             }),
 
@@ -94,6 +118,7 @@
 
                 this.form.data = {
                     name: item.name,
+                    type: item.type || 'expense',
                     is_active: isActive,
                 };
 
