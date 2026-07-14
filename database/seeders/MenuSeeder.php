@@ -67,7 +67,7 @@ class MenuSeeder extends Seeder
         ];
 
         foreach ($menus as $menu) {
-            Menu::create($menu);
+            Menu::updateOrCreate(['name' => $menu['name']], $menu);
         }
 
         $parent = Menu::where('name', 'Setting')->first();
@@ -106,13 +106,12 @@ class MenuSeeder extends Seeder
         ];
 
         foreach ($childMenus as $child) {
-            Menu::create($child);
+            Menu::updateOrCreate(['name' => $child['name']], $child);
         }
 
         // Master children
         $master = Menu::where('name', 'Master')->first();
-        Menu::create([
-            'name' => 'Data Petani',
+        Menu::updateOrCreate(['name' => 'Data Petani'], [
             'icon' => 'user-square',
             'route' => 'manajemen-petani.index',
             'url' => 'manajemen-petani',
@@ -122,8 +121,7 @@ class MenuSeeder extends Seeder
             'is_active' => true
         ]);
 
-        Menu::create([
-            'name' => 'Data Kategori Pengeluaran',
+        Menu::updateOrCreate(['name' => 'Data Kategori Pengeluaran'], [
             'icon' => null,
             'route' => 'manajemen-kategori-pengeluaran.index',
             'url' => 'manajemen-kategori-pengeluaran',
@@ -133,8 +131,7 @@ class MenuSeeder extends Seeder
             'is_active' => true
         ]);
 
-        Menu::create([
-            'name' => 'Data Pabrik',
+        Menu::updateOrCreate(['name' => 'Data Pabrik'], [
             'icon' => null,
             'route' => 'manajemen-pabrik.index',
             'url' => 'manajemen-pabrik',
@@ -144,8 +141,7 @@ class MenuSeeder extends Seeder
             'is_active' => true
         ]);
 
-        Menu::create([
-            'name' => 'Data Inventori',
+        Menu::updateOrCreate(['name' => 'Data Inventori'], [
             'icon' => null,
             'route' => 'manajemen-inventori.index',
             'url' => 'manajemen-inventori',
@@ -157,8 +153,7 @@ class MenuSeeder extends Seeder
 
         // Transaksi children
         $transaksi = Menu::where('name', 'Transaksi')->first();
-        Menu::create([
-            'name' => 'Manajemen Pinjaman',
+        Menu::updateOrCreate(['name' => 'Manajemen Pinjaman'], [
             'icon' => null,
             'route' => 'manajemen-pinjaman.index',
             'url' => 'manajemen-pinjaman',
@@ -168,8 +163,7 @@ class MenuSeeder extends Seeder
             'is_active' => true
         ]);
 
-        Menu::create([
-            'name' => 'Manajemen Panen',
+        Menu::updateOrCreate(['name' => 'Manajemen Panen'], [
             'icon' => null,
             'route' => 'manajemen-panen.index',
             'url' => 'manajemen-panen',
@@ -179,69 +173,56 @@ class MenuSeeder extends Seeder
             'is_active' => true
         ]);
 
-        Menu::create([
-            'name' => 'Manajemen Pemasukan',
+        Menu::updateOrCreate(['name' => 'Pemasukan & Pengeluaran'], [
             'icon' => null,
-            'route' => 'manajemen-pemasukan.index',
-            'url' => 'manajemen-pemasukan',
-            'permission' => 'manajemen-pemasukan.read',
+            'route' => 'manajemen-pemasukan-pengeluaran.index',
+            'url' => 'manajemen-pemasukan-pengeluaran',
+            'permission' => 'manajemen-pemasukan-pengeluaran.read',
             'parent_id' => $transaksi->id,
             'order' => 3,
             'is_active' => true
         ]);
 
-        Menu::create([
-            'name' => 'Manajemen Pengeluaran',
+        // Remove old separate income/expense menu items
+        Menu::whereIn('name', ['Manajemen Pemasukan', 'Manajemen Pengeluaran'])->delete();
+
+        Menu::updateOrCreate(['name' => 'Manajemen Gudang'], [
             'icon' => null,
-            'route' => 'manajemen-pengeluaran.index',
-            'url' => 'manajemen-pengeluaran',
-            'permission' => 'manajemen-pengeluaran.read',
+            'route' => 'manajemen-gudang.index',
+            'url' => 'manajemen-gudang',
+            'permission' => 'manajemen-gudang.read',
             'parent_id' => $transaksi->id,
             'order' => 4,
             'is_active' => true
         ]);
 
-        Menu::create([
-            'name' => 'Manajemen Gudang',
+        Menu::updateOrCreate(['name' => 'Gudang Basah'], [
             'icon' => null,
-            'route' => 'manajemen-gudang.index',
-            'url' => 'manajemen-gudang',
+            'route' => 'manajemen-gudang.wet',
+            'url' => 'manajemen-gudang/basah',
             'permission' => 'manajemen-gudang.read',
             'parent_id' => $transaksi->id,
             'order' => 5,
             'is_active' => true
         ]);
 
-        Menu::create([
-            'name' => 'Gudang Basah',
+        Menu::updateOrCreate(['name' => 'Gudang Kering'], [
             'icon' => null,
-            'route' => 'manajemen-gudang.wet',
-            'url' => 'manajemen-gudang/basah',
+            'route' => 'manajemen-gudang.dry',
+            'url' => 'manajemen-gudang/kering',
             'permission' => 'manajemen-gudang.read',
             'parent_id' => $transaksi->id,
             'order' => 6,
             'is_active' => true
         ]);
 
-        Menu::create([
-            'name' => 'Gudang Kering',
-            'icon' => null,
-            'route' => 'manajemen-gudang.dry',
-            'url' => 'manajemen-gudang/kering',
-            'permission' => 'manajemen-gudang.read',
-            'parent_id' => $transaksi->id,
-            'order' => 7,
-            'is_active' => true
-        ]);
-
-        Menu::create([
-            'name' => 'Manajemen Penjualan',
+        Menu::updateOrCreate(['name' => 'Manajemen Penjualan'], [
             'icon' => null,
             'route' => 'manajemen-penjualan.index',
             'url' => 'manajemen-penjualan',
             'permission' => 'manajemen-penjualan.read',
             'parent_id' => $transaksi->id,
-            'order' => 8,
+            'order' => 7,
             'is_active' => true
         ]);
     }

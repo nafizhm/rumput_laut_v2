@@ -46,11 +46,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('manajemen-panen', App\Http\Controllers\Transaction\HarvestTransactionController::class);
     Route::get('harvest-data', [App\Http\Controllers\Transaction\HarvestTransactionController::class, 'data'])->name('harvest-data');
 
-    Route::resource('manajemen-pemasukan', App\Http\Controllers\Transaction\IncomeController::class);
-    Route::get('income-data', [App\Http\Controllers\Transaction\IncomeController::class, 'data'])->name('income-data');
-
-    Route::resource('manajemen-pengeluaran', App\Http\Controllers\Transaction\ExpenseController::class);
-    Route::get('expense-data', [App\Http\Controllers\Transaction\ExpenseController::class, 'data'])->name('expense-data');
+    Route::resource('manajemen-pemasukan-pengeluaran', App\Http\Controllers\Transaction\TransactionController::class);
+    Route::get('transaction-data', [App\Http\Controllers\Transaction\TransactionController::class, 'data'])->name('transaction-data');
 
     // Warehouse
     Route::get('manajemen-gudang', [App\Http\Controllers\Transaction\WarehouseController::class, 'index'])->name('manajemen-gudang.index');

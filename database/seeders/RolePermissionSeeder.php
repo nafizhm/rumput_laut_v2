@@ -61,15 +61,10 @@ class RolePermissionSeeder extends Seeder
             'manajemen-panen.update',
             'manajemen-panen.delete',
 
-            'manajemen-pemasukan.read',
-            'manajemen-pemasukan.create',
-            'manajemen-pemasukan.update',
-            'manajemen-pemasukan.delete',
-
-            'manajemen-pengeluaran.read',
-            'manajemen-pengeluaran.create',
-            'manajemen-pengeluaran.update',
-            'manajemen-pengeluaran.delete',
+            'manajemen-pemasukan-pengeluaran.read',
+            'manajemen-pemasukan-pengeluaran.create',
+            'manajemen-pemasukan-pengeluaran.update',
+            'manajemen-pemasukan-pengeluaran.delete',
 
             'manajemen-gudang.read',
             'manajemen-gudang.create',
@@ -83,6 +78,12 @@ class RolePermissionSeeder extends Seeder
 
             'cash-flow.read',
         ];
+
+        // Remove old separate income/expense permissions
+        Permission::whereIn('name', [
+            'manajemen-pemasukan.read', 'manajemen-pemasukan.create', 'manajemen-pemasukan.update', 'manajemen-pemasukan.delete',
+            'manajemen-pengeluaran.read', 'manajemen-pengeluaran.create', 'manajemen-pengeluaran.update', 'manajemen-pengeluaran.delete',
+        ])->delete();
 
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(['name' => $permission]);
@@ -127,15 +128,10 @@ class RolePermissionSeeder extends Seeder
             'manajemen-panen.update',
             'manajemen-panen.delete',
 
-            'manajemen-pemasukan.read',
-            'manajemen-pemasukan.create',
-            'manajemen-pemasukan.update',
-            'manajemen-pemasukan.delete',
-
-            'manajemen-pengeluaran.read',
-            'manajemen-pengeluaran.create',
-            'manajemen-pengeluaran.update',
-            'manajemen-pengeluaran.delete',
+            'manajemen-pemasukan-pengeluaran.read',
+            'manajemen-pemasukan-pengeluaran.create',
+            'manajemen-pemasukan-pengeluaran.update',
+            'manajemen-pemasukan-pengeluaran.delete',
 
             'manajemen-gudang.read',
             'manajemen-gudang.create',

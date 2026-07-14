@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\CashFlow;
 
 use App\Http\Controllers\Controller;
-use App\Models\Expense;
 use App\Models\HarvestTransaction;
 use App\Models\Loan;
 use App\Models\SalesTransaction;
+use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -52,6 +52,24 @@ class CashFlowController extends Controller
                     'amount' => 'Rp ' . number_format($t->total_sale_value, 0, ',', '.')
                 ])
             ];
+
+            $incomeQuery = Transaction::where('type', 'income')
+                ->whereBetween('date', [$startDate, $endDate])
+                ->where('amount', '>', 0);
+            $incomeValue = $incomeQuery->sum('amount');
+            $summary[] = [
+                'id' => 5,
+                'category' => 'Pemasukan Lainnya',
+                'type' => 'Cash In',
+                'amount' => $incomeValue,
+                'amount_formatted' => 'Rp ' . number_format($incomeValue, 0, ',', '.'),
+                'details' => $incomeQuery->get()->map(fn($t) => [
+                    'id' => $t->id,
+                    'date' => $t->date->format('d/m/Y'),
+                    'description' => $t->description ?? 'Pemasukan',
+                    'amount' => 'Rp ' . number_format($t->amount, 0, ',', '.')
+                ])
+            ];
         }
 
         $harvestQuery = HarvestTransaction::with('farmer')->whereBetween('harvest_date', [$startDate, $endDate])
@@ -89,8 +107,9 @@ class CashFlowController extends Controller
                 ])
             ];
 
-            $expenseQuery = Expense::with('category')
-                ->whereBetween('expense_date', [$startDate, $endDate])
+            $expenseQuery = Transaction::with('category')
+                ->where('type', 'expense')
+                ->whereBetween('date', [$startDate, $endDate])
                 ->where('amount', '>', 0);
             $expenseCashOut = $expenseQuery->sum('amount');
             $summary[] = [
@@ -101,7 +120,7 @@ class CashFlowController extends Controller
                 'amount_formatted' => 'Rp ' . number_format($expenseCashOut, 0, ',', '.'),
                 'details' => $expenseQuery->get()->map(fn($t) => [
                     'id' => $t->id,
-                    'date' => $t->expense_date->format('d/m/Y'),
+                    'date' => $t->date->format('d/m/Y'),
                     'description' => ($t->category->name ?? 'Pengeluaran') . ': ' . $t->description,
                     'amount' => 'Rp ' . number_format($t->amount, 0, ',', '.')
                 ])
