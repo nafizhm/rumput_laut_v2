@@ -30,7 +30,7 @@ class SalesController extends Controller
             ['key' => 'price_per_kg', 'label' => 'Harga / Kg', 'render' => 'currency', 'align' => 'right'],
             ['key' => 'total_sale_value', 'label' => 'Total Nilai', 'render' => 'total_sale_value', 'sortable' => true, 'align' => 'right'],
             ['key' => 'payment_status', 'label' => 'Status', 'render' => 'payment_status', 'align' => 'center'],
-            ['key' => 'action', 'label' => 'Aksi', 'render' => 'action', 'width' => '200px'],
+            ['key' => 'action', 'label' => 'Aksi', 'render' => 'action', 'width' => '220px'],
         ];
 
         $data = $this->service->getAllSales();
@@ -66,6 +66,16 @@ class SalesController extends Controller
         try {
             $this->service->paySale($manajemen_penjualan, $request->validated());
             return $this->successResponse('Pembayaran penjualan berhasil dicatat');
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    public function destroy(SalesTransaction $manajemen_penjualan)
+    {
+        try {
+            $this->service->deleteSale($manajemen_penjualan);
+            return $this->successResponse('Penjualan berhasil dihapus');
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

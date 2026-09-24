@@ -84,6 +84,27 @@ class SalesService
         });
     }
 
+    public function deleteSale(SalesTransaction $sale): bool
+    {
+        return $this->transaction(function () use ($sale) {
+            $inventory = Inventory::lockForUpdate()->find($sale->inventory_id);
+            if ($inventory) {
+                $inventory->increment('current_stock_kg', $sale->total_weight_kg);
+                if ($sale->sold_sacks) {
+                    $inventory->increment('current_sack_count', $sale->sold_sacks);
+                }
+            }
+
+            $sale->stockMovements()->delete();
+
+            if ($sale->payment_proof_path) {
+                Storage::disk('public')->delete($sale->payment_proof_path);
+            }
+
+            return $sale->delete();
+        });
+    }
+
     public function paySale(SalesTransaction $sale, array $data): SalesTransaction
     {
         return $this->transaction(function () use ($sale, $data) {

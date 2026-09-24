@@ -92,6 +92,10 @@
         </form>
     </x-modal>
 
+    <x-delete-modal name="delete-sale-modal"
+        message="Apakah anda yakin ingin menghapus penjualan ini? Stok akan dikembalikan dan bukti bayar akan dihapus. Aksi ini tidak dapat dibatalkan."
+        @confirm-delete-delete-sale-modal.window="deleteConfirmed" />
+
     <x-modal name="pay-sale-modal">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Bayar Penjualan</h4>
 
@@ -142,6 +146,7 @@ function salesFormComponent() {
     return {
         inventories: @json($inventories),
         paymentItem: null,
+        deleteId: null,
 
         form: useForm({
             factory_id: '',
@@ -217,6 +222,26 @@ function salesFormComponent() {
 
             window.addEventListener('update-sales-field', (e) => this.form.data[e.detail.field] = e.detail.value);
             window.addEventListener('open-pay-sale', (e) => this.openPaymentModal(e.detail));
+            window.addEventListener('delete-sale', (e) => this.deleteItem(e.detail));
+        },
+
+        deleteItem(id) {
+            this.deleteId = id;
+            this.$dispatch('open-modal', 'delete-sale-modal');
+        },
+
+        async deleteConfirmed() {
+            await this.form.submit('delete', `{{ url('manajemen-penjualan') }}/${this.deleteId}`, {
+                onSuccess: (res) => {
+                    toast.success('Berhasil', res.data.message);
+                    refreshDataTable('salesTable');
+                    this.$dispatch('close-modal', 'delete-sale-modal');
+                    this.refreshInventories();
+                },
+                onError: (err) => {
+                    toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan saat menghapus data');
+                }
+            });
         },
 
         openPaymentModal(item) {

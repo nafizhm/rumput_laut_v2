@@ -72,6 +72,10 @@
                         Bukti Bayar
                     </a>
                 </template>
+                <button type="button" @click="$dispatch('delete-sale', item.id)"
+                    class="flex items-center justify-center rounded-lg bg-rose-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-600">
+                    Hapus
+                </button>
             </div>
         </x-slot:action>
     </x-data-table>
