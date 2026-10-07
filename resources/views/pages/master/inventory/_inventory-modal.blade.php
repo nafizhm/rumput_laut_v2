@@ -17,7 +17,7 @@
                 />
                 
                 <template x-if="!editMode">
-                    <p class="text-xs text-gray-500 italic">Catatan: Stok awal akan diset menjadi 0 Kg. Anda bisa menambah stok melalui menu Transaksi > Manajemen Gudang.</p>
+                    <p class="text-xs text-gray-500 italic">Catatan: Stok awal akan diset menjadi 0 Kg. Anda bisa menambah stok melalui menu Manajemen Gudang > Manajemen Gudang.</p>
                 </template>
             </div>
 

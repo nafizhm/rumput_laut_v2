@@ -4,6 +4,7 @@ namespace App\Services\Transaction;
 
 use App\Models\Farmer;
 use App\Models\FarmerPayment;
+use App\Services\Finance\OperationalAccountingService;
 use App\Traits\HandlesTransaction;
 use Exception;
 
@@ -22,8 +23,8 @@ class FarmerPaymentService
 
             $amount = (int) round($data['amount']);
 
-            if ($amount > $farmer->current_debt) {
-                throw new Exception('Jumlah bayar melebihi total hutang petani (Rp ' . number_format($farmer->current_debt, 0, ',', '.') . ').');
+            if ($amount <= 0 || $amount > $farmer->current_debt) {
+                throw new Exception('Jumlah bayar melebihi total hutang petani (Rp '.number_format($farmer->current_debt, 0, ',', '.').').');
             }
 
             $payment = FarmerPayment::create([
@@ -42,6 +43,8 @@ class FarmerPaymentService
                 'balance_after' => $farmer->current_debt,
             ]);
 
+            app(OperationalAccountingService::class)->farmerPayment($payment);
+
             return $payment;
         });
     }
@@ -49,6 +52,7 @@ class FarmerPaymentService
     public function deletePayment(FarmerPayment $payment): bool
     {
         return $this->transaction(function () use ($payment) {
+            $payment = FarmerPayment::lockForUpdate()->findOrFail($payment->id);
             $farmer = Farmer::lockForUpdate()->findOrFail($payment->farmer_id);
 
             $farmer->increment('current_debt', $payment->amount);
@@ -61,6 +65,8 @@ class FarmerPaymentService
             ]);
 
             $payment->ledgers()->delete();
+
+            app(OperationalAccountingService::class)->cancel($payment, 'farmer-payment');
 
             return $payment->delete();
         });

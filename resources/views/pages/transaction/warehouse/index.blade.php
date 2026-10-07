@@ -4,7 +4,7 @@
 
 @section('breadcrumb')
     <x-breadcrumb :pageTitle="$pageTitle ?? 'Manajemen Gudang'" :links="[
-        ['name' => 'Transaksi', 'url' => '#'],
+        ['name' => 'Manajemen Gudang', 'url' => '#'],
         ['name' => $pageTitle ?? 'Manajemen Gudang', 'url' => route('manajemen-gudang.index')],
     ]" />
 @endsection
@@ -16,13 +16,13 @@
         <x-slot:headerAction>
             <div class="flex flex-wrap gap-2">
                 @if ($showActions)
-                    <button type="button" @click="$dispatch('open-receive-modal')"
+                    <a href="{{ route('penerimaan-barang.create') }}"
                         class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
-                        Terima Stok
-                    </button>
+                        Penerimaan Barang
+                    </a>
                     <button type="button" @click="$dispatch('open-transfer-modal')"
                         class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

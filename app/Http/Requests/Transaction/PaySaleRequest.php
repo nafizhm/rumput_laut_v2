@@ -17,7 +17,7 @@ class PaySaleRequest extends FormRequest
             'payment_date' => 'required|date',
             'paid_amount' => 'required|numeric|min:0',
             'payment_notes' => 'nullable|string|max:1000',
-            'payment_proof' => 'required|file|mimes:jpg,jpeg,png,pdf|max:4096',
+            'payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:4096',
         ];
     }
 }

@@ -25,8 +25,8 @@ class MenuSeeder extends Seeder
                 'is_active' => true
             ],
             [
-                'name' => 'Transaksi',
-                'icon' => 'circle-dollar-sign',
+                'name' => 'Manajemen Gudang',
+                'icon' => 'warehouse',
                 'route' => null,
                 'url' => null,
                 'permission' => null,
@@ -67,7 +67,10 @@ class MenuSeeder extends Seeder
         ];
 
         foreach ($menus as $menu) {
-            Menu::updateOrCreate(['name' => $menu['name']], $menu);
+            $identity = $menu['route']
+                ? ['route' => $menu['route']]
+                : ['name' => $menu['name'], 'parent_id' => null];
+            Menu::updateOrCreate($identity, $menu);
         }
 
         $parent = Menu::where('name', 'Setting')->first();
@@ -154,7 +157,7 @@ class MenuSeeder extends Seeder
         ]);
 
         // Transaksi children
-        $transaksi = Menu::where('name', 'Transaksi')->first();
+        $transaksi = Menu::where('name', 'Manajemen Gudang')->whereNull('parent_id')->first();
         Menu::updateOrCreate(['name' => 'Manajemen Pinjaman'], [
             'icon' => null,
             'route' => 'manajemen-pinjaman.index',
@@ -188,13 +191,14 @@ class MenuSeeder extends Seeder
         // Remove old separate income/expense menu items
         Menu::whereIn('name', ['Manajemen Pemasukan', 'Manajemen Pengeluaran'])->delete();
 
-        Menu::updateOrCreate(['name' => 'Manajemen Gudang'], [
+        Menu::updateOrCreate(['route' => 'manajemen-gudang.index'], [
+            'name' => 'Dashboard Gudang',
             'icon' => null,
             'route' => 'manajemen-gudang.index',
             'url' => 'manajemen-gudang',
-            'permission' => 'manajemen-gudang.read',
+            'permission' => 'receiving.read',
             'parent_id' => $transaksi->id,
-            'order' => 4,
+            'order' => 0,
             'is_active' => true
         ]);
 
@@ -218,7 +222,8 @@ class MenuSeeder extends Seeder
             'is_active' => true
         ]);
 
-        Menu::updateOrCreate(['name' => 'Manajemen Penjualan'], [
+        Menu::updateOrCreate(['route' => 'manajemen-penjualan.index'], [
+            'name' => 'Manajemen Penjualan',
             'icon' => null,
             'route' => 'manajemen-penjualan.index',
             'url' => 'manajemen-penjualan',
@@ -227,5 +232,16 @@ class MenuSeeder extends Seeder
             'order' => 7,
             'is_active' => true
         ]);
+
+        $this->call(CustomerPurchaseOrderMenuSeeder::class);
+        $this->call(DeliveryNoteMenuSeeder::class);
+        $this->call(InvoiceMenuSeeder::class);
+        $this->call(FinanceMenuSeeder::class);
+        $this->call(ChartOfAccountSeeder::class);
+        $this->call(DirectSalesMenuSeeder::class);
+        $this->call(QualityGradeSeeder::class);
+        $this->call(GoodsReceivingSeeder::class);
+        $this->call(WarehouseNavigationSeeder::class);
+        $this->call(AccountingMenuSeeder::class);
     }
 }

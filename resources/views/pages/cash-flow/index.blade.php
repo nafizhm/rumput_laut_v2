@@ -3,7 +3,7 @@
 @section('title', 'Laporan Arus Kas')
 
 @section('breadcrumb')
-    <x-breadcrumb pageTitle="Laporan Arus Kas" :links="[['name' => 'Laporan', 'url' => '#'], ['name' => 'Arus Kas', 'url' => route('cash-flow.index')]]" />
+    <x-breadcrumb pageTitle="Laporan Arus Kas" :links="[['name' => 'Keuangan', 'url' => '#'], ['name' => 'Arus Kas', 'url' => route('cash-flow.index')]]" />
 @endsection
 
 @section('content')

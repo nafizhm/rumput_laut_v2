@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HasOperationalJournals;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class FarmerPayment extends Model
 {
+    use HasOperationalJournals;
+
     protected $fillable = [
         'farmer_id',
         'payment_date',

@@ -34,6 +34,9 @@ class InventoryService
         if ($inventory->stockMovements()->exists()) {
             throw new \Exception('Barang ini tidak bisa dihapus karena sudah memiliki riwayat transaksi.');
         }
+        if (\App\Models\WarehouseArea::where('inventory_id', $inventory->id)->exists()) {
+            throw new \Exception('Gudang ini masih digunakan oleh area penyimpanan.');
+        }
         return $inventory->delete();
     }
 }

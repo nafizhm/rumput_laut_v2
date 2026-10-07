@@ -1,9 +1,17 @@
 <div x-data="salesFormComponent()">
     <x-modal name="sales-modal">
-        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Tambah Data Penjualan</h4>
+        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Tambah Penjualan Langsung</h4>
 
         <form @submit.prevent="submit">
             <div class="space-y-4">
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Mekanisme Pengeluaran Stok</label>
+                    <select x-model="form.data.stock_mode" class="h-11 w-full rounded-lg border border-gray-300 px-4 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
+                        <option value="immediate">Langsung — barang diserahkan saat penjualan</option>
+                        <option value="delivery_note">Melalui Surat Jalan — stok keluar saat Konfirmasi Dikirim</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500" x-text="form.data.stock_mode === 'delivery_note' ? 'Penjualan ini belum memotong atau memesan stok. Siapkan Surat Jalan dan konfirmasi setelah barang keluar.' : 'Stok langsung berkurang saat penjualan disimpan. Jangan pilih ini untuk pengiriman melalui Surat Jalan.'"></p>
+                </div>
                 <x-select label="Pabrik" name="factory_id" :options="$factories"
                     x-on:change="$dispatch('update-sales-field', { field: 'factory_id', value: $event.detail })"
                     alpine-error="form.getError('factory_id')" required />
@@ -11,6 +19,17 @@
                 <x-select label="Barang / Stok" name="inventory_id" :options="$inventories"
                     x-on:change="$dispatch('update-sales-field', { field: 'inventory_id', value: $event.detail })"
                     alpine-error="form.getError('inventory_id')" required />
+
+                <div x-show="selectedInventory?.stock_stage === 'finished'" x-cloak>
+                    <label class="block text-sm text-gray-700 dark:text-gray-300">Batch barang jadi / kualitas / area
+                        <select x-model="form.data.finished_batch_id" :required="selectedInventory?.stock_stage === 'finished'" class="mt-2 w-full rounded-lg border bg-white p-3 dark:bg-gray-900">
+                            <option value="">Pilih batch barang jadi</option>
+                            <template x-for="batch in finishedBatches.filter(b => b.inventory_id == form.data.inventory_id)" :key="batch.id"><option :value="batch.id" x-text="batch.label"></option></template>
+                        </select>
+                    </label>
+                    <p class="mt-1 text-xs text-gray-500">Satu penjualan memakai satu batch jadi. Jumlah karung di bawah adalah jumlah kemasan jadi untuk batch ini.</p>
+                    <p x-show="form.getError('finished_batch_id')" x-text="form.getError('finished_batch_id')" class="text-xs text-red-600"></p>
+                </div>
 
                 <div x-show="selectedInventory" class="mt-2 flex items-center gap-2" x-cloak>
                     <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
@@ -97,13 +116,13 @@
         @confirm-delete-delete-sale-modal.window="deleteConfirmed" />
 
     <x-modal name="pay-sale-modal">
-        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Bayar Penjualan</h4>
+        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Pelunasan Penjualan Langsung</h4>
 
         <form @submit.prevent="submitPayment">
             <div class="space-y-4">
                 <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/70">
                     <div class="flex items-center justify-between text-sm">
-                        <span class="text-gray-500 dark:text-gray-400">Invoice</span>
+                        <span class="text-gray-500 dark:text-gray-400">No. Penjualan</span>
                         <span class="font-semibold text-gray-900 dark:text-white/90" x-text="paymentItem?.invoice_number || '-'"></span>
                     </div>
                     <div class="mt-2 flex items-center justify-between text-sm">
@@ -117,7 +136,7 @@
                 <x-input label="Nominal Bayar" name="paid_amount" x-model="paymentForm.data.paid_amount" :isCurrency="true"
                     alpine-error="paymentForm.getError('paid_amount')" required />
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bukti Bayar <span class="text-error-500">*</span></label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bukti Bayar (Opsional)</label>
                     <input type="file" x-ref="paymentProofInput" @change="paymentForm.data.payment_proof = $event.target.files[0]"
                         class="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
                     <p x-show="paymentForm.getError('payment_proof')" x-text="paymentForm.getError('payment_proof')" class="mt-1.5 text-xs text-error-500"></p>
@@ -145,12 +164,15 @@
 function salesFormComponent() {
     return {
         inventories: @json($inventories),
+        finishedBatches: @json($finishedBatches),
         paymentItem: null,
         deleteId: null,
 
         form: useForm({
+            stock_mode: 'immediate',
             factory_id: '',
             inventory_id: '',
+            finished_batch_id: '',
             sale_date: window.getLocalDateInputValue(),
             sold_weight_kg: 0,
             price_per_kg: 0,
@@ -220,7 +242,7 @@ function salesFormComponent() {
                 this.$dispatch('open-modal', 'sales-modal');
             });
 
-            window.addEventListener('update-sales-field', (e) => this.form.data[e.detail.field] = e.detail.value);
+            window.addEventListener('update-sales-field', (e) => { this.form.data[e.detail.field] = e.detail.value; if(e.detail.field === 'inventory_id') this.form.data.finished_batch_id = ''; });
             window.addEventListener('open-pay-sale', (e) => this.openPaymentModal(e.detail));
             window.addEventListener('delete-sale', (e) => this.deleteItem(e.detail));
         },
@@ -262,7 +284,9 @@ function salesFormComponent() {
                 const res = await fetch('/warehouse-stock');
                 const result = await res.json();
                 if (result.success && result.data) {
-                    this.inventories = result.data.filter(i => i.label === 'Gudang Kering');
+                    this.inventories = result.data.filter(item => item.stock_stage !== 'material');
+                    const batchResult = await fetch('{{ route('manajemen-penjualan.batches') }}').then(r => r.json());
+                    this.finishedBatches = batchResult.data || [];
                 }
             } catch (e) {
                 console.error('Gagal refresh stok:', e);
@@ -278,9 +302,7 @@ function salesFormComponent() {
                     this.refreshInventories();
                 },
                 onError: (err) => {
-                    if (err.response?.status !== 422) {
-                        toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan sistem');
-                    }
+                    toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan sistem');
                 }
             });
         },
@@ -302,9 +324,7 @@ function salesFormComponent() {
                     this.$dispatch('close-modal', 'pay-sale-modal');
                 },
                 onError: (err) => {
-                    if (err.response?.status !== 422) {
-                        toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan sistem');
-                    }
+                    toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan sistem');
                 }
             });
         }

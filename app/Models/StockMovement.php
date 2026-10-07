@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\HasOperationalJournals;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StockMovement extends Model
 {
+    use HasOperationalJournals;
+
     protected $fillable = [
+        'production_run_id', 'finished_batch_id', 'cost_cents',
+        'goods_receipt_id',
+        'delivery_note_id',
         'inventory_id',
         'harvest_transaction_id',
         'sales_transaction_id',
@@ -19,7 +25,7 @@ class StockMovement extends Model
         'discrepancy_kg',
         'sack_count',
         'balance_after_kg',
-        'description'
+        'description',
     ];
 
     protected $casts = [

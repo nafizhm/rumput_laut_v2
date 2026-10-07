@@ -51,6 +51,18 @@ class RolePermissionSeeder extends Seeder
             'manajemen-inventori.update',
             'manajemen-inventori.delete',
 
+            'quality.read',
+            'quality.create',
+            'quality.update',
+            'area.read',
+            'area.create',
+            'area.update',
+            'receiving.read',
+            'receiving.create',
+            'receiving.update',
+            'receiving.confirm',
+            'receiving.delete',
+
             'manajemen-pinjaman.read',
             'manajemen-pinjaman.create',
             'manajemen-pinjaman.update',
@@ -77,6 +89,16 @@ class RolePermissionSeeder extends Seeder
             'manajemen-penjualan.delete',
 
             'cash-flow.read',
+            'coa.read',
+            'coa.create',
+            'coa.update',
+            'journal.read',
+            'journal.create',
+            'journal.update',
+            'journal.delete',
+            'journal.post',
+            'journal.reverse',
+            'financial-reports.read',
         ];
 
         // Remove old separate income/expense permissions
@@ -118,6 +140,18 @@ class RolePermissionSeeder extends Seeder
             'manajemen-inventori.update',
             'manajemen-inventori.delete',
 
+            'quality.read',
+            'quality.create',
+            'quality.update',
+            'area.read',
+            'area.create',
+            'area.update',
+            'receiving.read',
+            'receiving.create',
+            'receiving.update',
+            'receiving.confirm',
+            'receiving.delete',
+
             'manajemen-pinjaman.read',
             'manajemen-pinjaman.create',
             'manajemen-pinjaman.update',
@@ -144,6 +178,16 @@ class RolePermissionSeeder extends Seeder
             'manajemen-penjualan.delete',
 
             'cash-flow.read',
+            'coa.read',
+            'coa.create',
+            'coa.update',
+            'journal.read',
+            'journal.create',
+            'journal.update',
+            'journal.delete',
+            'journal.post',
+            'journal.reverse',
+            'financial-reports.read',
         ]);
 
         // Admin — only non-financial menus (master data & settings)
@@ -185,6 +229,18 @@ class RolePermissionSeeder extends Seeder
             'manajemen-inventori.create',
             'manajemen-inventori.update',
             'manajemen-inventori.delete',
+
+            'quality.read',
+            'quality.create',
+            'quality.update',
+            'area.read',
+            'area.create',
+            'area.update',
+            'receiving.read',
+            'receiving.create',
+            'receiving.update',
+            'receiving.confirm',
+            'receiving.delete',
         ]);
     }
 }

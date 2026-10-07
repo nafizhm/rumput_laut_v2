@@ -6,6 +6,7 @@
     <x-breadcrumb 
         pageTitle="Pemasukan & Pengeluaran" 
         :links="[
+            ['name' => 'Keuangan', 'url' => '#'],
             ['name' => 'Pemasukan & Pengeluaran', 'url' => route('manajemen-pemasukan-pengeluaran.index')]
         ]" 
     />

@@ -7,6 +7,7 @@ use App\Models\StockMovement;
 use App\Traits\HandlesTransaction;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 class WarehouseService
 {
@@ -18,7 +19,7 @@ class WarehouseService
     public function getAllMovements(?int $inventoryId = null): Collection
     {
         return StockMovement::with(['inventory', 'harvestTransaction', 'salesTransaction'])
-            ->when($inventoryId, fn($query) => $query->where('inventory_id', $inventoryId))
+            ->when($inventoryId, fn ($query) => $query->where('inventory_id', $inventoryId))
             ->orderBy('movement_date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -29,32 +30,14 @@ class WarehouseService
      */
     public function receive(array $data): StockMovement
     {
-        return $this->transaction(function () use ($data) {
-            $inventory = Inventory::lockForUpdate()->findOrFail($data['inventory_id']);
+        throw ValidationException::withMessages(['receipt' => 'Gunakan menu Penerimaan Barang dan konfirmasi penerimaan untuk menambah stok.']);
+    }
 
-            $actualWeight = $data['actual_weight_kg'];
-            $actualSacks = $data['actual_sacks'];
-            $noteWeight = $data['note_weight_kg'] ?? $actualWeight;
-            $discrepancy = $noteWeight - $actualWeight;
-
-            $inventory->current_stock_kg += $actualWeight;
-            $inventory->current_sack_count += $actualSacks;
-            $inventory->save();
-
-            return StockMovement::create([
-                'inventory_id' => $inventory->id,
-                'harvest_transaction_id' => null,
-                'movement_date' => $data['movement_date'],
-                'direction' => 'in',
-                'type' => 'in',
-                'weight_kg' => $actualWeight,
-                'note_weight_kg' => $noteWeight,
-                'discrepancy_kg' => $discrepancy,
-                'sack_count' => $actualSacks,
-                'balance_after_kg' => $inventory->current_stock_kg,
-                'description' => $data['description'] ?? 'Penerimaan stok manual'
-            ]);
-        });
+    private function assertLegacyInventory(Inventory $inventory): void
+    {
+        if (in_array($inventory->stock_stage, ['material', 'finished'])) {
+            throw ValidationException::withMessages(['inventory' => 'Stok bahan harus dikelola melalui batch dan proses produksi, bukan perubahan saldo gudang manual.']);
+        }
     }
 
     /**
@@ -64,6 +47,7 @@ class WarehouseService
     {
         return $this->transaction(function () use ($data) {
             $inventory = Inventory::lockForUpdate()->findOrFail($data['inventory_id']);
+            $this->assertLegacyInventory($inventory);
             $lostWeight = $data['lost_weight_kg'];
 
             if ($inventory->current_stock_kg < $lostWeight) {
@@ -81,7 +65,7 @@ class WarehouseService
                 'weight_kg' => $lostWeight,
                 'sack_count' => 0,
                 'balance_after_kg' => $inventory->current_stock_kg,
-                'description' => $data['description'] ?? 'Penyusutan stok'
+                'description' => $data['description'] ?? 'Penyusutan stok',
             ]);
         });
     }
@@ -94,6 +78,8 @@ class WarehouseService
         return $this->transaction(function () use ($data) {
             $fromInventory = Inventory::lockForUpdate()->findOrFail($data['from_inventory_id']);
             $toInventory = Inventory::lockForUpdate()->findOrFail($data['to_inventory_id']);
+            $this->assertLegacyInventory($fromInventory);
+            $this->assertLegacyInventory($toInventory);
 
             $weight = $data['weight_kg'];
             $sacks = (int) ($data['sack_count'] ?? 0);
@@ -145,6 +131,7 @@ class WarehouseService
     {
         return $this->transaction(function () use ($data) {
             $inventory = Inventory::lockForUpdate()->findOrFail($data['inventory_id']);
+            $this->assertLegacyInventory($inventory);
             $adjWeight = $data['adjustment_weight_kg'];
 
             $newBalance = $inventory->current_stock_kg + $adjWeight;
@@ -163,7 +150,7 @@ class WarehouseService
                 'weight_kg' => abs($adjWeight),
                 'sack_count' => 0,
                 'balance_after_kg' => $inventory->current_stock_kg,
-                'description' => $data['description']
+                'description' => $data['description'],
             ]);
         });
     }

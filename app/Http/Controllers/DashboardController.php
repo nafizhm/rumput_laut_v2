@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Expense;
+use App\Models\AccountingSetting;
 use App\Models\Farmer;
 use App\Models\HarvestTransaction;
 use App\Models\Inventory;
+use App\Models\JournalLine;
 use App\Models\Loan;
 use App\Models\SalesTransaction;
 use App\Models\StockMovement;
+use App\Models\Transaction;
+use App\Services\Finance\CashFlowService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -23,17 +27,31 @@ class DashboardController extends Controller
     {
         [$startDate, $endDate] = $this->resolveDateRange($request);
 
-        $salesQuery = SalesTransaction::with('factory')->whereBetween('sale_date', [$startDate, $endDate]);
-        $harvestQuery = HarvestTransaction::with('farmer')->whereBetween('harvest_date', [$startDate, $endDate]);
-        $expenseQuery = Expense::with('category')->whereBetween('expense_date', [$startDate, $endDate]);
-        $loanQuery = Loan::with('farmer')->whereBetween('loan_date', [$startDate, $endDate]);
-        $movementQuery = StockMovement::whereBetween('movement_date', [$startDate, $endDate]);
+        $salesQuery = SalesTransaction::with('factory')->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+        $harvestQuery = HarvestTransaction::with('farmer')->whereBetween('harvest_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+        $expenseQuery = Transaction::with('category')->where('type', 'expense')->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+        $loanQuery = Loan::with('farmer')->whereBetween('loan_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+        $movementQuery = StockMovement::whereBetween('movement_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
 
         $totalSales = (clone $salesQuery)->sum('total_sale_value');
         $totalHarvest = (clone $harvestQuery)->sum('total_harvest_value');
         $totalExpenses = (clone $expenseQuery)->sum('amount');
 
-        $netProfit = $totalSales - $totalHarvest - $totalExpenses;
+        $recognizedSales = (clone $movementQuery)->where('direction', 'out')->whereNotNull('sales_transaction_id')->with('salesTransaction')->get()
+            ->sum(fn ($m) => $m->salesTransaction ? $m->salesTransaction->total_sale_value * $m->weight_kg / $m->salesTransaction->total_weight_kg : 0);
+        $cogs = Schema::hasColumn('stock_movements', 'cost_cents')
+            ? (clone $movementQuery)->whereNotNull('sales_transaction_id')->sum('cost_cents') / 100 : 0;
+        $otherIncome = Transaction::where('type', 'income')->whereBetween('date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])->sum('amount');
+        $netProfit = $recognizedSales + $otherIncome - $cogs - $totalExpenses;
+        $profitReady = true;
+        if (Schema::hasTable('operational_events')) {
+            $setting = AccountingSetting::findOrFail(1);
+            $profitReady = (bool) $setting->start_date;
+            $netProfit = JournalLine::query()->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+                ->where('journal_entries.status', 'posted')->whereBetween('journal_entries.entry_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->whereIn('journal_lines.category', ['Pendapatan', 'Biaya'])->get(['journal_lines.debit_cents', 'journal_lines.credit_cents'])
+                ->sum(fn ($l) => $l->credit_cents - $l->debit_cents) / 100;
+        }
         $farmerDebt = Farmer::sum('current_debt');
         $warehouseStock = Inventory::sum('current_stock_kg');
 
@@ -59,7 +77,7 @@ class DashboardController extends Controller
             ->orderBy('harvest_date', 'desc')
             ->limit(5)
             ->get()
-            ->map(fn($h) => [
+            ->map(fn ($h) => [
                 'name' => $h->farmer->name,
                 'weight' => $h->warehouse_weight,
                 'value' => $h->total_harvest_value,
@@ -69,13 +87,13 @@ class DashboardController extends Controller
         $weeklyExpenseCount = (clone $expenseQuery)->count();
         $weeklyExpenseValue = (clone $expenseQuery)->sum('amount');
         $recentExpenses = (clone $expenseQuery)
-            ->orderBy('expense_date', 'desc')
+            ->orderBy('date', 'desc')
             ->limit(5)
             ->get()
-            ->map(fn($e) => [
-                'name' => $e->category->name,
+            ->map(fn ($e) => [
+                'name' => $e->category?->name ?? 'Pengeluaran',
                 'amount' => $e->amount,
-                'date' => $e->expense_date->format('d/m'),
+                'date' => $e->date->format('d/m'),
             ]);
 
         $weeklySalesCount = (clone $salesQuery)->count();
@@ -84,7 +102,7 @@ class DashboardController extends Controller
             ->orderBy('sale_date', 'desc')
             ->limit(5)
             ->get()
-            ->map(fn($s) => [
+            ->map(fn ($s) => [
                 'name' => $s->factory->name,
                 'weight' => $s->total_weight_kg,
                 'value' => $s->total_sale_value,
@@ -98,6 +116,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'netProfit' => $netProfit,
+            'profitReady' => $profitReady,
             'totalSales' => $totalSales,
             'farmerDebt' => $farmerDebt,
             'warehouseStock' => $warehouseStock,
@@ -151,12 +170,9 @@ class DashboardController extends Controller
 
         while ($cursor <= $lastMonth) {
             $months[] = $cursor->translatedFormat('M Y');
-            $incomeData[] = SalesTransaction::whereBetween('sale_date', [$cursor->copy()->startOfMonth(), $cursor->copy()->endOfMonth()])
-                ->sum('total_sale_value');
-            $expenseData[] = HarvestTransaction::whereBetween('harvest_date', [$cursor->copy()->startOfMonth(), $cursor->copy()->endOfMonth()])
-                ->sum('total_harvest_value')
-                + Expense::whereBetween('expense_date', [$cursor->copy()->startOfMonth(), $cursor->copy()->endOfMonth()])
-                ->sum('amount');
+            $cash = app(CashFlowService::class)->summary($cursor->copy()->startOfMonth(), $cursor->copy()->endOfMonth(), 'all');
+            $incomeData[] = collect($cash)->where('type', 'Cash In')->sum('amount');
+            $expenseData[] = collect($cash)->where('type', 'Cash Out')->sum('amount');
             $cursor->addMonth();
         }
 

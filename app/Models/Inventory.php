@@ -9,8 +9,9 @@ class Inventory extends Model
 {
     protected $fillable = [
         'item_name',
+        'stock_stage',
         'current_stock_kg',
-        'current_sack_count'
+        'current_sack_count',
     ];
 
     public function stockMovements(): HasMany

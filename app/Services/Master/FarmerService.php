@@ -3,9 +3,11 @@
 namespace App\Services\Master;
 
 use App\Models\Farmer;
+use App\Models\GoodsReceipt;
 use App\Traits\HandlesTransaction;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class FarmerService
 {
@@ -26,7 +28,7 @@ class FarmerService
     {
         return Farmer::orderBy('name', 'asc')
             ->get(['id', 'name'])
-            ->map(fn($farmer) => [
+            ->map(fn ($farmer) => [
                 'label' => $farmer->name,
                 'value' => $farmer->id,
             ]);
@@ -58,6 +60,12 @@ class FarmerService
     public function deleteFarmer(Farmer $farmer): ?bool
     {
         return $this->transaction(function () use ($farmer) {
+            $farmer = Farmer::lockForUpdate()->findOrFail($farmer->id);
+            if ($farmer->loans()->exists() || $farmer->harvestTransactions()->exists() || $farmer->payments()->exists()
+                || GoodsReceipt::where('farmer_id', $farmer->id)->exists()) {
+                throw ValidationException::withMessages(['farmer' => 'Petani dengan transaksi tidak dapat dihapus. Riwayat dan relasi pembukuan harus dipertahankan.']);
+            }
+
             return $farmer->delete();
         });
     }
@@ -68,7 +76,7 @@ class FarmerService
     public function getFarmerLedgers(int $farmerId): Collection
     {
         $farmer = Farmer::findOrFail($farmerId);
-        
+
         return $farmer->ledgers()
             ->with('reference')
             ->orderBy('id', 'desc')

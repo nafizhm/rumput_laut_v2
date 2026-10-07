@@ -3,12 +3,14 @@
 namespace App\Services\Transaction;
 
 use App\Models\Farmer;
+use App\Models\GoodsReceipt;
 use App\Models\HarvestTransaction;
 use App\Models\Inventory;
-use App\Models\StockMovement;
+use App\Services\Finance\OperationalAccountingService;
 use App\Traits\HandlesTransaction;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 class HarvestTransactionService
 {
@@ -19,7 +21,7 @@ class HarvestTransactionService
      */
     public function getAllHarvests(): Collection
     {
-        return HarvestTransaction::with('farmer')->orderBy('harvest_date', 'desc')->get();
+        return HarvestTransaction::with(['farmer', 'receipt'])->orderBy('harvest_date', 'desc')->get();
     }
 
     /**
@@ -33,7 +35,11 @@ class HarvestTransactionService
             $data['batch_code'] = $this->generateBatchCode();
 
             $data = $this->prepareHarvestData($data);
-            $harvest = HarvestTransaction::create($data);
+            $this->assertDebtDeduction($data['debt_deduction'], (int) $farmer->current_debt);
+            $harvest = new HarvestTransaction($data);
+            $harvest->receipt_mode = 'separate';
+            $harvest->is_received = false;
+            $harvest->save();
 
             if ($harvest->debt_deduction > 0) {
                 $farmer->decrement('current_debt', $harvest->debt_deduction);
@@ -46,24 +52,9 @@ class HarvestTransactionService
                 ]);
             }
 
-            // Update Gudang Basah Stock
-            $inventory = Inventory::lockForUpdate()->where('item_name', 'Gudang Basah')->first();
-            if ($inventory) {
-                $inventory->increment('current_stock_kg', $harvest->warehouse_weight);
-                $inventory->increment('current_sack_count', $harvest->sack_count);
-
-                $harvest->stockMovement()->create([
-                    'inventory_id' => $inventory->id,
-                    'movement_date' => $harvest->harvest_date,
-                    'direction' => 'in',
-                    'type' => 'in',
-                    'weight_kg' => $harvest->warehouse_weight,
-                    'note_weight_kg' => $harvest->warehouse_weight,
-                    'sack_count' => $harvest->sack_count,
-                    'balance_after_kg' => $inventory->current_stock_kg,
-                    'description' => "Hasil Panen: {$harvest->batch_code} - {$farmer->name}",
-                ]);
-            }
+            // New purchases record financial values only. Actual stock is received
+            // and weighed through GoodsReceiptService.
+            app(OperationalAccountingService::class)->harvest($harvest);
 
             return $harvest;
         });
@@ -75,6 +66,13 @@ class HarvestTransactionService
     public function updateHarvest(HarvestTransaction $harvest, array $data): bool
     {
         return $this->transaction(function () use ($harvest, $data) {
+            $harvest = HarvestTransaction::lockForUpdate()->findOrFail($harvest->id);
+            if ((int) $data['farmer_id'] !== (int) $harvest->farmer_id) {
+                throw ValidationException::withMessages(['farmer_id' => 'Petani pada pembelian tidak dapat diganti. Batalkan pembelian yang belum diterima lalu buat transaksi baru.']);
+            }
+            if (GoodsReceipt::where('harvest_transaction_id', $harvest->id)->exists()) {
+                throw ValidationException::withMessages(['harvest' => 'Pembelian dengan dokumen penerimaan tidak dapat diubah.']);
+            }
             $farmer = Farmer::lockForUpdate()->findOrFail($harvest->farmer_id);
 
             $oldDeduction = $harvest->debt_deduction;
@@ -83,6 +81,7 @@ class HarvestTransactionService
 
             $data = $this->prepareHarvestData($data);
             $newDeduction = $data['debt_deduction'];
+            $this->assertDebtDeduction($newDeduction, (int) $farmer->current_debt + (int) $oldDeduction);
             $diff = $newDeduction - $oldDeduction;
 
             $harvest->update($data);
@@ -100,7 +99,7 @@ class HarvestTransactionService
 
             // Update Gudang Basah Stock if weight or sacks changed
             $inventory = Inventory::lockForUpdate()->where('item_name', 'Gudang Basah')->first();
-            if ($inventory) {
+            if ($harvest->receipt_mode === 'legacy' && $inventory) {
                 $weightDiff = $harvest->warehouse_weight - $oldWarehouseWeight;
                 $sackDiff = $harvest->sack_count - $oldSackCount;
 
@@ -124,7 +123,9 @@ class HarvestTransactionService
                     );
                 }
             }
-            
+
+            app(OperationalAccountingService::class)->harvest($harvest);
+
             return true;
         });
     }
@@ -135,11 +136,15 @@ class HarvestTransactionService
     public function deleteHarvest(HarvestTransaction $harvest): bool
     {
         return $this->transaction(function () use ($harvest) {
+            $harvest = HarvestTransaction::lockForUpdate()->findOrFail($harvest->id);
+            if (GoodsReceipt::where('harvest_transaction_id', $harvest->id)->exists()) {
+                throw ValidationException::withMessages(['harvest' => 'Pembelian dengan dokumen penerimaan tidak dapat dihapus.']);
+            }
             $farmer = Farmer::lockForUpdate()->findOrFail($harvest->farmer_id);
-            
+
             if ($harvest->debt_deduction > 0) {
                 $farmer->increment('current_debt', $harvest->debt_deduction);
-                
+
                 $harvest->ledgers()->create([
                     'farmer_id' => $farmer->id,
                     'type' => 'debit',
@@ -150,15 +155,18 @@ class HarvestTransactionService
 
             // Revert Gudang Basah Stock
             $inventory = Inventory::lockForUpdate()->where('item_name', 'Gudang Basah')->first();
-            if ($inventory) {
+            if ($harvest->receipt_mode === 'legacy' && $inventory) {
                 $inventory->decrement('current_stock_kg', $harvest->warehouse_weight);
                 $inventory->decrement('current_sack_count', $harvest->sack_count);
             }
 
-            // Delete stock movement (will be handled by the decrement above for consistency, 
+            // Delete stock movement (will be handled by the decrement above for consistency,
             // but we should delete the record too)
             $harvest->stockMovement()->delete();
-            
+
+            app(OperationalAccountingService::class)->cancel($harvest, 'purchase');
+            $harvest->ledgers()->delete();
+
             return $harvest->delete();
         });
     }
@@ -217,5 +225,12 @@ class HarvestTransactionService
         $data['debt_deduction'] = $netHarvestValue - $cashPayout;
 
         return $data;
+    }
+
+    private function assertDebtDeduction(int $deduction, int $available): void
+    {
+        if ($deduction > $available) {
+            throw ValidationException::withMessages(['cash_payout' => 'Potongan utang melebihi saldo utang petani. Bayarkan sisa nilai pembelian secara tunai.']);
+        }
     }
 }

@@ -7,6 +7,7 @@
 @endsection
 
 @section('content')
+    <p class="mb-4 rounded-lg bg-white p-4 text-sm text-gray-500 dark:bg-gray-900">Pembelian panen baru tidak menambah stok otomatis. Catat timbang aktual melalui Penerimaan Barang, lalu Konfirmasi Diterima. Data panen lama tetap mengikuti riwayat sebelumnya.</p>
     <x-data-table id="harvestTransactionTable" :rows="$data" :columns="$columns" :url="route('harvest-data')">
         <x-slot:headerAction>
             <button type="button" @click="$dispatch('create-harvest-transaction')"
@@ -24,6 +25,14 @@
         <x-slot:longDate>
             <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatDisplayDate(item.harvest_date)"></span>
         </x-slot:longDate>
+        <x-slot:receipt>
+            <span x-show="item.receipt_mode !== 'separate'" class="text-sm text-gray-500">Alur Lama</span>
+            <template x-if="item.receipt_mode === 'separate'"><div>
+                <span class="text-sm" x-text="item.is_received ? 'Diterima' : (item.receipt ? 'Draft Penerimaan' : 'Belum Diterima')"></span>
+                @can('receiving.read')<a x-show="item.receipt" :href="`{{ url('penerimaan-barang') }}/${item.receipt?.id}`" class="block text-sm text-brand-500">Lihat Penerimaan</a>@endcan
+                @can('receiving.create')<a x-show="!item.receipt" :href="`{{ route('penerimaan-barang.create') }}?harvest_id=${item.id}`" class="block text-sm text-brand-500">Buat Penerimaan</a>@endcan
+            </div></template>
+        </x-slot:receipt>
 
         <x-slot:warehouse_weight>
             <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatWeight(item.warehouse_weight)"></span>

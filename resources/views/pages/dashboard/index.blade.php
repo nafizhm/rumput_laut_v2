@@ -33,7 +33,7 @@
                         </template>
                         <template x-if="!loading">
                             <h4 class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90"
-                                x-text="formatIDR(stats.netProfit)"></h4>
+                                x-text="stats.profitReady === false ? 'Belum tersedia' : formatIDR(stats.netProfit)"></h4>
                         </template>
                     </div>
                 </div>

@@ -1,18 +1,22 @@
 @extends('layouts.app')
 
-@section('title', 'Manajemen Penjualan')
+@section('title', 'Penjualan Langsung')
 
 @section('breadcrumb')
     <x-breadcrumb 
-        pageTitle="Manajemen Penjualan" 
+        pageTitle="Penjualan Langsung" 
         :links="[
-            ['name' => 'Transaksi', 'url' => '#'],
-            ['name' => 'Manajemen Penjualan', 'url' => route('manajemen-penjualan.index')]
+            ['name' => 'Penjualan', 'url' => '#'],
+            ['name' => 'Penjualan Langsung', 'url' => route('manajemen-penjualan.index')]
         ]" 
     />
 @endsection
 
 @section('content')
+    <div class="mb-5 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <p>Untuk pengiriman, pilih stok keluar melalui Surat Jalan: stok baru berkurang saat Konfirmasi Dikirim. Untuk barang yang langsung diserahkan, pilih pengeluaran langsung. Invoice dan pembayaran tidak memotong stok.</p>
+        <p class="mt-2">Setelah menerima uang, gunakan tombol Pelunasan untuk mencatat tanggal dan jumlah pembayaran. Tahap ini mendukung pelunasan penuh; cicilan akan ditambahkan pada tahap berikutnya.</p>
+    </div>
     <x-data-table 
         id="salesTable" 
         :rows="$data" 
@@ -35,6 +39,7 @@
         <x-slot:date>
             <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatDisplayDate(item.sale_date)"></span>
         </x-slot:date>
+        <x-slot:stock_mode><span x-text="item.stock_mode === 'delivery_note' ? 'Melalui Surat Jalan' : 'Langsung / Alur Lama'"></span></x-slot:stock_mode>
 
         <x-slot:weight>
             <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatWeight(item.total_weight_kg)"></span>
@@ -58,13 +63,22 @@
             </span>
         </x-slot:payment_status>
 
+        <x-slot:paid_amount>
+            <span x-text="item.paid_amount == null ? (item.payment_status === 'paid' ? 'Belum tercatat' : formatCurrency(0)) : formatCurrency(item.paid_amount)"></span>
+        </x-slot:paid_amount>
+        <x-slot:remaining_amount><span x-text="formatCurrency(item.remaining_amount)"></span></x-slot:remaining_amount>
+        <x-slot:payment_date><span x-text="item.payment_date ? formatDisplayDate(item.payment_date) : '-'"></span></x-slot:payment_date>
+
         <x-slot:action>
             <div class="flex items-center gap-2">
-                <template x-if="item.payment_status !== 'paid'">
+                <template x-if="item.payment_status !== 'paid' && !item.invoice">
                     <button type="button" @click="$dispatch('open-pay-sale', item)"
                         class="flex w-full items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600">
-                        Bayar
+                        Pelunasan
                     </button>
+                </template>
+                <template x-if="item.invoice">
+                    <a href="{{ route('invoice.index') }}" class="text-sm text-brand-500" x-text="item.invoice.number"></a>
                 </template>
                 <template x-if="item.payment_status === 'paid' && item.payment_proof_url">
                     <a :href="item.payment_proof_url" target="_blank"
@@ -72,7 +86,7 @@
                         Bukti Bayar
                     </a>
                 </template>
-                <button type="button" @click="$dispatch('delete-sale', item.id)"
+                <button type="button" x-show="!item.invoice" @click="$dispatch('delete-sale', item.id)"
                     class="flex items-center justify-center rounded-lg bg-rose-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-600">
                     Hapus
                 </button>

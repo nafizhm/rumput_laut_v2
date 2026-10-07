@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HasOperationalJournals;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class HarvestTransaction extends Model
 {
+    use HasOperationalJournals;
+
     protected $fillable = [
         'farmer_id',
         'batch_code',
@@ -51,9 +54,15 @@ class HarvestTransaction extends Model
         return $this->hasOne(StockMovement::class);
     }
 
+    public function receipt()
+    {
+        return $this->hasOne(GoodsReceipt::class);
+    }
+
     public function getRemainingDebtAfterPaymentAttribute(): int
     {
         $currentDebt = (int) ($this->farmer?->current_debt ?? 0);
+
         return max(0, $currentDebt);
     }
 }

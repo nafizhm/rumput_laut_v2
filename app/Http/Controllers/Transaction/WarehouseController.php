@@ -23,11 +23,11 @@ class WarehouseController extends Controller
 
     public function index(Request $request)
     {
-        return $this->renderWarehousePage(
-            'Manajemen Gudang',
-            $request->integer('inventory_id'),
-            true
-        );
+        return app(WarehouseDashboardController::class)->index();
+    }
+
+    public function movements(Request $request) {
+        return $this->renderWarehousePage('Riwayat Mutasi Gudang', $request->integer('inventory_id'), true);
     }
 
     public function wet()
@@ -99,7 +99,8 @@ class WarehouseController extends Controller
             'value' => $i->id,
             'label' => $i->item_name,
             'current_stock' => (float) $i->current_stock_kg,
-            'current_sacks' => (int) $i->current_sack_count
+            'current_sacks' => (int) $i->current_sack_count,
+            'stock_stage' => $i->stock_stage,
         ]);
         return $this->successResponse('Data stok berhasil diambil', $inventories);
     }

@@ -3,7 +3,7 @@
 @section('title', 'Manajemen Pinjaman')
 
 @section('breadcrumb')
-    <x-breadcrumb pageTitle="Manajemen Pinjaman" :links="[['name' => 'Manajemen Pinjaman', 'url' => route('manajemen-pinjaman.index')]]" />
+    <x-breadcrumb pageTitle="Manajemen Pinjaman" :links="[['name' => 'Keuangan', 'url' => '#'], ['name' => 'Manajemen Pinjaman', 'url' => route('manajemen-pinjaman.index')]]" />
 @endsection
 
 @section('content')
