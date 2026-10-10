@@ -38,7 +38,7 @@ class JournalController extends Controller
 
     private function listing(string $kind, array $filters)
     {
-        $entries = JournalEntry::with(['lines', 'reversal'])->whereIn('kind', $kind === 'opening' ? ['opening'] : ['general', 'reversal', 'operational', 'operational-reversal'])
+        $entries = JournalEntry::with(['lines', 'reversal'])->whereIn('kind', $kind === 'opening' ? ['opening'] : ['opening', 'general', 'reversal', 'operational', 'operational-reversal'])
             ->when($filters['month'] ?? null, fn ($q, $month) => $q->whereBetween('entry_date', [$month.'-01', Carbon::parse($month.'-01')->endOfMonth()->format('Y-m-d')]))
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))->orderByDesc('entry_date')->orderByDesc('id')->get();
 

@@ -42,7 +42,7 @@
         </x-slot:payment>
         <x-slot:total>
             <div class="text-right text-sm">
-                <div class="font-medium text-gray-900 dark:text-gray-300" x-text="Number(item.total_amount).toLocaleString('id-ID', {style: 'currency', currency: 'IDR'})"></div>
+                <div class="text-right tabular-nums font-medium text-gray-900 dark:text-gray-300" x-text="Number(item.total_amount).toLocaleString('id-ID', {style: 'currency', currency: 'IDR'})"></div>
                 <div class="text-xs text-gray-500" x-show="item.paid_amount > 0" x-text="'Dibayar: Rp ' + Number(item.paid_amount).toLocaleString('id-ID')"></div>
                 <div class="text-xs text-gray-500" x-show="item.remaining_amount > 0" x-text="'Sisa: Rp ' + Number(item.remaining_amount).toLocaleString('id-ID')"></div>
             </div>

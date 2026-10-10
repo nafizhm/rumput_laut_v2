@@ -19,19 +19,19 @@
             <template x-for="(line,index) in lines" :key="index">
                 <div class="grid items-end gap-3 rounded-xl border border-gray-200 p-4 sm:grid-cols-2 xl:grid-cols-12 dark:border-gray-800">
                     <label class="text-sm sm:col-span-2 xl:col-span-6">Akun COA<select :name="'lines['+index+'][chart_of_account_id]'" x-model="line.chart_of_account_id" required class="{{ $input }} dark:bg-gray-900"><option value="">Pilih akun</option>@foreach($accounts as $account)<option value="{{ $account->id }}">{{ $account->code }} — {{ $account->name }}</option>@endforeach</select></label>
-                    <label class="text-sm xl:col-span-2">Debit (Rp)<input :name="'lines['+index+'][debit]'" x-model="line.debit" type="text" inputmode="decimal" pattern="[0-9]{1,12}(\.[0-9]{1,2})?" class="{{ $input }}" placeholder="0.00"></label>
-                    <label class="text-sm xl:col-span-2">Kredit (Rp)<input :name="'lines['+index+'][credit]'" x-model="line.credit" type="text" inputmode="decimal" pattern="[0-9]{1,12}(\.[0-9]{1,2})?" class="{{ $input }}" placeholder="0.00"></label>
+                    <div class="text-sm xl:col-span-2"><x-input label="Debit (Rp)" :name="null" x-bind:id="'journal-debit-'+index" x-bind:name="'lines['+index+'][debit]'" x-model="line.debit" :isCurrency="true" :currencyDecimals="2" placeholder="0,00" /></div>
+                    <div class="text-sm xl:col-span-2"><x-input label="Kredit (Rp)" :name="null" x-bind:id="'journal-credit-'+index" x-bind:name="'lines['+index+'][credit]'" x-model="line.credit" :isCurrency="true" :currencyDecimals="2" placeholder="0,00" /></div>
                     <button type="button" @click="lines.splice(index,1)" :disabled="lines.length<=2" class="min-h-11 rounded-lg border border-gray-300 px-3 text-sm text-gray-500 xl:col-span-2 dark:border-gray-700">Hapus</button>
                 </div>
             </template>
         </div>
         <button type="button" @click="lines.push({chart_of_account_id:'',debit:'0',credit:'0'})" :disabled="lines.length>=100" class="min-h-11 text-sm font-medium text-brand-600 dark:text-brand-300">+ Tambah Baris</button>
         <div class="grid gap-3 rounded-xl bg-gray-50 p-4 sm:grid-cols-3 dark:bg-gray-800">
-            <div><p class="text-sm text-gray-500">Total Debit</p><p class="mt-1 break-words font-semibold" x-text="format(total('debit'))"></p></div>
-            <div><p class="text-sm text-gray-500">Total Kredit</p><p class="mt-1 break-words font-semibold" x-text="format(total('credit'))"></p></div>
+            <div><p class="text-sm text-gray-500">Total Debit</p><p class="text-right tabular-nums mt-1 break-words font-semibold" x-text="format(total('debit'))"></p></div>
+            <div><p class="text-sm text-gray-500">Total Kredit</p><p class="text-right tabular-nums mt-1 break-words font-semibold" x-text="format(total('credit'))"></p></div>
             <div><p class="text-sm text-gray-500">Pemeriksaan</p><p class="mt-1 font-semibold" x-text="total('debit')===total('credit') && total('debit')>0n ? 'Seimbang' : 'Belum seimbang'"></p></div>
         </div>
-        <p class="text-xs leading-5 text-gray-500">Gunakan angka tanpa pemisah ribuan dan titik untuk desimal, misalnya 1500000.50. Draft boleh belum seimbang; posting harus seimbang.</p>
+        <p class="text-xs leading-5 text-gray-500">Pemisah ribuan tampil otomatis. Gunakan koma untuk desimal, misalnya 1.500.000,50. Draft boleh belum seimbang; posting harus seimbang.</p>
         <div class="flex flex-col gap-3 sm:flex-row"><button class="min-h-11 rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white">Simpan Draft</button><a href="{{ route($entry->kind==='opening'?'saldo-awal.index':'jurnal.index') }}" class="min-h-11 rounded-lg border border-gray-300 px-5 py-2 text-center text-sm dark:border-gray-700">Batal</a></div>
     </form>
 @endsection

@@ -83,7 +83,7 @@ class OperationalAccountingService
             [['11305', $wip + $run->packing_cost_cents, 0], ['11304', 0, $wip], ['11101', 0, $run->packing_cost_cents]]);
     }
 
-    public function shipment(StockMovement $movement): void
+    public function shipment(StockMovement $movement, bool $syncPayments = true): void
     {
         if (! $movement->sales_transaction_id) {
             return;
@@ -95,13 +95,18 @@ class OperationalAccountingService
             - (int) round($grossCents * ($prior / $sale->total_weight_kg));
         $this->record($movement, 'dispatch', $movement->movement_date->format('Y-m-d'), 'Penyerahan '.$sale->invoice_number,
             [['11202', $value, 0], ['41102', 0, $value], ['51103', (int) $movement->cost_cents, 0], ['11305', 0, (int) $movement->cost_cents]]);
-        $this->salePayments($sale);
+        if ($syncPayments) {
+            $this->salePayments($sale);
+        }
     }
 
-    public function salePayments(SalesTransaction $sale): void
+    public function salePayments(SalesTransaction $sale, bool $missingOnly = false): void
     {
         if (! $this->enabled()) {
-            return;
+            if (! Schema::hasTable('accounting_settings')) {
+                return; // Compatibility with installations before the accounting module.
+            }
+            throw ValidationException::withMessages(['accounting' => 'Integrasi jurnal belum tersedia. Jalankan migrasi pembukuan sebelum menyimpan pembayaran.']);
         }
         $sale = SalesTransaction::lockForUpdate()->findOrFail($sale->id);
         $shipped = min((float) $sale->total_weight_kg, (float) $sale->stockMovements()->sum('weight_kg'));
@@ -112,15 +117,28 @@ class OperationalAccountingService
                 $amount = (int) $payment->amount * 100;
                 $againstReceivable = min($amount, $receivable);
                 $receivable -= $againstReceivable;
+                if ($missingOnly && ! $this->needsRecovery($payment, 'invoice-payment', $payment->payment_date->format('Y-m-d'))) {
+                    continue;
+                }
                 $this->record($payment, 'invoice-payment', $payment->payment_date->format('Y-m-d'), 'Pembayaran '.$invoice->number,
                     [['11101', $amount, 0], ['11202', 0, $againstReceivable], ['21201', 0, $amount - $againstReceivable]]);
             }
         } elseif ((int) $sale->paid_amount > 0) {
+            if ($missingOnly && ! $this->needsRecovery($sale, 'sale-payment', $sale->payment_date->format('Y-m-d'))) {
+                return;
+            }
             $amount = (int) $sale->paid_amount * 100;
             $againstReceivable = min($amount, $receivable);
             $this->record($sale, 'sale-payment', $sale->payment_date->format('Y-m-d'), 'Pelunasan '.$sale->invoice_number,
                 [['11101', $amount, 0], ['11202', 0, $againstReceivable], ['21201', 0, $amount - $againstReceivable]]);
         }
+    }
+
+    private function needsRecovery(Model $source, string $event, string $date): bool
+    {
+        $start = AccountingSetting::findOrFail(1)->start_date;
+        return (! $start || $date >= $start->format('Y-m-d'))
+            && ! DB::table('operational_events')->where('source_key', $source->getMorphClass().':'.$source->getKey().':'.$event)->exists();
     }
 
     public function transaction(Transaction $transaction): void
@@ -134,7 +152,10 @@ class OperationalAccountingService
     public function record(Model $source, string $event, string $date, string $description, array $lines): void
     {
         if (! $this->enabled()) {
-            return;
+            if (! Schema::hasTable('accounting_settings')) {
+                return; // Compatibility with installations before the accounting module.
+            }
+            throw ValidationException::withMessages(['accounting' => 'Integrasi jurnal belum tersedia. Jalankan migrasi pembukuan sebelum menyimpan transaksi keuangan.']);
         }
         DB::transaction(function () use ($source, $event, $date, $description, $lines) {
             $setting = AccountingSetting::lockForUpdate()->findOrFail(1);

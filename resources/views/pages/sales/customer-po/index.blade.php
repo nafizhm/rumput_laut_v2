@@ -34,8 +34,8 @@
 
         <x-slot:date><span x-text="formatDisplayDate(item.po_date)"></span></x-slot:date>
         <x-slot:weight><span x-text="formatWeight(item.quantity_kg)"></span></x-slot:weight>
-        <x-slot:price><span x-text="formatCurrency(item.price_per_kg)"></span></x-slot:price>
-        <x-slot:total><span x-text="formatCurrency(item.total_amount)"></span></x-slot:total>
+        <x-slot:price><span x-text="formatCurrency(item.price_per_kg)" class="text-right tabular-nums"></span></x-slot:price>
+        <x-slot:total><span x-text="formatCurrency(item.total_amount)" class="text-right tabular-nums"></span></x-slot:total>
         <x-slot:action>
             <div class="flex items-center gap-2">
                 <button type="button" @click="$dispatch('view-entity', item)"

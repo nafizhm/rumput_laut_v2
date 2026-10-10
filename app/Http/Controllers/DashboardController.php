@@ -8,6 +8,7 @@ use App\Models\HarvestTransaction;
 use App\Models\Inventory;
 use App\Models\JournalLine;
 use App\Models\Loan;
+use App\Models\ProductionRun;
 use App\Models\SalesTransaction;
 use App\Models\StockMovement;
 use App\Models\Transaction;
@@ -114,6 +115,20 @@ class DashboardController extends Controller
         $shrinkageRate = $totalReceived > 0 ? ($totalShrinkage / $totalReceived) * 100 : 0;
         $totalDiscrepancy = (clone $movementQuery)->sum('discrepancy_kg');
 
+        $production = ['count' => 0, 'processing' => 0, 'wip' => 0, 'packed' => 0, 'sacks' => 0, 'recent' => []];
+        if (Schema::hasTable('production_runs')) {
+            $runs = ProductionRun::whereBetween('started_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+            $production['count'] = (clone $runs)->count();
+            $production['sacks'] = (clone $runs)->sum('input_sacks');
+            foreach (['processing', 'wip', 'packed'] as $status) {
+                $production[$status] = (clone $runs)->where('status', $status)->count();
+            }
+            $production['recent'] = (clone $runs)->with('area')->orderByDesc('started_date')->orderByDesc('id')->limit(5)->get()
+                ->map(fn ($run) => ['number' => $run->number, 'date' => $run->started_date->format('d/m/Y'),
+                    'work_type' => $run->work_type, 'area' => $run->area->code, 'sacks' => $run->input_sacks,
+                    'status' => $run->status, 'url' => route('produksi.show', $run)]);
+        }
+
         return response()->json([
             'netProfit' => $netProfit,
             'profitReady' => $profitReady,
@@ -123,6 +138,7 @@ class DashboardController extends Controller
             'shrinkageRate' => round($shrinkageRate, 2),
             'logisticsDiscrepancy' => round($totalDiscrepancy, 2),
             'recentInvoices' => $recentInvoices,
+            'production' => $production,
             'weeklyHarvest' => [
                 'count' => $weeklyHarvestCount,
                 'value' => $weeklyHarvestValue,

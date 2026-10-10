@@ -81,7 +81,7 @@
                     </div>
                     <div class="mt-2 flex items-center justify-between text-sm">
                         <span class="text-gray-500 dark:text-gray-400">Sisa Hutang</span>
-                        <span class="font-semibold text-red-600" x-text="'Rp ' + Number(farmer?.current_debt || 0).toLocaleString('id-ID')"></span>
+                        <span class="text-right tabular-nums font-semibold text-red-600" x-text="'Rp ' + Number(farmer?.current_debt || 0).toLocaleString('id-ID')"></span>
                     </div>
                 </div>
 

@@ -3,6 +3,8 @@
 .env
 .env.backup
 .env.production
+.env.*
+!.env.example
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -11,6 +13,14 @@
 /.phpunit.cache
 /.vscode
 /.zed
+/.agents
+/.cursor
+/.kilo
+/.codex
+/boost.json
+/out.txt
+/tmp_*.php
+/create_manual*.py
 /auth.json
 /node_modules
 /public/build

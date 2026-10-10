@@ -24,7 +24,7 @@
             </div>
         </template>
         <button type="button" @click="rows.push({material_batch_id:'',sack_count:1})" class="text-sm text-brand-600">+ Tambah batch sumber</button>
-        <label class="block text-sm">Biaya proses dibayar tunai (Rp)<input type="number" name="processing_cost" value="{{ old('processing_cost',0) }}" min="0" step="0.01" required class="mt-2 w-full rounded-lg border bg-transparent p-3"></label>
+        <x-input label="Biaya proses dibayar tunai (Rp)" name="processing_cost" :value="old('processing_cost', 0)" :isCurrency="true" :currencyDecimals="2" required />
         <p class="text-xs text-gray-500">Biaya ini masuk nilai WIP dan kas keluar. Catat di sini satu kali; jangan masukkan kembali sebagai pengeluaran umum.</p>
         <label class="block text-sm">Catatan<textarea name="notes" maxlength="2000" class="mt-2 w-full rounded-lg border bg-transparent p-3">{{ old('notes') }}</textarea></label>
         <label class="flex gap-3 text-sm"><input type="checkbox" name="confirm" value="1" required>Karung sumber, area, pekerjaan, dan biaya sudah diperiksa. Mulai proses akan mengurangi saldo bahan dan mengunci alokasi ini.</label>

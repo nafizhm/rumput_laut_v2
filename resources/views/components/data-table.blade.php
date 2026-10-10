@@ -117,9 +117,9 @@
                                 'justify-center text-center' => ($column['align'] ?? null) === 'center',
                             ])>
                         @if (isset($column['sortable']) && $column['sortable'])
-                            <div class="flex w-full cursor-pointer items-center justify-between"
+                            <div class="flex w-full cursor-pointer items-center justify-between gap-2"
                                 @click="sortBy('{{ $column['key'] }}')">
-                                <p class="text-theme-xs font-medium text-gray-700 dark:text-gray-400 truncate">
+                                <p class="flex-1 text-theme-xs font-medium text-gray-700 dark:text-gray-400 truncate">
                                     {{ $column['label'] }}
                                 </p>
 
@@ -141,7 +141,7 @@
                             </div>
                         @else
                             <div class="flex w-full items-center justify-between">
-                                <p class="text-theme-xs font-medium text-gray-700 dark:text-gray-400 truncate">
+                                <p class="flex-1 text-theme-xs font-medium text-gray-700 dark:text-gray-400 truncate">
                                     {{ $column['label'] }}
                                 </p>
                             </div>

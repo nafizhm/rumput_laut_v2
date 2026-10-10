@@ -46,6 +46,83 @@ use Tests\TestCase;
  */
 class BusinessFlowAuditTest extends TestCase
 {
+    public function test_dashboard_displays_completed_daily_process_as_wip_and_filters_start_dates(): void
+    {
+        $area = WarehouseArea::where('usage', 'processing')->firstOrFail();
+        ProductionRun::create(['number' => 'PRD-DASHBOARD', 'started_date' => '2026-10-07',
+            'warehouse_area_id' => $area->id, 'pic' => 'Audit', 'work_type' => 'Penjemuran',
+            'status' => 'wip', 'input_sacks' => 40, 'created_by_name' => 'Audit']);
+        $this->getJson(route('dashboard.stats', ['start_date' => '2026-10-01', 'end_date' => '2026-10-07']))
+            ->assertOk()->assertJsonPath('production.count', 1)->assertJsonPath('production.processing', 0)
+            ->assertJsonPath('production.wip', 1)->assertJsonPath('production.recent.0.number', 'PRD-DASHBOARD');
+        $this->getJson(route('dashboard.stats', ['start_date' => '2026-09-01', 'end_date' => '2026-09-30']))
+            ->assertOk()->assertJsonPath('production.count', 0);
+        $this->get(route('manajemen-gudang.index'))->assertOk()->assertViewHas('stageCounts',
+            fn ($counts) => $counts['process'] === 0 && $counts['wip'] === 1 && $counts['press'] === 1);
+    }
+
+    public function test_backfill_recovers_missing_loan_without_changing_debt_or_duplicating_journals(): void
+    {
+        $loan = $this->loan();
+        $debt = $this->farmer->fresh()->current_debt;
+        DB::table('operational_events')->delete();
+        DB::table('journal_lines')->delete();
+        DB::table('journal_entries')->delete();
+        $service = app(\App\Services\Finance\OperationalJournalBackfillService::class);
+        $this->assertSame(1, $service->run()['created']);
+        $entry = $loan->journals()->firstOrFail();
+        $this->assertSame('draft', $entry->status);
+        $this->assertSame($entry->lines->sum('debit_cents'), $entry->lines->sum('credit_cents'));
+        $this->assertSame(0, $service->run()['created']);
+        $this->assertSame(1, JournalEntry::count());
+        $this->assertSame($debt, $this->farmer->fresh()->current_debt);
+    }
+
+    public function test_missing_accounting_integration_rolls_back_a_new_loan(): void
+    {
+        Schema::drop('operational_events');
+        try {
+            $this->loan();
+            $this->fail('Loan must not succeed without its journal.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('accounting', $exception->errors());
+        }
+        $this->assertSame(0, \App\Models\Loan::count());
+        $this->assertEquals(0, $this->farmer->fresh()->current_debt);
+        $this->assertSame(0, FarmerLedger::count());
+    }
+
+    public function test_backfill_preserves_posted_and_cancelled_events(): void
+    {
+        $this->legacy->update(['current_stock_kg' => 0, 'current_sack_count' => 0]);
+        app(JournalService::class)->startZero('2026-10-01', $this->user);
+        $loan = $this->loan();
+        $entry = $loan->journals()->firstOrFail();
+        $service = app(\App\Services\Finance\OperationalJournalBackfillService::class);
+        $service->run();
+        $this->assertSame('posted', $entry->fresh()->status);
+        $this->assertSame(2, JournalEntry::count());
+        app(OperationalAccountingService::class)->cancel($loan, 'loan');
+        $service->run();
+        $this->assertSame(3, JournalEntry::count());
+        $this->assertTrue((bool) DB::table('operational_events')->where('source_id', $loan->id)->value('cancelled'));
+    }
+
+    public function test_accounting_enabled_rejects_payment_for_an_unlinked_invoice(): void
+    {
+        $invoice = Invoice::create(['number' => 'INV-UNLINKED', 'invoice_date' => '2026-10-01',
+            'due_date' => '2026-10-31', 'customer_name' => 'Pabrik Audit', 'customer_address' => 'Alamat',
+            'item_name' => 'Rumput Laut', 'quantity_kg' => 1, 'price_per_kg' => 100000]);
+        try {
+            app(InvoicePaymentService::class)->recordPayment(['invoice_id' => $invoice->id,
+                'payment_date' => '2026-10-07', 'amount' => 100000]);
+            $this->fail('Unlinked payment must require reconciliation.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('invoice_id', $exception->errors());
+        }
+        $this->assertSame(0, $invoice->payments()->count());
+    }
+
     private Farmer $farmer;
 
     private Factory $factory;

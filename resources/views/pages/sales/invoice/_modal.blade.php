@@ -41,9 +41,9 @@
             <x-form-section title="Detail Barang & Harga" description="Periksa jumlah dan harga barang yang ditagihkan.">
                 <x-input label="Deskripsi Barang" name="item_name" type="text" x-model="form.data.item_name" x-bind:readonly="!!form.data.sales_transaction_id" alpine-error="form.getError('item_name')" required />
                 <x-input label="Jumlah (Kg)" name="quantity_kg" type="number" x-model="form.data.quantity_kg" x-bind:readonly="!!form.data.sales_transaction_id" alpine-error="form.getError('quantity_kg')" required min="0.01" step="0.01" />
-                <x-input label="Harga per Kg (Rp)" name="price_per_kg" type="number" x-model="form.data.price_per_kg" x-bind:readonly="!!form.data.sales_transaction_id" alpine-error="form.getError('price_per_kg')" required min="0.01" step="0.01" />
+                <x-input label="Harga per Kg (Rp)" name="price_per_kg" :isCurrency="true" :currencyDecimals="2" x-model="form.data.price_per_kg" x-bind:readonly="!!form.data.sales_transaction_id" alpine-error="form.getError('price_per_kg')" required min="0.01" step="0.01" />
                 <div class="sm:col-span-2 rounded-lg bg-gray-50 p-4 text-sm text-gray-800 dark:bg-gray-800 dark:text-white">
-                    Total tagihan setelah potongan: <strong x-text="Number(invoiceTotal).toLocaleString('id-ID', {style: 'currency', currency: 'IDR'})"></strong>
+                    Total tagihan setelah potongan: <strong x-text="Number(invoiceTotal).toLocaleString('id-ID', {style: 'currency', currency: 'IDR'})" class="text-right tabular-nums"></strong>
                 </div>
             </x-form-section>
             <x-form-section title="Pembayaran & Jatuh Tempo" description="Atur batas pembayaran dan status pelunasan.">

@@ -22,6 +22,9 @@
         .items { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .items th { background: #edf5f8; font-size: 10px; text-align: left; text-transform: uppercase; padding: 10px; border-top: 1px solid #b8c9d1; border-bottom: 1px solid #b8c9d1; }
         .items td { padding: 16px 10px; border-bottom: 1px solid #d8e1e7; vertical-align: top; overflow-wrap: anywhere; white-space: pre-line; }
+        .text-right { text-align: right; }
+        .tabular-nums { font-variant-numeric: tabular-nums; }
+        .items th:nth-child(n+3) { text-align: right; }
         .items tr { break-inside: avoid; }
         .notes { margin-top: 24px; border: 1px solid #eec567; border-radius: 8px; background: #fff5da; padding: 14px; overflow-wrap: anywhere; }
         .notes strong { color: #c57a13; font-size: 12px; }
@@ -68,8 +71,8 @@
             <tbody><tr>
                 <td>{{ $invoice->item_name }}</td>
                 <td>{{ number_format((float) $invoice->quantity_kg, 2, ',', '.') }} kg</td>
-                <td>Rp{{ number_format((float) $invoice->price_per_kg, 2, ',', '.') }}</td>
-                <td>Rp{{ number_format((float) $invoice->quantity_kg * (float) $invoice->price_per_kg, 2, ',', '.') }}</td>
+                <td class="text-right tabular-nums">Rp{{ number_format((float) $invoice->price_per_kg, 2, ',', '.') }}</td>
+                <td class="text-right tabular-nums">Rp{{ number_format((float) $invoice->quantity_kg * (float) $invoice->price_per_kg, 2, ',', '.') }}</td>
             </tr></tbody>
         </table>
         <div class="notes">

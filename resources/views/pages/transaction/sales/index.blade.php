@@ -46,11 +46,11 @@
         </x-slot:weight>
 
         <x-slot:currency>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.price_per_kg)"></span>
+            <span class="text-right tabular-nums text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.price_per_kg)"></span>
         </x-slot:currency>
 
         <x-slot:total_sale_value>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.total_sale_value)"></span>
+            <span class="text-right tabular-nums text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.total_sale_value)"></span>
         </x-slot:total_sale_value>
 
         <x-slot:payment_status>
@@ -64,9 +64,9 @@
         </x-slot:payment_status>
 
         <x-slot:paid_amount>
-            <span x-text="item.paid_amount == null ? (item.payment_status === 'paid' ? 'Belum tercatat' : formatCurrency(0)) : formatCurrency(item.paid_amount)"></span>
+            <span x-text="item.paid_amount == null ? (item.payment_status === 'paid' ? 'Belum tercatat' : formatCurrency(0)) : formatCurrency(item.paid_amount)" class="text-right tabular-nums"></span>
         </x-slot:paid_amount>
-        <x-slot:remaining_amount><span x-text="formatCurrency(item.remaining_amount)"></span></x-slot:remaining_amount>
+        <x-slot:remaining_amount><span x-text="formatCurrency(item.remaining_amount)" class="text-right tabular-nums"></span></x-slot:remaining_amount>
         <x-slot:payment_date><span x-text="item.payment_date ? formatDisplayDate(item.payment_date) : '-'"></span></x-slot:payment_date>
 
         <x-slot:action>

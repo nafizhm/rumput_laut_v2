@@ -6,8 +6,10 @@ import collapse from "@alpinejs/collapse";
 
 import { createIcons, icons } from "lucide";
 import { useForm } from "./lib/form";
+import { moneyInput } from "./lib/money-input";
 
 window.useForm = useForm;
+Alpine.data('moneyInput', moneyInput);
 
 Alpine.plugin(persist);
 Alpine.plugin(collapse);

@@ -79,7 +79,8 @@
                                     <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">{{ number_format($batchCount, 0, ',', '.') }} batch penerimaan</p>
                                     <span class="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">Pencatatan tersedia</span>
                                 @else
-                                    <span class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">Siap dicatat</span>
+                                    <p class="mb-3 text-2xl font-semibold text-gray-900 dark:text-white">{{ number_format($stageCounts[$key], 0, ',', '.') }} <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ $key === 'finished' ? 'batch tersedia' : ($key === 'press' ? 'proses menunggu packing' : 'proses') }}</span></p>
+                                    <span class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">{{ $stageCounts[$key] > 0 ? 'Lihat pekerjaan tercatat' : 'Belum ada pekerjaan pada tahap ini' }}</span>
                                 @endif
                             </div>
                             <span class="mt-auto flex items-center justify-between gap-3 pt-5 text-sm font-semibold text-brand-700 dark:text-brand-300">

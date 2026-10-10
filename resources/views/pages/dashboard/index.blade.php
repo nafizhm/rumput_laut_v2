@@ -32,7 +32,7 @@
                             <div class="h-8 w-32 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
                         </template>
                         <template x-if="!loading">
-                            <h4 class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90"
+                            <h4 class="text-right tabular-nums text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90"
                                 x-text="stats.profitReady === false ? 'Belum tersedia' : formatIDR(stats.netProfit)"></h4>
                         </template>
                     </div>
@@ -45,7 +45,7 @@
                             <div class="h-8 w-32 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
                         </template>
                         <template x-if="!loading">
-                            <h4 class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90"
+                            <h4 class="text-right tabular-nums text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90"
                                 x-text="formatIDR(stats.totalSales)"></h4>
                         </template>
                     </div>
@@ -58,7 +58,7 @@
                             <div class="h-8 w-32 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700"></div>
                         </template>
                         <template x-if="!loading">
-                            <h4 class="text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90"
+                            <h4 class="text-right tabular-nums text-title-xs sm:text-title-sm font-bold text-gray-800 dark:text-white/90"
                                 x-text="formatIDR(stats.farmerDebt)"></h4>
                         </template>
                     </div>
@@ -79,6 +79,31 @@
             </div>
         </div>
         <!-- Metrics End -->
+
+        <section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div><h3 class="text-lg font-semibold text-gray-800 dark:text-white">Proses Harian / Produksi</h3><p class="mt-1 text-sm text-gray-500">Proses yang dimulai pada periode pilihan. Selesai proses berpindah ke WIP sampai packing selesai.</p></div>
+                <a href="{{ route('manajemen-gudang.index') }}" class="text-sm font-semibold text-brand-600">Lihat Dashboard Gudang</a>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 text-sm text-gray-600 dark:text-gray-300">
+                <div>Total Proses<p class="mt-1 text-xl font-semibold" x-text="stats.production.count"></p></div>
+                <div>Dalam Proses<p class="mt-1 text-xl font-semibold" x-text="stats.production.processing"></p></div>
+                <div>WIP / Menunggu Packing<p class="mt-1 text-xl font-semibold" x-text="stats.production.wip"></p></div>
+                <div>Selesai Packing<p class="mt-1 text-xl font-semibold" x-text="stats.production.packed"></p></div>
+            </div>
+            <div class="mt-4 overflow-x-auto">
+                <table class="w-full text-left text-sm text-gray-700 dark:text-gray-300">
+                    <thead><tr><th class="p-3">Nomor / Tanggal</th><th class="p-3">Pekerjaan / Area</th><th class="p-3 text-right">Karung Sumber</th><th class="p-3">Status</th></tr></thead>
+                    <tbody><template x-for="run in stats.production.recent" :key="run.number"><tr class="border-t border-gray-100 dark:border-gray-800">
+                        <td class="p-3"><a :href="run.url" class="font-semibold text-brand-600" x-text="run.number"></a><p class="mt-1 text-xs text-gray-500" x-text="run.date"></p></td>
+                        <td class="p-3"><span x-text="run.work_type"></span><p class="mt-1 text-xs text-gray-500" x-text="run.area"></p></td>
+                        <td class="p-3 text-right tabular-nums" x-text="Number(run.sacks).toLocaleString('id-ID')"></td>
+                        <td class="p-3" x-text="({processing:'Dalam Proses', wip:'WIP / Menunggu Packing', packed:'Selesai Packing'})[run.status] || run.status"></td>
+                    </tr></template></tbody>
+                </table>
+                <p x-show="!loading && stats.production.recent.length === 0" class="p-4 text-center text-sm text-gray-500">Belum ada proses yang dimulai pada periode pilihan.</p>
+            </div>
+        </section>
 
         <div class="gap-5 space-y-5 sm:gap-6 sm:space-y-6 xl:grid xl:grid-cols-12 xl:space-y-0">
             <div class="xl:col-span-7 2xl:col-span-8">
@@ -154,7 +179,7 @@
                                                 x-text="invoice.sale_date"></td>
                                             <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400"
                                                 x-text="invoice.factory_name"></td>
-                                            <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400"
+                                            <td class="text-right tabular-nums px-6 py-4  text-sm whitespace-nowrap text-gray-700 dark:text-gray-400"
                                                 x-text="formatCurrency(invoice.total_sale_value)"></td>
                                             <td class="px-6 py-4 text-left">
                                                 <span
@@ -213,7 +238,7 @@
                                     <div class="px-5"><span class="block text-sm text-gray-500 dark:text-gray-400">Total
                                             Nilai</span>
                                         <div class="mt-1 flex items-center gap-2">
-                                            <h4 class="text-xl font-semibold text-gray-800 dark:text-white/90"
+                                            <h4 class="text-right tabular-nums text-xl font-semibold text-gray-800 dark:text-white/90"
                                                 x-text="formatIDRShort(stats.weeklyHarvest.value)"></h4>
                                         </div>
                                     </div>
@@ -229,7 +254,7 @@
                                                 <p class="text-xs text-gray-500"
                                                     x-text="item.date + ' • ' + formatWeight(item.weight)"></p>
                                             </div>
-                                            <p class="font-semibold text-gray-700 dark:text-gray-300"
+                                            <p class="text-right tabular-nums font-semibold text-gray-700 dark:text-gray-300"
                                                 x-text="formatIDRShort(item.value)"></p>
                                         </div>
                                     </template>
@@ -249,7 +274,7 @@
                                     <div class="px-5"><span class="block text-sm text-gray-500 dark:text-gray-400">Total
                                             Pengeluaran</span>
                                         <div class="mt-1 flex items-center gap-2">
-                                            <h4 class="text-xl font-semibold text-gray-800 dark:text-white/90"
+                                            <h4 class="text-right tabular-nums text-xl font-semibold text-gray-800 dark:text-white/90"
                                                 x-text="formatIDRShort(stats.weeklyExpense.value)"></h4>
                                         </div>
                                     </div>
@@ -264,7 +289,7 @@
                                                     x-text="item.name"></p>
                                                 <p class="text-xs text-gray-500" x-text="item.date"></p>
                                             </div>
-                                            <p class="font-semibold text-error-600" x-text="formatIDRShort(item.amount)">
+                                            <p class="text-right tabular-nums font-semibold text-error-600" x-text="formatIDRShort(item.amount)">
                                             </p>
                                         </div>
                                     </template>
@@ -284,7 +309,7 @@
                                     <div class="px-5"><span class="block text-sm text-gray-500 dark:text-gray-400">Total
                                             Nilai</span>
                                         <div class="mt-1 flex items-center gap-2">
-                                            <h4 class="text-xl font-semibold text-gray-800 dark:text-white/90"
+                                            <h4 class="text-right tabular-nums text-xl font-semibold text-gray-800 dark:text-white/90"
                                                 x-text="formatIDRShort(stats.weeklySales.value)"></h4>
                                         </div>
                                     </div>
@@ -300,7 +325,7 @@
                                                 <p class="text-xs text-gray-500"
                                                     x-text="item.date + ' • ' + formatWeight(item.weight)"></p>
                                             </div>
-                                            <p class="font-semibold text-success-600" x-text="formatIDRShort(item.value)">
+                                            <p class="text-right tabular-nums font-semibold text-success-600" x-text="formatIDRShort(item.value)">
                                             </p>
                                         </div>
                                     </template>
@@ -343,7 +368,7 @@
                                     </div>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-sm font-bold text-gray-800 dark:text-white/90"
+                                    <p class="text-right tabular-nums text-sm font-bold text-gray-800 dark:text-white/90"
                                         x-text="formatIDRShort(loan.amount)"></p>
                                 </div>
                             </div>
@@ -369,6 +394,7 @@
                     shrinkageRate: 0,
                     logisticsDiscrepancy: 0,
                     recentInvoices: [],
+                    production: {count: 0, processing: 0, wip: 0, packed: 0, sacks: 0, recent: []},
                     weeklyHarvest: {
                         count: 0,
                         value: 0,

@@ -43,11 +43,11 @@
         </x-slot:total_weight>
 
         <x-slot:total_harvest_value>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.total_harvest_value)"></span>
+            <span class="text-right tabular-nums text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.total_harvest_value)"></span>
         </x-slot:total_harvest_value>
 
         <x-slot:debt_deduction>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.debt_deduction)"></span>
+            <span class="text-right tabular-nums text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatCurrency(item.debt_deduction)"></span>
         </x-slot:debt_deduction>
 
         <x-slot:action>

@@ -87,15 +87,15 @@
                     <div class="space-y-3 text-sm">
                         <div class="flex items-center justify-between">
                             <span class="text-gray-500 dark:text-gray-400">Nilai Kotor</span>
-                            <span class="font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(grossSaleValue)"></span>
+                            <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(grossSaleValue)"></span>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-gray-500 dark:text-gray-400">Potongan Penjualan</span>
-                            <span class="font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(totalDeductionAmount)"></span>
+                            <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(totalDeductionAmount)"></span>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-gray-500 dark:text-gray-400">Total Nilai Jual</span>
-                            <span class="font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(totalSaleValue)"></span>
+                            <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(totalSaleValue)"></span>
                         </div>
                     </div>
                 </div>
@@ -127,7 +127,7 @@
                     </div>
                     <div class="mt-2 flex items-center justify-between text-sm">
                         <span class="text-gray-500 dark:text-gray-400">Total Penjualan</span>
-                        <span class="font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(paymentItem?.total_sale_value || 0)"></span>
+                        <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(paymentItem?.total_sale_value || 0)"></span>
                     </div>
                 </div>
 

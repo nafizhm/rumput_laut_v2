@@ -23,7 +23,7 @@
         </x-slot:headerAction>
 
         <x-slot:currency>
-            <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="'Rp ' + Number(item.current_debt).toLocaleString('id-ID')"></span>
+            <span class="text-right tabular-nums text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="'Rp ' + Number(item.current_debt).toLocaleString('id-ID')"></span>
         </x-slot:currency>
 
         <x-slot:action>

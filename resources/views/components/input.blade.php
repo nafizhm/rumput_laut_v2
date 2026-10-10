@@ -7,6 +7,7 @@
     'prefix' => null,
     'suffix' => null,
     'isCurrency' => false,
+    'currencyDecimals' => 0,
     'isNumeric' => false,
     'numericDecimals' => 2,
     'required' => false,
@@ -22,7 +23,7 @@
 
 <div>
     @if ($label)
-        <label for="{{ $id }}" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+        <label for="{{ $id }}" @if($attributes->has('x-bind:id')) x-bind:for="{{ $attributes->get('x-bind:id') }}" @endif class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
             {{ $label }}
             @if ($required)
                 <span class="text-error-500">*</span>
@@ -42,13 +43,7 @@
             $alpineError,
     ]) @if ($type === 'password') x-data="{ showPassword: false }" @endif
         @if ($isCurrency) 
-            x-data="{ 
-                internalValue: '',
-                isFocused: false,
-                get displayValue() {
-                    return this.internalValue ? new Intl.NumberFormat('id-ID').format(this.internalValue) : '';
-                }
-            }" 
+            x-data="moneyInput(@js($attributes->get('value', '')), {{ (int) $currencyDecimals }})"
             @if($attributes->has('x-model')) 
                 x-modelable="internalValue" 
                 {{ $attributes->only('x-model') }}
@@ -114,7 +109,7 @@
             {{ $attributes->merge([
                 'type' => $realType,
                 'id' => $id,
-                'name' => $name,
+                'name' => $isCurrency ? null : $name,
                 'placeholder' => $placeholder,
                 'inputmode' => ($isCurrency || $isNumeric) ? 'decimal' : null,
                 'class' =>
@@ -122,9 +117,10 @@
                     ($hasSsrError
                         ? 'border-error-300 focus:border-error-300 focus:ring-error-500/10 dark:border-error-700 dark:focus:border-error-800 dark:focus:ring-error-500/5'
                         : 'border-gray-300 focus:border-brand-300 focus:ring-brand-500/10 dark:border-gray-700 dark:focus:border-brand-800 dark:focus:ring-brand-500/5') .
+                    ($isCurrency ? ' text-right tabular-nums' : '') .
                     ($prefix ? ' pl-16' : '') .
                     ($suffix || $type === 'password' || in_array($type, ['date', 'time']) || $hasSsrError ? ' pr-11' : ''),
-            ])->except(($isCurrency || $isNumeric) && $attributes->has('x-model') ? ['x-model'] : []) }}
+            ])->except(array_merge(($isCurrency || $isNumeric) && $attributes->has('x-model') ? ['x-model'] : [], $isCurrency ? [':name', 'x-bind:name', 'value', 'type', 'step', 'min', 'max', 'pattern'] : [])) }}
             @if ($alpineError) :class="{
                 'border-error-300! focus:border-error-300! dark:border-error-700! dark:focus:border-error-800! pr-11!': {!! $alpineError !!}
             }" @endif
@@ -132,30 +128,7 @@
             @if ($type === 'time') onclick="this.showPicker()" @endif
             @if ($isCurrency) 
                 :value="displayValue"
-                x-on:focus="isFocused = true"
-                x-on:blur="isFocused = false"
-                x-on:input="
-                    let el = $event.target;
-                    let oldVal = el.value;
-                    let cursor = el.selectionStart;
-                    let digitsBefore = oldVal.slice(0, cursor).replace(/[^0-9]/g, '').length;
-                    
-                    internalValue = oldVal.replace(/[^0-9]/g, '');
-                    
-                    $nextTick(() => {
-                        let newVal = displayValue;
-                        let newCursor = 0;
-                        let digitsFound = 0;
-                        for (let i = 0; i < newVal.length; i++) {
-                            if (/[0-9]/.test(newVal[i])) {
-                                digitsFound++;
-                            }
-                            newCursor = i + 1;
-                            if (digitsFound >= digitsBefore) break;
-                        }
-                        el.setSelectionRange(newCursor, newCursor);
-                    });
-                "
+                x-on:input="update($event)"
             @elseif ($isNumeric)
                 :value="displayValue"
                 x-on:focus="isFocused = true"
@@ -194,6 +167,10 @@
                     });
                 "
             @endif>
+
+        @if ($isCurrency)
+            <input type="hidden" @if($name) name="{{ $name }}" @endif {{ $attributes->only([':name', 'x-bind:name']) }} :value="internalValue" @if($attributes->has('disabled')) disabled @endif>
+        @endif
 
         @if ($type === 'password')
             <span @click="showPassword = !showPassword"

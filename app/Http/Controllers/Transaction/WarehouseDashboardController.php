@@ -42,6 +42,13 @@ class WarehouseDashboardController extends Controller
             'drafts' => GoodsReceipt::where('status', 'draft')->count(),
             'legacyStocks' => Inventory::where('stock_stage', 'legacy')->get(),
             'productionReady' => $productionReady,
+            'stageCounts' => [
+                'incoming' => MaterialBatch::where('remaining_sacks', '>', 0)->count(),
+                'process' => $productionReady ? ProductionRun::where('status', 'processing')->count() : 0,
+                'wip' => $productionReady ? ProductionRun::where('status', 'wip')->count() : 0,
+                'press' => $productionReady ? ProductionRun::where('status', 'wip')->count() : 0,
+                'finished' => $productionReady ? FinishedBatch::where('remaining_weight_kg', '>', 0)->count() : 0,
+            ],
         ]);
     }
 

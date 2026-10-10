@@ -86,7 +86,7 @@
                         <div>
                             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Potongan
                                 Penjualan</label>
-                            <div class="flex h-11 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            <div class="text-right tabular-nums flex h-11 items-center rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                                 x-text="formatCurrency(saleDeductionAmount)"></div>
                         </div>
 
@@ -115,12 +115,12 @@
                         <div class="space-y-3">
                             <div class="flex items-center justify-between text-sm">
                                 <span class="text-gray-500 dark:text-gray-400">Sisa Hutang Saat Ini</span>
-                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90"
                                     x-text="formatCurrency(farmer_current_debt)"></span>
                             </div>
                             <div class="flex items-center justify-between text-sm">
                                 <span class="text-gray-500 dark:text-gray-400">Sisa Hutang Setelah Potongan</span>
-                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90"
                                     x-text="formatCurrency(remainingDebtAfterCut)"></span>
                             </div>
                         </div>
@@ -155,7 +155,7 @@
                         <div class="space-y-3 text-sm">
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-500 dark:text-gray-400">Nilai Kotor</span>
-                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90"
                                     x-text="formatCurrency(baseHarvestValue)"></span>
                             </div>
                             <template x-if="form.data.sale_deduction_type !== 'none'">
@@ -168,12 +168,12 @@
                             </template>
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-500 dark:text-gray-400">Potongan Penjualan</span>
-                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90"
                                     x-text="formatCurrency(saleDeductionAmount)"></span>
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-gray-500 dark:text-gray-400">Bayar Tunai</span>
-                                <span class="font-semibold text-gray-900 dark:text-white/90"
+                                <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90"
                                     x-text="formatCurrency(form.data.cash_payout)"></span>
                             </div>
                         </div>

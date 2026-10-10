@@ -18,6 +18,9 @@ class InvoicePaymentService
     {
         return $this->transaction(function () use ($data) {
             $invoice = Invoice::lockForUpdate()->findOrFail($data['invoice_id']);
+            if (\Illuminate\Support\Facades\Schema::hasTable('accounting_settings') && ! $invoice->sales_transaction_id) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['invoice_id' => 'Hubungkan invoice dengan transaksi penjualan terlebih dahulu agar pembayaran tercatat pada jurnal yang benar.']);
+            }
             $amount = $this->normalizeAmount($data['amount']);
             if ($amount <= 0) {
                 throw new Exception('Jumlah pembayaran harus minimal Rp 1.');

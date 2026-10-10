@@ -27,9 +27,9 @@
             <x-form-section title="Detail Barang & Harga" description="Isi barang yang dipesan, jumlah, dan harga satuan.">
                 <x-input label="Nama Barang" name="item_name" type="text" x-model="form.data.item_name" alpine-error="form.getError('item_name')" required />
                 <x-input label="Jumlah (Kg)" name="quantity_kg" type="number" x-model="form.data.quantity_kg" alpine-error="form.getError('quantity_kg')" required step="0.01" min="0.01" max="999999999.99" />
-                <x-input label="Harga / Kg (Rp)" name="price_per_kg" type="number" x-model="form.data.price_per_kg" alpine-error="form.getError('price_per_kg')" required step="0.01" min="0" max="999999999.99" />
+                <x-input label="Harga / Kg (Rp)" name="price_per_kg" :isCurrency="true" :currencyDecimals="2" x-model="form.data.price_per_kg" alpine-error="form.getError('price_per_kg')" required step="0.01" min="0" max="999999999.99" />
             <div class="sm:col-span-2 rounded-lg bg-gray-50 p-4 text-sm font-medium text-gray-800 dark:text-gray-200">
-                Total PO: <span x-text="new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR'}).format((Number(form.data.quantity_kg) || 0) * (Number(form.data.price_per_kg) || 0))"></span>
+                Total PO: <span x-text="new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR'}).format((Number(form.data.quantity_kg) || 0) * (Number(form.data.price_per_kg) || 0))" class="text-right tabular-nums"></span>
             </div>
             </x-form-section>
             <x-form-section title="Pengiriman & Catatan" description="Jadwal pengiriman dan informasi tambahan pesanan.">
