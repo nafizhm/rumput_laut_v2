@@ -41,7 +41,7 @@
                 </select>
             </label>
         </div>
-        <p class="text-sm text-gray-500">Kode terdiri dari 5 digit sesuai kategori. Harta dan Biaya umumnya Debit; Utang, Modal, dan Pendapatan umumnya Kredit. Akun pengurang memiliki saldo normal berlawanan.</p>
+        <x-info-help><p class="text-sm text-gray-500">Kode terdiri dari 5 digit sesuai kategori. Harta dan Biaya umumnya Debit; Utang, Modal, dan Pendapatan umumnya Kredit. Akun pengurang memiliki saldo normal berlawanan.</p></x-info-help>
         <label class="block text-sm">Keterangan Penggunaan
             <textarea name="description" maxlength="2000" rows="3" class="mt-2 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700">{{ old('description', $account->description) }}</textarea>
         </label>

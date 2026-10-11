@@ -1,5 +1,5 @@
 <div x-data="transactionForm()">
-    <x-modal name="entity-modal">
+    <x-modal name="entity-modal" maxWidth="max-w-[720px]">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90"
             x-text="editMode ? 'Edit Data' : 'Tambah Data'"></h4>
 
@@ -35,29 +35,19 @@
                     alpine-error="form.getError('date')"
                 />
 
-                <template x-if="form.data.type === 'income'">
-                    <x-select 
-                        label="Kategori" 
-                        name="expense_category_id" 
-                        :options="$incomeCategories" 
-                        placeholder="Pilih kategori"
-                        :required="true"
-                        x-on:change="$dispatch('update-field', { field: 'expense_category_id', value: $event.detail })"
-                        alpine-error="form.hasErrors('expense_category_id') ? form.getError('expense_category_id') : null" 
-                    />
-                </template>
-
-                <template x-if="form.data.type === 'expense'">
-                    <x-select 
-                        label="Kategori" 
-                        name="expense_category_id" 
-                        :options="$expenseCategories" 
-                        placeholder="Pilih kategori"
-                        :required="true"
-                        x-on:change="$dispatch('update-field', { field: 'expense_category_id', value: $event.detail })"
-                        alpine-error="form.hasErrors('expense_category_id') ? form.getError('expense_category_id') : null" 
-                    />
-                </template>
+                <x-select label="Akun COA Transaksi" name="chart_of_account_id" :options="$accounts" :searchable="true"
+                    placeholder="Pilih akun COA" required
+                    x-on:change="$dispatch('update-field', { field: 'chart_of_account_id', value: $event.detail })"
+                    alpine-error="form.getError('chart_of_account_id')" />
+                <x-select label="Akun Kas / Bank" name="cash_account_id" :options="$cashAccounts" :searchable="true"
+                    placeholder="Pilih kas atau rekening bank" required
+                    x-on:change="$dispatch('update-field', { field: 'cash_account_id', value: $event.detail })"
+                    alpine-error="form.getError('cash_account_id')" />
+                <div class="rounded-lg bg-gray-50 p-3 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                    <p x-text="form.data.type === 'income' ? 'Debit: akun kas/bank. Kredit: akun COA transaksi.' : 'Debit: akun COA transaksi. Kredit: akun kas/bank.'"></p>
+                    <x-info-help><p class="mt-1 text-xs text-gray-500">Jurnal seimbang dibuat otomatis saat disimpan. Akun transaksi dan kas/bank harus berbeda.</p></x-info-help>
+                    <p class="mt-1 text-xs text-error-500" x-text="form.getError('accounting') || form.getError('date')"></p>
+                </div>
 
                 <x-input 
                     label="Jumlah"
@@ -119,7 +109,8 @@
                 date: window.getLocalDateInputValue(),
                 amount: 0,
                 description: '',
-                expense_category_id: '',
+                chart_of_account_id: '',
+                cash_account_id: '',
             }),
 
             init() {
@@ -141,7 +132,8 @@
                 this.form.data.type = 'income';
                 this.form.data.date = window.getLocalDateInputValue();
 
-                window.dispatchEvent(new CustomEvent('set-selected-expense_category_id', { detail: null }));
+                window.dispatchEvent(new CustomEvent('set-selected-chart_of_account_id', { detail: null }));
+                window.dispatchEvent(new CustomEvent('set-selected-cash_account_id', { detail: null }));
 
                 this.$dispatch('open-modal', 'entity-modal');
             },
@@ -156,10 +148,12 @@
                     date: item.date ? item.date.split('T')[0] : '',
                     amount: item.amount,
                     description: item.description || '',
-                    expense_category_id: item.expense_category_id || '',
+                    chart_of_account_id: item.chart_of_account_id || '',
+                    cash_account_id: item.cash_account_id || '',
                 };
 
-                window.dispatchEvent(new CustomEvent('set-selected-expense_category_id', { detail: item.expense_category_id }));
+                window.dispatchEvent(new CustomEvent('set-selected-chart_of_account_id', { detail: item.chart_of_account_id }));
+                window.dispatchEvent(new CustomEvent('set-selected-cash_account_id', { detail: item.cash_account_id }));
 
                 this.$dispatch('open-modal', 'entity-modal');
             },

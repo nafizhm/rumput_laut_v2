@@ -7,6 +7,7 @@ use App\Models\ChartOfAccount;
 use App\Models\FarmerPayment;
 use App\Models\GoodsReceipt;
 use App\Models\HarvestTransaction;
+use App\Models\HarvestPayment;
 use App\Models\JournalEntry;
 use App\Models\Loan;
 use App\Models\ProductionRun;
@@ -31,6 +32,7 @@ class OperationalAccountingService
         '11305' => ['Persediaan Barang Jadi Rumput Laut', 'Harta', 'Persediaan', 'Debit'],
         '11401' => ['Uang Muka Pembelian', 'Harta', 'Uang Muka', 'Debit'],
         '21201' => ['Uang Muka Konsumen', 'Utang', 'Uang Muka Penjualan', 'Kredit'],
+        '21101' => ['Utang Pembelian kepada Petani', 'Utang', 'Utang Lancar', 'Kredit'],
         '41102' => ['Penjualan Rumput Laut Kering', 'Pendapatan', 'Pendapatan Usaha', 'Kredit'],
         '42102' => ['Pendapatan Lain-lain', 'Pendapatan', 'Pendapatan Lainnya', 'Kredit'],
         '51103' => ['Harga Pokok Penjualan Barang Jadi Rumput Laut', 'Biaya', 'Harga Pokok Penjualan', 'Debit'],
@@ -50,8 +52,28 @@ class OperationalAccountingService
 
     public function harvest(HarvestTransaction $harvest): void
     {
+        if ($harvest->separate_payment) {
+            if ($harvest->priced_at) {
+                $this->record($harvest, 'harvest-purchase', $harvest->purchase_date->format('Y-m-d'), 'Pembelian panen '.$harvest->batch_code,
+                    [['11301', $harvest->total_harvest_value * 100, 0], ['21101', 0, $harvest->total_harvest_value * 100]]);
+            }
+            return;
+        }
         $this->record($harvest, 'purchase', $harvest->harvest_date->format('Y-m-d'), 'Pembelian '.$harvest->batch_code,
             [['11401', $harvest->total_harvest_value * 100, 0], ['11101', 0, $harvest->cash_payout * 100], ['11201', 0, $harvest->debt_deduction * 100]]);
+    }
+
+    public function harvestPayment(HarvestPayment $payment): void
+    {
+        $date = $payment->payment_date->format('Y-m-d');
+        if ($payment->debt_deduction > 0) {
+            $this->record($payment, 'harvest-loan-offset', $date, 'Potongan pinjaman panen '.$payment->harvest->batch_code,
+                [['21101', $payment->debt_deduction * 100, 0], ['11201', 0, $payment->debt_deduction * 100]]);
+        }
+        if ($payment->amount > 0) {
+            $this->record($payment, 'harvest-payment', $date, 'Pembayaran panen '.$payment->harvest->batch_code,
+                [['21101', $payment->amount * 100, 0], [$payment->cashAccount->code, 0, $payment->amount * 100]]);
+        }
     }
 
     public function farmerPayment(FarmerPayment $payment): void
@@ -62,7 +84,7 @@ class OperationalAccountingService
 
     public function receipt(GoodsReceipt $receipt): void
     {
-        if (! $receipt->harvest_transaction_id) {
+        if (! $receipt->harvest_transaction_id || $receipt->harvest->separate_payment) {
             return;
         }
         $cost = (int) $receipt->harvest->total_harvest_value * 100;
@@ -72,12 +94,14 @@ class OperationalAccountingService
 
     public function productionStart(ProductionRun $run): void
     {
+        if ($run->warehouse_only) return;
         $this->record($run, 'production-start', $run->started_date->format('Y-m-d'), 'Bahan masuk proses '.$run->number,
             [['11304', $run->material_cost_cents + $run->processing_cost_cents, 0], ['11301', 0, $run->material_cost_cents], ['11101', 0, $run->processing_cost_cents]]);
     }
 
     public function productionPack(ProductionRun $run): void
     {
+        if ($run->warehouse_only) return;
         $wip = $run->material_cost_cents + $run->processing_cost_cents;
         $this->record($run, 'production-pack', $run->packed_date->format('Y-m-d'), 'Barang jadi '.$run->number,
             [['11305', $wip + $run->packing_cost_cents, 0], ['11304', 0, $wip], ['11101', 0, $run->packing_cost_cents]]);
@@ -145,6 +169,22 @@ class OperationalAccountingService
     {
         $amount = (int) $transaction->amount * 100;
         $income = $transaction->type === 'income';
+        if ($transaction->chart_of_account_id && $transaction->cash_account_id) {
+            if (! $this->enabled()) {
+                throw ValidationException::withMessages(['accounting' => 'Jurnal otomatis belum tersedia. Jalankan migrasi pembukuan terlebih dahulu.']);
+            }
+            AccountingSetting::lockForUpdate()->findOrFail(1);
+            $accounts = ChartOfAccount::whereIn('id', [$transaction->chart_of_account_id, $transaction->cash_account_id])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $account = $accounts->get($transaction->chart_of_account_id);
+            $cash = $accounts->get($transaction->cash_account_id);
+            if (! $account?->is_active || ! $cash?->is_active || $account->id === $cash->id
+                || $cash->category !== 'Harta' || $cash->account_group !== 'Kas dan Bank' || $cash->normal_balance !== 'Debit') {
+                throw ValidationException::withMessages(['chart_of_account_id' => 'Pilih akun COA aktif dan akun kas/bank aktif yang berbeda.']);
+            }
+            $this->record($transaction, 'cash-transaction', $transaction->date->format('Y-m-d'), $transaction->description ?: 'Transaksi kas',
+                $income ? [[$cash->code, $amount, 0], [$account->code, 0, $amount]] : [[$account->code, $amount, 0], [$cash->code, 0, $amount]]);
+            return;
+        }
         $this->record($transaction, 'cash-transaction', $transaction->date->format('Y-m-d'), $transaction->description ?: 'Transaksi kas',
             $income ? [['11101', $amount, 0], ['42102', 0, $amount]] : [['54102', $amount, 0], ['11101', 0, $amount]]);
     }
@@ -253,6 +293,14 @@ class OperationalAccountingService
 
     private function account(string $code): ChartOfAccount
     {
+        if (! isset(self::ACCOUNTS[$code])) {
+            $account = ChartOfAccount::where('code', $code)->lockForUpdate()->firstOrFail();
+            if (! $account->is_active || ! in_array($account->category, array_keys(ChartOfAccount::CATEGORIES), true)
+                || ! in_array($account->normal_balance, ['Debit', 'Kredit'], true)) {
+                throw ValidationException::withMessages(['chart_of_account_id' => 'Akun '.$code.' harus aktif dengan kategori dan saldo normal yang valid.']);
+            }
+            return $account;
+        }
         [$name,$category,$group,$normal] = self::ACCOUNTS[$code];
         $account = ChartOfAccount::firstOrCreate(['code' => $code], ['name' => $name, 'category' => $category, 'account_group' => $group, 'normal_balance' => $normal, 'is_active' => true]);
         $account = ChartOfAccount::lockForUpdate()->findOrFail($account->id);

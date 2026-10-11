@@ -6,6 +6,7 @@ use App\Models\CustomerPurchaseOrder;
 use App\Models\DeliveryNote;
 use App\Models\Invoice;
 use App\Models\SalesTransaction;
+use App\Services\Setting\DocumentNumberService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,7 +19,12 @@ class InvoiceService
 
     public function store(array $data): Invoice
     {
-        return DB::transaction(fn () => Invoice::create($this->withReferences($this->prepareSale($data))));
+        return DB::transaction(function () use ($data) {
+            if (empty($data['number'])) {
+                $data['number'] = app(DocumentNumberService::class)->next('invoice', $data['invoice_date']);
+            }
+            return Invoice::create($this->withReferences($this->prepareSale($data)));
+        });
     }
 
     public function update(Invoice $invoice, array $data): bool
@@ -87,6 +93,9 @@ class InvoiceService
             throw ValidationException::withMessages(['invoice_date' => 'Tanggal invoice tidak boleh sebelum tanggal penjualan.']);
         }
         $po = CustomerPurchaseOrder::findOrFail($data['customer_purchase_order_id']);
+        if ($sale->customer_purchase_order_id && (int) $sale->customer_purchase_order_id !== (int) $po->id) {
+            throw ValidationException::withMessages(['customer_purchase_order_id' => 'PO invoice harus sama dengan PO penjualan.']);
+        }
         if ($sale->deliveryNotes()->whereNotNull('customer_purchase_order_id')->where('customer_purchase_order_id', '!=', $po->id)->exists()) {
             throw ValidationException::withMessages(['customer_purchase_order_id' => 'PO invoice harus sama dengan surat jalan penjualan ini.']);
         }
@@ -99,7 +108,7 @@ class InvoiceService
         }
         $data['sales_transaction_id'] = $sale->id;
         $data['customer_name'] = $sale->factory->name;
-        $data['item_name'] = $sale->inventory->item_name;
+        $data['item_name'] = $sale->document_item_name;
         $data['quantity_kg'] = $sale->total_weight_kg;
         $data['price_per_kg'] = $sale->price_per_kg;
         $data['sale_total_amount'] = $sale->total_sale_value;

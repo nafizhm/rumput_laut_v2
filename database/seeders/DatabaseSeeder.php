@@ -18,9 +18,14 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class,
             MenuSeeder::class,
+            CompanyProfileMenuSeeder::class,
+            UserManagementMenuSeeder::class,
             UserSeeder::class,
             InventorySeeder::class,
-            DummyDataSeeder::class
+            DummyDataSeeder::class,
+            HarvestFinanceSeeder::class,
+            WarehouseActionMenuSeeder::class,
+            WarehouseLocationSeeder::class,
         ]);
     }
 }

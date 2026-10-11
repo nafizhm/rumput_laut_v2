@@ -10,6 +10,7 @@ use App\Models\StockMovement;
 use App\Models\User;
 use App\Services\Finance\OperationalAccountingService;
 use App\Services\Transaction\ProductionService;
+use App\Services\Setting\DocumentNumberService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,9 @@ class DeliveryNoteService
     public function store(array $data): DeliveryNote
     {
         return DB::transaction(function () use ($data) {
+            if (empty($data['number'])) {
+                $data['number'] = app(DocumentNumberService::class)->next('delivery_note', $data['delivery_date']);
+            }
             $note = new DeliveryNote($this->prepare($data));
             $note->status = 'draft';
             $note->save();
@@ -74,6 +78,12 @@ class DeliveryNoteService
         if ($note && (int) $sale->id !== (int) $note->sales_transaction_id) {
             throw ValidationException::withMessages(['sales_transaction_id' => 'Penjualan terkait tidak dapat diganti.']);
         }
+        if ($sale->customer_purchase_order_id) {
+            if (! empty($data['customer_purchase_order_id']) && (int) $data['customer_purchase_order_id'] !== (int) $sale->customer_purchase_order_id) {
+                throw ValidationException::withMessages(['customer_purchase_order_id' => 'PO surat jalan harus sama dengan PO penjualan.']);
+            }
+            $data['customer_purchase_order_id'] = $sale->customer_purchase_order_id;
+        }
         if ((float) $data['quantity_kg'] > (float) $sale->total_weight_kg || (int) ($data['sack_count'] ?? 0) > (int) $sale->sold_sacks) {
             throw ValidationException::withMessages(['quantity_kg' => 'Jumlah pengiriman tidak boleh melebihi penjualan.']);
         }
@@ -93,7 +103,7 @@ class DeliveryNoteService
             $data['customer_purchase_order_id'] = $sale->invoice->customer_purchase_order_id;
         }
         $data['recipient_name'] = $sale->factory->name;
-        $data['item_name'] = $sale->inventory->item_name;
+        $data['item_name'] = $sale->document_item_name;
         $data['sack_count'] = $data['sack_count'] ?? 0;
 
         return $data;
@@ -132,7 +142,10 @@ class DeliveryNoteService
             }
             $inventory = Inventory::lockForUpdate()->findOrFail($sale->inventory_id);
             $allocation = [];
-            if ($inventory->stock_stage === 'finished') {
+            $allocations = [];
+            if ($sale->quality_grade_id) {
+                $allocations = app(ProductionService::class)->allocateGrade($inventory->id, $sale->quality_grade_id, (float) $note->quantity_kg, (int) $note->sack_count, $date);
+            } elseif ($inventory->stock_stage === 'finished') {
                 if (! $sale->finished_batch_id) {
                     throw ValidationException::withMessages(['surat_jalan' => 'Penjualan belum memilih batch jadi.']);
                 }
@@ -141,22 +154,27 @@ class DeliveryNoteService
             if ((int) round((float) $inventory->current_stock_kg * 100) < $quantity || $inventory->current_sack_count < $note->sack_count) {
                 throw ValidationException::withMessages(['quantity_kg' => 'Stok berat atau karung gudang tidak cukup untuk pengiriman.']);
             }
-            $inventory->decrement('current_stock_kg', $note->quantity_kg);
-            $inventory->decrement('current_sack_count', $note->sack_count);
-            $movement = StockMovement::create($allocation + [
-                'inventory_id' => $inventory->id, 'sales_transaction_id' => $sale->id, 'delivery_note_id' => $note->id,
-                'movement_date' => $date, 'direction' => 'out', 'type' => 'out',
-                'weight_kg' => $note->quantity_kg, 'note_weight_kg' => $note->quantity_kg, 'sack_count' => $note->sack_count,
-                'balance_after_kg' => $inventory->current_stock_kg,
-                'description' => 'Pengiriman '.$note->number.' / Penjualan '.$sale->invoice_number,
-            ]);
+            if (! $allocations) {
+                $allocations = [$allocation + ['weight_kg' => $note->quantity_kg, 'sack_count' => $note->sack_count]];
+            }
+            foreach ($allocations as $allocation) {
+                $inventory->decrement('current_stock_kg', $allocation['weight_kg']);
+                $inventory->decrement('current_sack_count', $allocation['sack_count']);
+                $movement = StockMovement::create($allocation + [
+                    'inventory_id' => $inventory->id, 'sales_transaction_id' => $sale->id, 'delivery_note_id' => $note->id,
+                    'movement_date' => $date, 'direction' => 'out', 'type' => 'out',
+                    'note_weight_kg' => $allocation['weight_kg'],
+                    'balance_after_kg' => $inventory->current_stock_kg,
+                    'description' => 'Pengiriman '.$note->number.' / Penjualan '.$sale->invoice_number,
+                ]);
+                app(OperationalAccountingService::class)->shipment($movement);
+            }
             $note->status = 'shipped';
             $note->shipped_date = $date;
             $note->shipped_at = now();
             $note->shipped_by = $user->id;
             $note->shipped_by_name = $user->name;
             $note->save();
-            app(OperationalAccountingService::class)->shipment($movement);
 
             return $note;
         });

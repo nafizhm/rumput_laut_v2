@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Finance\ChartOfAccountController;
 use App\Http\Controllers\Finance\FinancialReportController;
 use App\Http\Controllers\Finance\JournalController;
+use App\Http\Controllers\Finance\HarvestFinanceController;
 use App\Http\Controllers\Master\ExpenseCategoryController;
 use App\Http\Controllers\Master\FactoryController;
 use App\Http\Controllers\Master\FarmerController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Sales\InvoiceController;
 use App\Http\Controllers\Setting\MenuController;
 use App\Http\Controllers\Setting\PermissionController;
 use App\Http\Controllers\Setting\RoleController;
+use App\Http\Controllers\Setting\CompanyProfileController;
 use App\Http\Controllers\Transaction\FarmerPaymentController;
 use App\Http\Controllers\Transaction\GoodsReceiptController;
 use App\Http\Controllers\Transaction\HarvestTransactionController;
@@ -39,6 +41,13 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::resource('setting/users', \App\Http\Controllers\Setting\UserController::class)
+        ->only(['index', 'create', 'store', 'edit', 'update'])
+        ->middlewareFor('index', 'can:users.read')
+        ->middlewareFor(['create', 'store'], 'can:users.create')
+        ->middlewareFor(['edit', 'update'], 'can:users.update');
+    Route::get('setting/profile', [CompanyProfileController::class, 'index'])->name('company-profile.index')->middleware('can:company-profile.read');
+    Route::put('setting/profile', [CompanyProfileController::class, 'update'])->name('company-profile.update')->middleware('can:company-profile.update');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
     Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])->name('dashboard.chart-data');
@@ -53,6 +62,8 @@ Route::middleware('auth')->group(function () {
     Route::get('role-data', [RoleController::class, 'data'])->name('role-data');
 
     Route::resource('manajemen-petani', FarmerController::class);
+    Route::get('area-barang-masuk', [WarehouseAreaController::class, 'index'])->defaults('usage', 'receiving')->name('area-barang-masuk.index')->middleware('can:area.read');
+    Route::get('area-barang-ready', [WarehouseAreaController::class, 'index'])->defaults('usage', 'finished')->name('area-barang-ready.index')->middleware('can:area.read');
     Route::get('kualitas-barang', [QualityGradeController::class, 'index'])->name('kualitas-barang.index')->middleware('can:quality.read');
     Route::get('kualitas-barang/create', [QualityGradeController::class, 'create'])->name('kualitas-barang.create')->middleware('can:quality.create');
     Route::post('kualitas-barang', [QualityGradeController::class, 'store'])->name('kualitas-barang.store')->middleware('can:quality.create');
@@ -75,14 +86,21 @@ Route::middleware('auth')->group(function () {
     Route::resource('manajemen-pinjaman', LoanController::class);
     Route::get('loan-data', [LoanController::class, 'data'])->name('loan-data');
 
-    Route::resource('manajemen-panen', HarvestTransactionController::class);
-    Route::get('harvest-data', [HarvestTransactionController::class, 'data'])->name('harvest-data');
+    Route::resource('manajemen-panen', HarvestTransactionController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->middlewareFor(['index'], 'can:manajemen-panen.read')
+        ->middlewareFor(['update'], ['can:manajemen-panen.update', 'can:harvest-finance.price'])
+        ->middlewareFor(['destroy'], ['can:manajemen-panen.delete', 'can:harvest-finance.price']);
+    Route::get('harvest-data', [HarvestTransactionController::class, 'data'])->name('harvest-data')->middleware('can:manajemen-panen.read');
 
     Route::resource('manajemen-pemasukan-pengeluaran', TransactionController::class);
     Route::get('transaction-data', [TransactionController::class, 'data'])->name('transaction-data');
 
     // Warehouse
+    Route::get('produksi', [ProductionController::class, 'index'])->name('produksi.index')->middleware('can:production.read');
     Route::get('produksi/create', [ProductionController::class, 'create'])->name('produksi.create')->middleware('can:production.create');
+    Route::get('produksi/{produksi}/edit', [ProductionController::class, 'edit'])->name('produksi.edit')->middleware('can:production.create');
+    Route::put('produksi/{produksi}', [ProductionController::class, 'update'])->name('produksi.update')->middleware('can:production.create');
     Route::post('produksi', [ProductionController::class, 'store'])->name('produksi.store')->middleware('can:production.create');
     Route::get('produksi/{produksi}', [ProductionController::class, 'show'])->name('produksi.show')->middleware('can:production.read');
     Route::post('produksi/{produksi}/complete', [ProductionController::class, 'complete'])->name('produksi.complete')->middleware('can:production.confirm');
@@ -125,6 +143,7 @@ Route::middleware('auth')->group(function () {
         ->parameters(['po-konsumen' => 'po_konsumen'])
         ->only(['index', 'store', 'update', 'destroy']);
 
+    Route::get('sales-purchase-orders', [SalesController::class, 'purchaseOrders'])->name('manajemen-penjualan.purchase-orders')->middleware('can:manajemen-penjualan.create');
     Route::resource('manajemen-penjualan', SalesController::class);
     Route::get('sales-data', [SalesController::class, 'data'])->name('manajemen-penjualan.data');
     Route::get('finished-batches', [SalesController::class, 'finishedBatches'])->name('manajemen-penjualan.batches');
@@ -132,6 +151,10 @@ Route::middleware('auth')->group(function () {
 
     // Cash Flow
     Route::prefix('keuangan')->group(function () {
+        Route::get('pembayaran-panen', [HarvestFinanceController::class, 'index'])->name('harvest-finance.index')->middleware('can:harvest-finance.read');
+        Route::get('pembayaran-panen/{harvest}', [HarvestFinanceController::class, 'show'])->name('harvest-finance.show')->middleware('can:harvest-finance.read');
+        Route::post('pembayaran-panen/{harvest}/harga', [HarvestFinanceController::class, 'price'])->name('harvest-finance.price')->middleware(['can:harvest-finance.read', 'can:harvest-finance.price']);
+        Route::post('pembayaran-panen/{harvest}/bayar', [HarvestFinanceController::class, 'pay'])->name('harvest-finance.pay')->middleware(['can:harvest-finance.read', 'can:harvest-finance.pay']);
         Route::post('mulai-saldo-nol', [JournalController::class, 'startZero'])->name('saldo-awal.start-zero')->middleware('can:journal.post');
         Route::get('saldo-awal', [JournalController::class, 'opening'])->name('saldo-awal.index')->middleware('can:journal.read');
         Route::get('saldo-awal/create', [JournalController::class, 'create'])->name('saldo-awal.create')->middleware('can:journal.create');

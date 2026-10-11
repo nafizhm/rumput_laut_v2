@@ -209,7 +209,7 @@ class MenuSeeder extends Seeder
             'permission' => 'manajemen-gudang.read',
             'parent_id' => $transaksi->id,
             'order' => 5,
-            'is_active' => true
+            'is_active' => false
         ]);
 
         Menu::updateOrCreate(['name' => 'Gudang Kering'], [
@@ -219,7 +219,7 @@ class MenuSeeder extends Seeder
             'permission' => 'manajemen-gudang.read',
             'parent_id' => $transaksi->id,
             'order' => 6,
-            'is_active' => true
+            'is_active' => false
         ]);
 
         Menu::updateOrCreate(['route' => 'manajemen-penjualan.index'], [
@@ -243,5 +243,7 @@ class MenuSeeder extends Seeder
         $this->call(GoodsReceivingSeeder::class);
         $this->call(WarehouseNavigationSeeder::class);
         $this->call(AccountingMenuSeeder::class);
+        $this->call(HarvestFinanceSeeder::class);
+        $this->call(WarehouseLocationSeeder::class);
     }
 }

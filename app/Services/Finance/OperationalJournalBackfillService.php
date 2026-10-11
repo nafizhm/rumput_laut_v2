@@ -3,6 +3,8 @@
 namespace App\Services\Finance;
 
 use App\Models\{AccountingSetting, FarmerPayment, GoodsReceipt, HarvestTransaction, Loan, ProductionRun, SalesTransaction, StockMovement, Transaction};
+use App\Models\HarvestPayment;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -38,7 +40,18 @@ class OperationalJournalBackfillService
                 $recover($row, 'loan', $row->loan_date->format('Y-m-d'), fn () => $accounting->loan($row));
             }
             foreach (HarvestTransaction::orderBy('id')->cursor() as $row) {
-                $recover($row, 'purchase', $row->harvest_date->format('Y-m-d'), fn () => $accounting->harvest($row));
+                if ($row->separate_payment) {
+                    if ($row->priced_at) $recover($row, 'harvest-purchase', $row->purchase_date->format('Y-m-d'), fn () => $accounting->harvest($row));
+                } else {
+                    $recover($row, 'purchase', $row->harvest_date->format('Y-m-d'), fn () => $accounting->harvest($row));
+                }
+            }
+            if (Schema::hasTable('harvest_payments')) {
+                foreach (HarvestPayment::orderBy('id')->cursor() as $payment) {
+                    $date = $payment->payment_date->format('Y-m-d');
+                    if ($payment->debt_deduction > 0) $recover($payment, 'harvest-loan-offset', $date, fn () => $accounting->record($payment, 'harvest-loan-offset', $date, 'Potongan pinjaman panen '.$payment->harvest->batch_code, [['21101', $payment->debt_deduction * 100, 0], ['11201', 0, $payment->debt_deduction * 100]]));
+                    if ($payment->amount > 0) $recover($payment, 'harvest-payment', $date, fn () => $accounting->record($payment, 'harvest-payment', $date, 'Pembayaran panen '.$payment->harvest->batch_code, [['21101', $payment->amount * 100, 0], [$payment->cashAccount->code, 0, $payment->amount * 100]]));
+                }
             }
             foreach (FarmerPayment::orderBy('id')->cursor() as $row) {
                 $recover($row, 'farmer-payment', $row->payment_date->format('Y-m-d'), fn () => $accounting->farmerPayment($row));
@@ -47,9 +60,11 @@ class OperationalJournalBackfillService
                 $recover($row, 'cash-transaction', $row->date->format('Y-m-d'), fn () => $accounting->transaction($row));
             }
             foreach (GoodsReceipt::where('status', 'confirmed')->whereNotNull('harvest_transaction_id')->orderBy('id')->cursor() as $row) {
+                if ($row->harvest->separate_payment) continue;
                 $recover($row, 'receipt', $row->received_date->format('Y-m-d'), fn () => $accounting->receipt($row));
             }
             foreach (ProductionRun::orderBy('id')->cursor() as $row) {
+                if ($row->warehouse_only) continue;
                 $recover($row, 'production-start', $row->started_date->format('Y-m-d'), fn () => $accounting->productionStart($row));
                 if ($row->packed_date) {
                     $recover($row, 'production-pack', $row->packed_date->format('Y-m-d'), fn () => $accounting->productionPack($row));

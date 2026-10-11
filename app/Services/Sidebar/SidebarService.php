@@ -48,6 +48,10 @@ class SidebarService
 
     private static function checkMenuPermission($user, $menu)
     {
+        if (! $menu->is_active) {
+            return false;
+        }
+
         if ($menu->permission) {
             return $user->can($menu->permission);
         }

@@ -19,10 +19,10 @@ class AccountingMenuSeeder extends Seeder
             }
             $parent = Menu::whereNull('parent_id')->where('name', 'Keuangan')->firstOrFail();
             foreach ([
-                ['jurnal.index', 'Jurnal Umum', 'keuangan/jurnal', 'journal.read', 5],
-                ['saldo-awal.index', 'Saldo Awal', 'keuangan/saldo-awal', 'journal.read', 6],
-                ['neraca.index', 'Neraca', 'keuangan/neraca', 'financial-reports.read', 7],
-                ['laba-rugi.index', 'Laba Rugi', 'keuangan/laba-rugi', 'financial-reports.read', 8],
+                ['jurnal.index', 'Jurnal Umum', 'keuangan/jurnal', 'journal.read', 3],
+                ['saldo-awal.index', 'Saldo Awal', 'keuangan/saldo-awal', 'journal.read', 8],
+                ['neraca.index', 'Neraca', 'keuangan/neraca', 'financial-reports.read', 6],
+                ['laba-rugi.index', 'Laba Rugi', 'keuangan/laba-rugi', 'financial-reports.read', 5],
             ] as [$route, $name, $url, $permission, $order]) {
                 Menu::updateOrCreate(['route' => $route], ['name' => $name, 'url' => $url, 'parent_id' => $parent->id, 'permission' => $permission, 'order' => $order, 'is_active' => true]);
             }

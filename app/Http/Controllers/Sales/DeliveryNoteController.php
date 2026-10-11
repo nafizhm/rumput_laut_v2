@@ -42,8 +42,9 @@ class DeliveryNoteController extends Controller
         $sales = SalesTransaction::with(['factory', 'inventory'])->where('stock_mode', 'delivery_note')->orderByDesc('sale_date')->get()->map(fn ($sale) => [
             'value' => $sale->id, 'label' => $sale->invoice_number.' - '.$sale->factory->name,
             'recipient_name' => $sale->factory->name, 'destination_address' => $sale->factory->address ?? '',
-            'item_name' => $sale->inventory->item_name, 'origin' => $sale->inventory->item_name,
+            'item_name' => $sale->document_item_name, 'origin' => $sale->inventory->item_name,
             'quantity_kg' => $sale->total_weight_kg, 'sack_count' => $sale->sold_sacks ?? 0,
+            'customer_purchase_order_id' => $sale->customer_purchase_order_id,
         ]);
         return view('pages.sales.delivery-note.index', compact('data', 'columns', 'orders', 'sales'));
     }
@@ -73,7 +74,7 @@ class DeliveryNoteController extends Controller
 
     public function print(DeliveryNote $surat_jalan)
     {
-        return view('pages.sales.delivery-note.print', ['note' => $surat_jalan]);
+        return view('pages.sales.delivery-note.print', ['note' => $surat_jalan, 'profile' => \App\Models\CompanyProfile::current()]);
     }
 
     public function dispatch(Request $request, DeliveryNote $surat_jalan)

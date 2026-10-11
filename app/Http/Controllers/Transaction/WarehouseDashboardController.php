@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Transaction;
 use App\Http\Controllers\Controller;
 use App\Models\FinishedBatch;
 use App\Models\GoodsReceipt;
-use App\Models\Inventory;
 use App\Models\MaterialBatch;
 use App\Models\ProductionRun;
 use App\Models\WarehouseArea;
@@ -40,7 +39,6 @@ class WarehouseDashboardController extends Controller
             'stages' => self::STAGES, 'batchCount' => MaterialBatch::count(),
             'weight' => MaterialBatch::sum('incoming_weight_kg'), 'sacks' => MaterialBatch::sum('remaining_sacks'),
             'drafts' => GoodsReceipt::where('status', 'draft')->count(),
-            'legacyStocks' => Inventory::where('stock_stage', 'legacy')->get(),
             'productionReady' => $productionReady,
             'stageCounts' => [
                 'incoming' => MaterialBatch::where('remaining_sacks', '>', 0)->count(),

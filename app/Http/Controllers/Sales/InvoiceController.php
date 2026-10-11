@@ -46,10 +46,11 @@ class InvoiceController extends Controller
             ->map(fn ($sale) => [
                 'value' => $sale->id, 'label' => $sale->invoice_number.' - '.$sale->factory->name,
                 'invoice_id' => $sale->invoice?->id, 'customer_name' => $sale->factory->name,
-                'customer_address' => $sale->factory->address ?? '', 'item_name' => $sale->inventory->item_name,
+                'customer_address' => $sale->factory->address ?? '', 'item_name' => $sale->document_item_name,
                 'quantity_kg' => $sale->total_weight_kg, 'price_per_kg' => $sale->price_per_kg,
                 'total_amount' => $sale->total_sale_value,
                 'stock_mode' => $sale->stock_mode,
+                'customer_purchase_order_id' => $sale->customer_purchase_order_id,
             ])->values();
         return view('pages.sales.invoice.index', compact('data', 'columns', 'orders', 'sales'));
     }
@@ -79,7 +80,7 @@ class InvoiceController extends Controller
 
     public function print(Invoice $invoice)
     {
-        return view('pages.sales.invoice.print', compact('invoice'));
+        return view('pages.sales.invoice.print', ['invoice' => $invoice, 'profile' => \App\Models\CompanyProfile::current()]);
     }
 
     public function pay(StoreInvoicePaymentRequest $request, Invoice $invoice, InvoicePaymentService $payments)

@@ -7,7 +7,6 @@ use App\Models\Farmer;
 use App\Models\GoodsReceipt;
 use App\Models\HarvestTransaction;
 use App\Models\Inventory;
-use App\Models\QualityGrade;
 use App\Models\WarehouseArea;
 use App\Services\Transaction\GoodsReceiptService;
 use Illuminate\Http\Request;
@@ -51,18 +50,17 @@ class GoodsReceiptController extends Controller
             'receipt' => $receipt, 'farmers' => Farmer::orderBy('name')->get(),
             'harvests' => HarvestTransaction::with('farmer')->where('receipt_mode', 'separate')->where('is_received', false)->orderByDesc('id')->get(),
             'inventories' => Inventory::where('stock_stage', 'material')->get(),
-            'areas' => WarehouseArea::with('grades')->where('is_active', true)->where('usage', 'receiving')->get(),
-            'grades' => QualityGrade::where('is_active', true)->orderBy('sort_order')->get(),
+            'areas' => WarehouseArea::query()->where('is_active', true)->where('usage', 'receiving')->get(),
         ]);
     }
 
-    public function show(GoodsReceipt $penerimaan_barang)
+    public function show(Request $request, GoodsReceipt $penerimaan_barang)
     {
         $receipt = $penerimaan_barang->load(['farmer', 'harvest', 'inventory', 'lines.grade', 'lines.area', 'lines.batch']);
         $availablePurchases = HarvestTransaction::where('farmer_id', $receipt->farmer_id)->where('receipt_mode', 'separate')->where('is_received', false)
             ->whereDate('harvest_date', '<=', $receipt->received_date)->whereDoesntHave('receipt')->get();
 
-        return view('pages.transaction.receiving.show', compact('receipt', 'availablePurchases'));
+        return view($request->header('X-Warehouse-Detail') === 'modal' ? 'pages.transaction.receiving._detail' : 'pages.transaction.receiving.show', compact('receipt', 'availablePurchases'));
     }
 
     public function linkPurchase(Request $request, GoodsReceipt $penerimaan_barang)
@@ -107,10 +105,10 @@ class GoodsReceiptController extends Controller
         return $request->validate([
             'received_date' => 'required|date_format:Y-m-d', 'farmer_id' => 'required|integer|exists:farmers,id',
             'harvest_transaction_id' => ['nullable', 'integer', 'exists:harvest_transactions,id', Rule::unique('goods_receipts')->ignore($receipt?->id)],
-            'source_reference' => ['nullable', 'required_without:harvest_transaction_id', 'string', 'max:100', Rule::unique('goods_receipts')->ignore($receipt?->id)],
+            'source_reference' => ['nullable', 'string', 'max:100', Rule::unique('goods_receipts')->ignore($receipt?->id)],
             'inventory_id' => 'required|integer|exists:inventories,id', 'note_weight_kg' => 'nullable|numeric|decimal:0,2|min:0|max:999999999.99',
             'notes' => 'nullable|string|max:2000', 'lines' => 'required|array|min:1|max:50',
-            'lines.*.quality_grade_id' => 'required|integer|exists:quality_grades,id', 'lines.*.warehouse_area_id' => 'required|integer|exists:warehouse_areas,id',
+            'lines.*.quality_grade_id' => 'nullable|integer|exists:quality_grades,id', 'lines.*.warehouse_area_id' => 'required|integer|exists:warehouse_areas,id',
             'lines.*.actual_weight_kg' => 'required|numeric|decimal:0,2|min:0.01|max:999999999.99',
             'lines.*.sack_count' => 'required|integer|min:1|max:1000000',
         ]);

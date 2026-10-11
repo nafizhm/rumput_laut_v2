@@ -14,6 +14,9 @@ class RolePermissionSeeder extends Seeder
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         $permissions = [
+            'users.read', 'users.create', 'users.update',
+            'harvest-finance.read', 'harvest-finance.price', 'harvest-finance.pay',
+            'company-profile.read', 'company-profile.update',
             'dashboard.read',
 
             'menu.read',
@@ -118,6 +121,9 @@ class RolePermissionSeeder extends Seeder
         // Owner — all except menu, permission, role
         $owner = Role::firstOrCreate(['name' => 'owner']);
         $owner->syncPermissions([
+            'users.read', 'users.create', 'users.update',
+            'harvest-finance.read', 'harvest-finance.price', 'harvest-finance.pay',
+            'company-profile.read', 'company-profile.update',
             'dashboard.read',
 
             'manajemen-petani.read',
@@ -193,6 +199,8 @@ class RolePermissionSeeder extends Seeder
         // Admin — only non-financial menus (master data & settings)
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->syncPermissions([
+            'users.read', 'users.create', 'users.update',
+            'company-profile.read', 'company-profile.update',
             'dashboard.read',
 
             'menu.read',

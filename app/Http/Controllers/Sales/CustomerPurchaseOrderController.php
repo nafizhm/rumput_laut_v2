@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Sales\SaveCustomerPurchaseOrderRequest;
 use App\Models\CustomerPurchaseOrder;
 use App\Models\Factory;
+use App\Models\QualityGrade;
 use Illuminate\Support\Facades\Storage;
 use App\Services\Sales\CustomerPurchaseOrderService;
 use App\Traits\JsonResponser;
@@ -22,9 +23,8 @@ class CustomerPurchaseOrderController extends Controller
             ['key' => 'po_number', 'label' => 'Nomor PO', 'sortable' => true],
             ['key' => 'po_date', 'label' => 'Tanggal PO', 'sortable' => true, 'render' => 'date'],
             ['key' => 'customer_name', 'label' => 'Konsumen', 'sortable' => true],
-            ['key' => 'item_name', 'label' => 'Barang', 'sortable' => true],
+            ['key' => 'item_name', 'label' => 'Barang / Grade', 'render' => 'items'],
             ['key' => 'quantity_kg', 'label' => 'Jumlah (Kg)', 'sortable' => true, 'render' => 'weight', 'align' => 'right'],
-            ['key' => 'price_per_kg', 'label' => 'Harga / Kg', 'render' => 'price', 'align' => 'right'],
             ['key' => 'total_amount', 'label' => 'Total', 'render' => 'total', 'align' => 'right'],
             ['key' => 'action', 'label' => 'Aksi', 'width' => '240px', 'render' => 'action'],
         ];
@@ -34,7 +34,8 @@ class CustomerPurchaseOrderController extends Controller
             'phone' => $factory->phone, 'address' => $factory->address,
         ]);
 
-        return view('pages.sales.customer-po.index', compact('data', 'columns', 'factories'));
+        $grades = QualityGrade::where('is_active', true)->orderBy('sort_order')->get(['id', 'name', 'code']);
+        return view('pages.sales.customer-po.index', compact('data', 'columns', 'factories', 'grades'));
     }
 
     public function data()

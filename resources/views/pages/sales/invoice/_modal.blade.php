@@ -12,7 +12,7 @@
                         <template x-for="sale in availableSales" :key="sale.value"><option :value="sale.value" x-text="sale.label"></option></template>
                     </select>
                     <p class="mt-1 text-xs text-error-500" x-text="form.getError('sales_transaction_id')"></p>
-                    <p class="mt-1 text-xs text-gray-500">Satu penjualan untuk satu invoice. Nilai barang dan potongan mengikuti penjualan; stok tidak dipotong lagi.</p>
+                    <x-info-help><p class="mt-1 text-xs text-gray-500">Satu penjualan untuk satu invoice. Nilai barang dan potongan mengikuti penjualan; stok tidak dipotong lagi.</p></x-info-help>
                 </div>
                 <div class="sm:col-span-2">
                     <x-select label="Nomor PO" name="invoice_po_id" :options="$orders" :searchable="true" placeholder="Pilih nomor PO konsumen" required
@@ -29,9 +29,9 @@
                         </template>
                     </div>
                     <p x-show="!deliveryNotes.length" class="text-sm text-gray-500" x-text="form.data.customer_purchase_order_id ? 'Belum ada Surat Jalan untuk PO ini' : 'Pilih nomor PO terlebih dahulu'"></p>
-                    <p class="mt-2 text-xs text-gray-500">Untuk alur pengiriman baru, hanya Surat Jalan yang sudah dikonfirmasi Dikirim dari penjualan ini yang disertakan.</p>
+                    <x-info-help><p class="mt-2 text-xs text-gray-500">Untuk alur pengiriman baru, hanya Surat Jalan yang sudah dikonfirmasi Dikirim dari penjualan ini yang disertakan.</p></x-info-help>
                 </div>
-                <x-input label="No. Invoice" name="number" type="text" x-model="form.data.number" alpine-error="form.getError('number')" required maxlength="100" />
+                <x-input label="No. Invoice" name="number" type="text" x-model="form.data.number" x-bind:readonly="!editMode" placeholder="Otomatis saat disimpan sesuai aturan Profile" alpine-error="form.getError('number')" maxlength="100" />
                 <x-input label="Tanggal Invoice" name="invoice_date" type="date" x-model="form.data.invoice_date" alpine-error="form.getError('invoice_date')" required />
             </x-form-section>
             <x-form-section title="Data Customer" description="Identitas dan alamat penagihan konsumen.">
@@ -50,7 +50,7 @@
                 <x-input label="Jatuh Tempo" name="due_date" type="date" x-model="form.data.due_date" alpine-error="form.getError('due_date')" required x-bind:min="form.data.invoice_date" />
                 <div>
                     <label for="payment_status" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Status Pembayaran</label>
-                    <p class="text-sm text-gray-500">Status mengikuti pembayaran yang dicatat melalui tombol Bayar, bukan diubah manual.</p>
+                    <x-info-help><p class="text-sm text-gray-500">Status mengikuti pembayaran yang dicatat melalui tombol Bayar, bukan diubah manual.</p></x-info-help>
                     <p class="mt-1 text-xs text-error-500" x-text="form.getError('payment_status')"></p>
                 </div>
                 <x-input label="Cara Pembayaran / Rekening" name="payment_terms" type="text" x-model="form.data.payment_terms" alpine-error="form.getError('payment_terms')"  />
@@ -182,6 +182,10 @@
                     const sale = this.sales.find(sale => String(sale.value) === String(this.form.data.sales_transaction_id));
                     if (!sale) return;
                     ['customer_name', 'customer_address', 'item_name', 'quantity_kg', 'price_per_kg'].forEach(key => this.form.data[key] = sale[key] ?? '');
+                    if (sale.customer_purchase_order_id) {
+                        this.form.data.customer_purchase_order_id = sale.customer_purchase_order_id;
+                        this.$dispatch('set-selected-invoice_po_id', sale.customer_purchase_order_id);
+                    }
                     this.refreshDeliveryNotes();
                 },
 

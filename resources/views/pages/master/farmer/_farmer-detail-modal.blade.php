@@ -23,6 +23,7 @@
                                         item.reference?.batch_code ||
                                         (item.reference_type.includes('Loan') ? 'Pinjaman' : '') ||
                                         (item.reference_type.includes('FarmerPayment') ? 'Pembayaran Tunai' : '') ||
+                                        (item.reference_type.includes('HarvestPayment') ? 'Potongan Pinjaman Panen' : '') ||
                                         'Panen'
                                     "></span>
                                 <span class="text-[10px] text-gray-400 uppercase font-medium"

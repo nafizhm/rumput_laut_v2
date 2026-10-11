@@ -89,7 +89,7 @@ class ChartOfAccountSeeder extends Seeder
             $finance = Menu::whereNull('parent_id')->where('name', 'Keuangan')->firstOrFail();
             Menu::updateOrCreate(['route' => 'coa.index'], [
                 'name' => 'COA', 'icon' => 'list-tree', 'url' => 'keuangan/coa',
-                'parent_id' => $finance->id, 'order' => 3, 'is_active' => true, 'permission' => 'coa.read',
+                'parent_id' => $finance->id, 'order' => 7, 'is_active' => true, 'permission' => 'coa.read',
             ]);
         });
         app(PermissionRegistrar::class)->forgetCachedPermissions();

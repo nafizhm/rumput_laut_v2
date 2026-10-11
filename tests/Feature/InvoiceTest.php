@@ -32,6 +32,7 @@ beforeEach(function () {
         '2026_10_06_000008_add_po_reference_to_invoices.php',
         '2026_10_07_000005_link_invoices_to_sales.php',
         '2026_10_07_000006_add_delivery_confirmation_stock_flow.php',
+        '2026_10_10_000002_create_company_profile_and_document_numbering.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
     }
@@ -70,7 +71,7 @@ it('creates, lists, edits, prints and deletes invoices with calculated totals', 
     $this->getJson(route('invoice.data'))->assertOk()->assertJsonPath('data.0.total_amount', 26000000)
         ->assertJsonPath('data.0.term_days', 30)->assertJsonPath('data.0.days_until_due', 23);
     $this->get(route('invoice.index'))->assertOk()->assertSee('Tambah Invoice')->assertSee('Status mengikuti pembayaran');
-    $this->get(route('invoice.print', $invoice))->assertOk()->assertSee('images/branding/albagro.jpeg')
+    $this->get(route('invoice.print', $invoice))->assertOk()->assertSee('images/branding/albagro.png')
         ->assertSee('INV-2026-0098')->assertSee('PO-2026-001')->assertSee('PT Maju Jaya')->assertSee('Rp26.000.000,00')
         ->assertSee('29/10/2026')->assertSee('23 hari lagi')->assertSee('window.print()');
     $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, [
@@ -213,4 +214,29 @@ it('backfills existing invoice references without changing their customer and am
     expect($invoice->customer_purchase_order_id)->toBe($this->po->id)
         ->and($invoice->po_number)->toBe('PO-2026-001')->and($invoice->delivery_note_number)->toBe('SJ-LEGACY')
         ->and($invoice->customer_name)->toBe('PT Maju Jaya')->and($invoice->total_amount)->toBe(26000000.0);
+});
+
+it('automatically numbers new invoices and prints the configured company and payment details', function () {
+    \App\Models\CompanyProfile::whereKey(1)->update([
+        'company_name' => 'PT Perusahaan Dokumen', 'address' => 'Jl. Perusahaan 10', 'phone' => '081111222333',
+        'bank_name' => 'Bank Uji', 'bank_account' => '1234567890', 'bank_account_name' => 'Perusahaan Dokumen',
+        'tax_number' => 'NPWP-UJI', 'signatory_name' => 'Penanggung Jawab',
+    ]);
+    $payload = $this->payload;
+    unset($payload['number']);
+    $this->postJson(route('invoice.store'), $payload)->assertOk();
+    $invoice = Invoice::firstOrFail();
+    expect($invoice->number)->toBe('INV/0001/09/2026');
+    $this->get(route('invoice.print', $invoice))->assertOk()
+        ->assertSee('PT PERUSAHAAN DOKUMEN')->assertSee('Jl. Perusahaan 10')->assertSee('081111222333')
+        ->assertSee('Bank Uji')->assertSee('1234567890')->assertSee('NPWP-UJI')->assertSee('Penanggung Jawab')
+        ->assertSee('Dua puluh enam juta rupiah');
+    \App\Models\DocumentNumberRule::where('document_type', 'invoice')->update(['format' => 'ALB/{YYYY}/{SEQ}', 'start_number' => 50]);
+    $sale = SalesTransaction::firstOrFail()->replicate();
+    $sale->invoice_number = 'PJL-TEST-NEW';
+    $sale->save();
+    $payload['sales_transaction_id'] = $sale->id;
+    $this->postJson(route('invoice.store'), $payload)->assertOk();
+    expect(Invoice::latest('id')->first()->number)->toBe('ALB/2026/0050')
+        ->and($invoice->refresh()->number)->toBe('INV/0001/09/2026');
 });

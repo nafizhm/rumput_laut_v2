@@ -33,6 +33,7 @@
         </x-slot:headerAction>
 
         <x-slot:date><span x-text="formatDisplayDate(item.po_date)"></span></x-slot:date>
+        <x-slot:items><span x-text="item.items?.length ? item.items.map(row => row.description).join(', ') : item.item_name"></span></x-slot:items>
         <x-slot:weight><span x-text="formatWeight(item.quantity_kg)"></span></x-slot:weight>
         <x-slot:price><span x-text="formatCurrency(item.price_per_kg)" class="text-right tabular-nums"></span></x-slot:price>
         <x-slot:total><span x-text="formatCurrency(item.total_amount)" class="text-right tabular-nums"></span></x-slot:total>

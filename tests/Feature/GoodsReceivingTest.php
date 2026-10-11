@@ -37,6 +37,9 @@ beforeEach(function () {
         '2026_10_06_225852_create_invoice_payments_table.php', '2026_10_07_000005_link_invoices_to_sales.php',
         '2026_10_07_000006_add_delivery_confirmation_stock_flow.php', '2026_10_07_000007_create_quality_grades_table.php',
         '2026_10_07_000009_create_goods_receiving_flow.php',
+        '2026_10_10_000007_add_harvest_submission_key.php',
+        '2026_10_07_000002_create_chart_of_accounts_table.php',
+        '2026_10_10_000008_separate_harvest_receiving_and_payments.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
     }
@@ -70,6 +73,49 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
+it('receives and packs by dynamic locations without selecting quality', function () {
+    foreach (['2026_10_07_000012_create_accounting_journals.php', '2026_10_07_000015_connect_production_and_operational_accounting.php', '2026_10_10_000010_enable_independent_warehouse_processing.php', '2026_10_11_000002_use_warehouse_locations.php'] as $migration) {
+        (require database_path('migrations/'.$migration))->up();
+    }
+    $this->seed(\Database\Seeders\WarehouseLocationSeeder::class);
+    expect(WarehouseArea::where('usage', 'finished')->count())->toBe(4);
+    $payload = $this->payload;
+    unset($payload['lines'][0]['quality_grade_id']);
+    $this->get(route('area-barang-masuk.index'))->assertOk()->assertSee('Area 1')->assertDontSee('Area A');
+    $this->get(route('area-barang-ready.index'))->assertOk()->assertSee('Area A')->assertSee('Area D')->assertDontSee('Area 1');
+    $this->get(route('penerimaan-barang.create'))->assertOk()->assertDontSee('Pilih kualitas');
+    $this->post(route('penerimaan-barang.store'), $payload)->assertRedirect();
+    $receipt = GoodsReceipt::firstOrFail();
+    $this->post(route('penerimaan-barang.confirm', $receipt), ['confirm' => 1])->assertRedirect();
+    expect($receipt->lines()->first()->quality_grade_id)->toBeNull();
+    $this->post(route('produksi.store'), [
+        'started_date' => '2026-10-07', 'warehouse_area_id' => WarehouseArea::where('usage', 'processing')->value('id'),
+        'pic' => 'PIC', 'work_type' => 'Jemur', 'confirm' => 1,
+        'inputs' => [['material_batch_id' => MaterialBatch::first()->id, 'sack_count' => 64]],
+    ])->assertRedirect();
+    $run = \App\Models\ProductionRun::firstOrFail();
+    $this->post(route('produksi.complete', $run), ['completed_date' => '2026-10-07', 'confirm' => 1])->assertRedirect();
+    $outputs = [
+        ['warehouse_area_id' => WarehouseArea::where('code', 'BJ-A')->value('id'), 'weight_kg' => 1000, 'package_count' => 20],
+        ['warehouse_area_id' => WarehouseArea::where('code', 'BJ-D')->value('id'), 'weight_kg' => 1500, 'package_count' => 30],
+    ];
+    $invalid = $outputs;
+    $invalid[0]['warehouse_area_id'] = $this->area->id;
+    $this->postJson(route('produksi.pack', $run), ['packed_date' => '2026-10-07', 'confirm' => 1, 'outputs' => $invalid])->assertUnprocessable();
+    expect(\App\Models\FinishedBatch::count())->toBe(0);
+    $this->post(route('produksi.pack', $run), ['packed_date' => '2026-10-07', 'confirm' => 1, 'outputs' => $outputs])->assertRedirect();
+    expect(\App\Models\FinishedBatch::whereNull('quality_grade_id')->count())->toBe(2)
+        ->and((float) Inventory::where('stock_stage', 'finished')->value('current_stock_kg'))->toBe(2500.0);
+    $this->get(route('produksi.show', $run))->assertOk()->assertSee('Area D');
+    $this->get(route('manajemen-gudang.stage', 'finished'))->assertOk()->assertSee('Area A')->assertSee('Area D');
+    $this->getJson(route('manajemen-penjualan.batches'))->assertOk()->assertJsonCount(2, 'data');
+    $batch = \App\Models\FinishedBatch::firstOrFail();
+    app(\App\Services\Transaction\ProductionService::class)->consumeFinished($batch->id, (int) $batch->inventory_id, 100, 2, '2026-10-07');
+    expect((float) $batch->refresh()->remaining_weight_kg)->toBe(900.0)->and($batch->remaining_packages)->toBe(18);
+    $this->post(route('area-gudang.store'), ['code' => 'BM-4', 'name' => 'Area 4', 'inventory_id' => $this->inventory->id, 'usage' => 'receiving', 'is_active' => 1])->assertRedirect();
+    expect(WarehouseArea::where('code', 'BM-4')->exists())->toBeTrue();
+});
+
 it('creates draft and confirms actual incoming weight and batches once', function () {
     $this->post(route('penerimaan-barang.store'), $this->payload)->assertRedirect();
     $receipt = GoodsReceipt::firstOrFail();
@@ -84,7 +130,7 @@ it('creates draft and confirms actual incoming weight and batches once', functio
     $this->postJson(route('penerimaan-barang.confirm', $receipt), ['confirm' => 1])->assertUnprocessable();
     $this->putJson(route('penerimaan-barang.update', $receipt), $this->payload)->assertUnprocessable();
     $this->deleteJson(route('penerimaan-barang.destroy', $receipt))->assertUnprocessable();
-    $this->get(route('penerimaan-barang.show', $receipt))->assertOk()->assertSee('Grade A')->assertSee('BM-A');
+    $this->get(route('penerimaan-barang.show', $receipt))->assertOk()->assertDontSee('>Kualitas<', false)->assertSee('Area 1');
     expect(StockMovement::count())->toBe(1)->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(3386.0);
 });
 
@@ -100,13 +146,13 @@ it('records several quality areas from a single receipt without multiplying stoc
         ->and(StockMovement::count())->toBe(1)->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(3386.0);
 });
 
-it('rejects incorrect areas and rechecks inactive quality at confirmation', function () {
+it('rejects incorrect areas and rechecks inactive areas at confirmation', function () {
     $bad = $this->payload;
-    $bad['lines'][0]['warehouse_area_id'] = WarehouseArea::where('code', 'BM-B')->value('id');
+    $bad['lines'][0]['warehouse_area_id'] = WarehouseArea::create(['code'=>'OTHER', 'name'=>'Wrong Area', 'inventory_id'=>$this->inventory->id, 'usage'=>'processing', 'is_active'=>true])->id;
     $this->postJson(route('penerimaan-barang.store'), $bad)->assertUnprocessable();
     expect(GoodsReceipt::count())->toBe(0);
     $this->post(route('penerimaan-barang.store'), $this->payload)->assertRedirect();
-    $this->grade->update(['is_active' => false]);
+    $this->area->update(['is_active' => false]);
     $this->postJson(route('penerimaan-barang.confirm', GoodsReceipt::first()), ['confirm' => 1])->assertUnprocessable();
     expect(MaterialBatch::count())->toBe(0)->and(StockMovement::count())->toBe(0)->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(0.0);
 });
@@ -135,8 +181,8 @@ it('separates purchasing from physical receiving and prevents a second receipt f
 it('shows clickable warehouse stages and farmer receiving history without guessing production figures', function () {
     $this->post(route('penerimaan-barang.store'), $this->payload)->assertRedirect();
     $this->post(route('penerimaan-barang.confirm', GoodsReceipt::first()), ['confirm' => 1])->assertRedirect();
-    $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Barang Datang')->assertSee('Press + Timbang + Packing')->assertSee('Saldo Gudang Lama');
-    $this->get(route('manajemen-gudang.stage', 'incoming'))->assertOk()->assertSee('Petani Test')->assertSee('Grade A')->assertSee('3.386,00');
+    $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Barang Datang')->assertSee('Press + Timbang + Packing')->assertDontSee('Saldo Gudang Lama');
+    $this->get(route('manajemen-gudang.stage', 'incoming'))->assertOk()->assertSee('Petani Test')->assertDontSee('>Kualitas<', false)->assertSee('3.386,00');
     foreach (['process', 'wip', 'press', 'finished'] as $stage) {
         $this->get(route('manajemen-gudang.stage', $stage))->assertOk()->assertSee('Belum ada')->assertDontSee('Pencatatan tahap ini belum tersedia');
     }
@@ -150,7 +196,7 @@ it('preserves seed edits and requires permission and explicit confirmation', fun
     $this->inventory->update(['current_stock_kg' => 123]);
     $this->seed(GoodsReceivingSeeder::class);
     expect($this->area->refresh()->name)->toBe('Area Client')->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(123.0)
-        ->and(Menu::where('route', 'penerimaan-barang.index')->count())->toBe(1);
+        ->and(Menu::where('route', 'penerimaan-barang.index')->count())->toBe(0);
     $this->post(route('penerimaan-barang.store'), $this->payload)->assertRedirect();
     $receipt = GoodsReceipt::first();
     $this->postJson(route('penerimaan-barang.confirm', $receipt), ['confirm' => false])->assertUnprocessable();
@@ -230,4 +276,213 @@ it('summarizes confirmed batches per area and keeps received kg separate from re
     $detail = $this->get(route('manajemen-gudang.area', $this->area))->assertOk()->assertSee('BM-A')->assertSee('2.000,00');
     expect($detail->viewData('batches')->count())->toBe(1)->and($detail->viewData('batches')->sum('remaining_sacks'))->toBe(20);
     $this->get(route('manajemen-gudang.area',999999))->assertNotFound();
+});
+
+it('hides references on create and generates distinct stable references without changing stock', function () {
+    $this->get(route('penerimaan-barang.create'))->assertOk()
+        ->assertDontSee('Referensi Pembelian Panen')->assertDontSee('Referensi Nota / Kedatangan');
+    $payload = $this->payload;
+    unset($payload['source_reference'], $payload['harvest_transaction_id']);
+    $this->post(route('penerimaan-barang.store'), $payload)->assertRedirect();
+    $first = GoodsReceipt::firstOrFail();
+    $reference = $first->source_reference;
+    expect($reference)->not->toBeEmpty()->and($first->harvest_transaction_id)->toBeNull();
+    $this->post(route('penerimaan-barang.store'), $payload)->assertRedirect();
+    expect(GoodsReceipt::latest('id')->first()->source_reference)->not->toBe($reference)
+        ->and(StockMovement::count())->toBe(0);
+    $this->put(route('penerimaan-barang.update', $first), $payload)->assertRedirect();
+    expect($first->refresh()->source_reference)->toBe($reference);
+});
+
+function unifiedHarvestPayload($test): array
+{
+    foreach (['manajemen-panen.create', 'manajemen-panen.read'] as $name) {
+        $test->user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate($name, 'web'));
+    }
+    return $test->harvestPayload + [
+        'submission_key' => (string) \Illuminate\Support\Str::uuid(), 'confirm' => true,
+        'inventory_id' => $test->inventory->id,
+        'lines' => [['quality_grade_id' => $test->grade->id, 'warehouse_area_id' => $test->area->id, 'actual_weight_kg' => 3450, 'sack_count' => 64]],
+    ];
+}
+
+function enableHarvestFinance($test): void
+{
+    (require database_path('migrations/2026_10_07_000012_create_accounting_journals.php'))->up();
+    Schema::table('journal_entries', function (Blueprint $t) { $t->nullableMorphs('source'); $t->boolean('is_automatic')->default(false); });
+    Schema::create('operational_events', function (Blueprint $t) {
+        $t->id(); $t->string('source_key')->unique(); $t->string('source_type'); $t->unsignedBigInteger('source_id');
+        $t->string('event'); $t->json('snapshot'); $t->foreignId('journal_entry_id')->nullable()->constrained();
+        $t->unsignedInteger('version')->default(0); $t->boolean('cancelled')->default(false); $t->timestamps();
+    });
+    Schema::table('material_batches', function (Blueprint $t) {
+        $t->decimal('remaining_weight_kg', 12, 2)->default(0); $t->unsignedBigInteger('remaining_cost_cents')->default(0); $t->boolean('is_costed')->default(false);
+    });
+    \App\Models\AccountingSetting::find(1)->update(['start_date' => '2026-10-07']);
+    $test->seed(\Database\Seeders\HarvestFinanceSeeder::class);
+}
+
+function receiveHarvestForFinance($test): \App\Models\HarvestTransaction
+{
+    $test->postJson(route('manajemen-panen.store'), unifiedHarvestPayload($test))->assertSuccessful();
+    return \App\Models\HarvestTransaction::firstOrFail();
+}
+
+function harvestPricePayload(): array
+{
+    return ['confirm' => 1, 'purchase_date' => '2026-10-07', 'price_per_kg' => 100, 'sale_deduction_type' => 'none', 'sale_deduction_value' => 0];
+}
+
+function harvestPaymentPayload(): array
+{
+    return ['confirm' => 1, 'submission_key' => (string) \Illuminate\Support\Str::uuid(), 'payment_date' => '2026-10-07', 'amount' => 0, 'debt_deduction' => 0];
+}
+
+it('receives physical harvest once without financial posting or trusting injected money', function () {
+    enableHarvestFinance($this);
+    $payload = unifiedHarvestPayload($this);
+    $payload['price_per_kg'] = 5000;
+    $payload['cash_payout'] = 200000;
+    $payload['debt_deduction'] = 50000;
+    $this->postJson(route('manajemen-panen.store'), $payload)->assertSuccessful();
+    $harvest = \App\Models\HarvestTransaction::firstOrFail();
+    expect((bool) $harvest->is_received)->toBeTrue()->and($harvest->separate_payment)->toBeTrue()
+        ->and((int) $harvest->total_harvest_value)->toBe(0)->and((int) $harvest->price_per_kg)->toBe(0)
+        ->and((int) $harvest->cash_payout)->toBe(0)->and((int) $harvest->debt_deduction)->toBe(0)
+        ->and((int) $this->farmer->refresh()->current_debt)->toBe(100000)
+        ->and($harvest->payment_status)->toBe('Menunggu Penetapan Harga')
+        ->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(3450.0)
+        ->and((bool) MaterialBatch::first()->is_costed)->toBeFalse()
+        ->and(\App\Models\JournalEntry::count())->toBe(0)->and(\App\Models\FarmerLedger::count())->toBe(0);
+    $this->postJson(route('manajemen-panen.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('confirm');
+    expect(StockMovement::count())->toBe(1)->and(GoodsReceipt::count())->toBe(1);
+    $this->get(route('manajemen-panen.index'))->assertOk()->assertDontSee('Ringkasan Hutang')->assertDontSee('Harga / Kg');
+    $row = $this->getJson(route('harvest-data'))->assertOk()->json('data.0');
+    expect($row)->not->toHaveKeys(['cash_payout', 'price_per_kg', 'debt_deduction', 'total_harvest_value', 'remaining_debt_after_payment'])
+        ->and($row['farmer'])->not->toHaveKey('current_debt');
+});
+
+it('rolls back physical receipt on invalid area or mismatched totals', function () {
+    $payload = unifiedHarvestPayload($this);
+    $payload['lines'][0]['warehouse_area_id'] = WarehouseArea::create(['code'=>'WRONG', 'name'=>'Ready', 'inventory_id'=>$this->inventory->id, 'usage'=>'finished', 'is_active'=>true])->id;
+    $this->postJson(route('manajemen-panen.store'), $payload)->assertUnprocessable();
+    $payload['lines'][0]['warehouse_area_id'] = $this->area->id;
+    $payload['lines'][0]['actual_weight_kg'] = 3400;
+    $this->postJson(route('manajemen-panen.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('lines');
+    expect(\App\Models\HarvestTransaction::count())->toBe(0)->and(GoodsReceipt::count())->toBe(0)
+        ->and(StockMovement::count())->toBe(0)->and((int) $this->farmer->refresh()->current_debt)->toBe(100000);
+});
+
+it('prices inventory against payable then settles loan and cash with separate balanced journals', function () {
+    enableHarvestFinance($this);
+    $harvest = receiveHarvestForFinance($this);
+    $this->get(route('harvest-finance.index'))->assertOk()->assertSee('Menunggu Penetapan Harga');
+    $this->get(route('harvest-finance.show', $harvest))->assertOk()->assertSee('Tetapkan Nilai Pembelian');
+    $this->post(route('harvest-finance.price', $harvest), harvestPricePayload())->assertRedirect();
+    expect($harvest->refresh()->payment_status)->toBe('Belum Terbayar')->and($harvest->outstanding_payable)->toBe(338600)
+        ->and((bool) MaterialBatch::first()->is_costed)->toBeTrue()->and((int) MaterialBatch::first()->remaining_cost_cents)->toBe(33860000)
+        ->and((int) $this->farmer->refresh()->current_debt)->toBe(100000);
+    $purchase = \App\Models\JournalEntry::with('lines')->firstOrFail();
+    expect((int) $purchase->lines->where('account_code','11301')->sum('debit_cents'))->toBe(33860000)
+        ->and((int) $purchase->lines->where('account_code','21101')->sum('credit_cents'))->toBe(33860000);
+    $cash = \App\Models\ChartOfAccount::create(['code'=>'11109','name'=>'Bank Pembayaran','category'=>'Harta','account_group'=>'Kas dan Bank','normal_balance'=>'Debit','is_active'=>true]);
+    $payload = harvestPaymentPayload();
+    $payload['amount'] = 50000; $payload['debt_deduction'] = 50000; $payload['cash_account_id'] = $cash->id;
+    $this->post(route('harvest-finance.pay', $harvest), $payload)->assertRedirect();
+    expect($harvest->refresh()->payment_status)->toBe('Terbayar Sebagian')->and($harvest->outstanding_payable)->toBe(238600)
+        ->and((int) $this->farmer->refresh()->current_debt)->toBe(50000)->and(\App\Models\JournalEntry::count())->toBe(3);
+    $this->get(route('harvest-finance.show',$harvest))->assertOk()->assertSee('Riwayat Pembayaran')->assertSee('238.600');
+    $this->postJson(route('harvest-finance.pay',$harvest),$payload)->assertUnprocessable()->assertJsonValidationErrors('amount');
+    $payload['submission_key'] = (string) \Illuminate\Support\Str::uuid(); $payload['amount'] = 238600; $payload['debt_deduction'] = 0;
+    $this->post(route('harvest-finance.pay',$harvest),$payload)->assertRedirect()->assertSessionHasNoErrors();
+    expect($harvest->refresh()->payment_status)->toBe('Sudah Terbayar')->and($harvest->outstanding_payable)->toBe(0)
+        ->and((int) $harvest->cash_payout)->toBe(288600)->and(\App\Models\HarvestPayment::count())->toBe(2)
+        ->and(StockMovement::count())->toBe(1)->and(\App\Models\JournalEntry::count())->toBe(4);
+    foreach (\App\Models\JournalEntry::with('lines')->get() as $journal) {
+        expect($journal->status)->toBe('posted')->and((int) $journal->lines->sum('debit_cents'))->toBe((int) $journal->lines->sum('credit_cents'));
+    }
+    $offset = \App\Models\JournalEntry::whereHas('lines', fn($q)=>$q->where('account_code','11201'))->with('lines')->firstOrFail();
+    expect((int) $offset->lines->where('account_code','11201')->sum('credit_cents'))->toBe(5000000)
+        ->and((int) $offset->lines->where('account_code','21101')->sum('debit_cents'))->toBe(5000000);
+    $flow = app(\App\Services\Finance\CashFlowService::class)->summary(Carbon::parse('2026-10-07'),Carbon::parse('2026-10-07'),'all');
+    expect(collect($flow)->firstWhere('id',2)['amount'])->toBe(288600);
+    $this->get(route('harvest-finance.index',['status'=>'paid']))->assertOk()->assertSee($harvest->batch_code);
+    $this->get(route('harvest-finance.index',['status'=>'unpaid']))->assertOk()->assertDontSee($harvest->batch_code);
+    $this->postJson(route('harvest-finance.price',$harvest),harvestPricePayload())->assertUnprocessable();
+    $payload['submission_key'] = (string) \Illuminate\Support\Str::uuid(); $payload['amount'] = 1;
+    $this->postJson(route('harvest-finance.pay',$harvest),$payload)->assertUnprocessable();
+});
+
+it('records an independent loan offset without inventing cash payment', function () {
+    enableHarvestFinance($this);
+    $harvest = receiveHarvestForFinance($this);
+    $this->post(route('harvest-finance.price',$harvest),harvestPricePayload())->assertRedirect();
+    $payload = harvestPaymentPayload(); $payload['debt_deduction'] = 100000;
+    $this->post(route('harvest-finance.pay',$harvest),$payload)->assertRedirect();
+    expect((int) $this->farmer->refresh()->current_debt)->toBe(0)->and((int) $harvest->refresh()->cash_payout)->toBe(0)
+        ->and($harvest->outstanding_payable)->toBe(238600)->and(\App\Models\JournalEntry::count())->toBe(2);
+});
+
+it('rejects payment before pricing, excess amounts, excess loan offset and inactive bank without mutations', function () {
+    enableHarvestFinance($this);
+    $harvest = receiveHarvestForFinance($this);
+    $payload = harvestPaymentPayload(); $payload['amount'] = 1000;
+    $this->postJson(route('harvest-finance.pay',$harvest),$payload)->assertUnprocessable();
+    $this->post(route('harvest-finance.price',$harvest),harvestPricePayload())->assertRedirect();
+    $payload['amount'] = 338601;
+    $this->postJson(route('harvest-finance.pay',$harvest),$payload)->assertUnprocessable()->assertJsonValidationErrors('amount');
+    $payload['amount'] = 0; $payload['debt_deduction'] = 100001;
+    $this->postJson(route('harvest-finance.pay',$harvest),$payload)->assertUnprocessable()->assertJsonValidationErrors('debt_deduction');
+    $cash = \App\Models\ChartOfAccount::create(['code'=>'11102','name'=>'Bank','category'=>'Harta','account_group'=>'Kas dan Bank','normal_balance'=>'Debit','is_active'=>false]);
+    $payload['amount'] = 1000; $payload['debt_deduction'] = 50000; $payload['cash_account_id'] = $cash->id;
+    $this->postJson(route('harvest-finance.pay',$harvest),$payload)->assertUnprocessable()->assertJsonValidationErrors('cash_account_id');
+    expect(\App\Models\HarvestPayment::count())->toBe(0)->and(\App\Models\FarmerLedger::count())->toBe(0)
+        ->and((int) $this->farmer->refresh()->current_debt)->toBe(100000)->and($harvest->refresh()->outstanding_payable)->toBe(338600)
+        ->and(\App\Models\JournalEntry::count())->toBe(1);
+});
+
+it('rolls back pricing and settlement when accounting rejects posting', function () {
+    enableHarvestFinance($this);
+    $harvest = receiveHarvestForFinance($this);
+    $payable = \App\Models\ChartOfAccount::create(['code'=>'21101','name'=>'Utang Petani','category'=>'Utang','account_group'=>'Utang Lancar','normal_balance'=>'Kredit','is_active'=>false]);
+    $this->postJson(route('harvest-finance.price',$harvest),harvestPricePayload())->assertUnprocessable();
+    expect($harvest->refresh()->priced_at)->toBeNull()->and((bool) MaterialBatch::first()->is_costed)->toBeFalse()
+        ->and(\App\Models\JournalEntry::count())->toBe(0);
+    $payable->update(['is_active'=>true]);
+    $this->post(route('harvest-finance.price',$harvest),harvestPricePayload())->assertRedirect();
+    \App\Models\ChartOfAccount::create(['code'=>'11201','name'=>'Piutang Petani','category'=>'Harta','account_group'=>'Piutang','normal_balance'=>'Debit','is_active'=>false]);
+    $payload = harvestPaymentPayload(); $payload['debt_deduction'] = 50000;
+    $this->postJson(route('harvest-finance.pay',$harvest),$payload)->assertUnprocessable();
+    expect((int) $this->farmer->refresh()->current_debt)->toBe(100000)->and(\App\Models\HarvestPayment::count())->toBe(0)
+        ->and(\App\Models\FarmerLedger::count())->toBe(0)->and($harvest->refresh()->outstanding_payable)->toBe(338600)
+        ->and(\App\Models\JournalEntry::count())->toBe(1);
+});
+
+it('separates warehouse and finance access on pages and submissions', function () {
+    enableHarvestFinance($this);
+    $harvest = receiveHarvestForFinance($this);
+    $warehouse = User::create(['name'=>'Gudang','email'=>'gudang@example.test','password'=>'password']); $warehouse->assignRole('gudang');
+    $this->actingAs($warehouse);
+    $this->get(route('manajemen-panen.index'))->assertOk()->assertDontSee('Harga / Kg');
+    $this->getJson(route('harvest-data'))->assertOk();
+    $this->get(route('harvest-finance.index'))->assertForbidden();
+    $this->postJson(route('harvest-finance.price',$harvest),harvestPricePayload())->assertForbidden();
+    $this->postJson(route('harvest-finance.pay',$harvest),harvestPaymentPayload())->assertForbidden();
+    $finance = User::create(['name'=>'Keuangan','email'=>'finance@example.test','password'=>'password']); $finance->assignRole('keuangan');
+    $this->actingAs($finance);
+    $this->get(route('harvest-finance.index'))->assertOk();
+    $this->get(route('harvest-finance.show',$harvest))->assertOk();
+    $this->get(route('manajemen-panen.index'))->assertForbidden();
+    $this->postJson(route('manajemen-panen.store'),unifiedHarvestPayload($this))->assertForbidden();
+    $this->post(route('harvest-finance.price',$harvest),harvestPricePayload())->assertRedirect();
+});
+
+it('preserves old purchase journals and prevents legacy double payment', function () {
+    enableHarvestFinance($this);
+    $harvest = app(HarvestTransactionService::class)->createHarvest($this->harvestPayload);
+    expect((bool) $harvest->separate_payment)->toBeFalse()->and((int) $harvest->cash_payout)->toBe(338600);
+    $this->get(route('harvest-finance.show',$harvest))->assertOk()->assertSee('alur lama');
+    $this->postJson(route('harvest-finance.price',$harvest),harvestPricePayload())->assertUnprocessable();
+    $this->postJson(route('harvest-finance.pay',$harvest),harvestPaymentPayload())->assertUnprocessable();
+    expect(\App\Models\HarvestPayment::count())->toBe(0)->and(\App\Models\JournalEntry::count())->toBe(1);
 });

@@ -1,21 +1,22 @@
 @extends('layouts.app')
 
-@section('title', 'Penjualan Langsung')
+@section('title', 'Penjualan')
 
 @section('breadcrumb')
     <x-breadcrumb 
-        pageTitle="Penjualan Langsung" 
+        pageTitle="Penjualan"
         :links="[
             ['name' => 'Penjualan', 'url' => '#'],
-            ['name' => 'Penjualan Langsung', 'url' => route('manajemen-penjualan.index')]
+            ['name' => 'Penjualan', 'url' => route('manajemen-penjualan.index')]
         ]" 
     />
 @endsection
 
 @section('content')
     <div class="mb-5 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-        <p>Untuk pengiriman, pilih stok keluar melalui Surat Jalan: stok baru berkurang saat Konfirmasi Dikirim. Untuk barang yang langsung diserahkan, pilih pengeluaran langsung. Invoice dan pembayaran tidak memotong stok.</p>
-        <p class="mt-2">Setelah menerima uang, gunakan tombol Pelunasan untuk mencatat tanggal dan jumlah pembayaran. Tahap ini mendukung pelunasan penuh; cicilan akan ditambahkan pada tahap berikutnya.</p>
+        <x-info-help><p>Untuk pengiriman, pilih stok keluar melalui Surat Jalan: stok baru berkurang saat Konfirmasi Dikirim. Untuk barang yang langsung diserahkan, pilih pengeluaran langsung. Invoice dan pembayaran tidak memotong stok.</p>
+<p class="mt-2">Pilih penjualan melalui PO untuk menarik konsumen, harga, dan sisa jumlah pesanan; atau penjualan langsung tanpa PO. Barang/stok gudang tetap dipilih sesuai barang yang akan dijual.</p>
+<p class="mt-2">Setelah menerima uang, gunakan tombol Pelunasan untuk mencatat tanggal dan jumlah pembayaran. Tahap ini mendukung pelunasan penuh; cicilan akan ditambahkan pada tahap berikutnya.</p></x-info-help>
     </div>
     <x-data-table 
         id="salesTable" 
@@ -40,6 +41,7 @@
             <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatDisplayDate(item.sale_date)"></span>
         </x-slot:date>
         <x-slot:stock_mode><span x-text="item.stock_mode === 'delivery_note' ? 'Melalui Surat Jalan' : 'Langsung / Alur Lama'"></span></x-slot:stock_mode>
+        <x-slot:purchase_order><span x-text="item.purchase_order ? item.purchase_order.po_number + (item.purchase_order_item ? ' · ' + item.purchase_order_item.description : '') : 'Langsung (tanpa PO)'"></span></x-slot:purchase_order>
 
         <x-slot:weight>
             <span class="text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="formatWeight(item.total_weight_kg)"></span>

@@ -13,6 +13,12 @@ class HarvestTransaction extends Model
 
     protected $fillable = [
         'farmer_id',
+        'submission_key',
+        'separate_payment',
+        'purchase_date',
+        'priced_at',
+        'priced_by',
+        'priced_by_name',
         'batch_code',
         'harvest_date',
         'location',
@@ -33,6 +39,9 @@ class HarvestTransaction extends Model
 
     protected $casts = [
         'harvest_date' => 'date:Y-m-d',
+        'purchase_date' => 'date:Y-m-d',
+        'priced_at' => 'datetime',
+        'separate_payment' => 'boolean',
     ];
 
     protected $appends = [
@@ -57,6 +66,22 @@ class HarvestTransaction extends Model
     public function receipt()
     {
         return $this->hasOne(GoodsReceipt::class);
+    }
+
+    public function payments() { return $this->hasMany(HarvestPayment::class); }
+
+    public function getOutstandingPayableAttribute(): int
+    {
+        return $this->separate_payment && $this->priced_at
+            ? max(0, (int) $this->total_harvest_value - (int) $this->cash_payout - (int) $this->debt_deduction) : 0;
+    }
+
+    public function getPaymentStatusAttribute(): string
+    {
+        if (! $this->separate_payment) return 'Riwayat Lama — Selesai';
+        if (! $this->priced_at) return 'Menunggu Penetapan Harga';
+        if ($this->outstanding_payable === 0) return 'Sudah Terbayar';
+        return (int) $this->cash_payout + (int) $this->debt_deduction > 0 ? 'Terbayar Sebagian' : 'Belum Terbayar';
     }
 
     public function getRemainingDebtAfterPaymentAttribute(): int

@@ -1,5 +1,5 @@
 <div x-data="customerPoForm()">
-    <x-modal name="entity-modal" maxWidth="max-w-[820px]">
+    <x-modal name="entity-modal" maxWidth="max-w-[960px]">
         <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90"
             x-text="viewMode ? 'Detail PO konsumen' : (editMode ? 'Edit PO konsumen' : 'Tambah PO konsumen')"></h4>
 
@@ -24,13 +24,24 @@
                 <x-input label="Telepon Konsumen" name="customer_phone" type="text" readonly x-model="form.data.customer_phone" alpine-error="form.getError('customer_phone')" />
                 <x-input label="Alamat Konsumen" name="customer_address" type="text" readonly x-model="form.data.customer_address" alpine-error="form.getError('customer_address')" />
             </x-form-section>
-            <x-form-section title="Detail Barang & Harga" description="Isi barang yang dipesan, jumlah, dan harga satuan.">
-                <x-input label="Nama Barang" name="item_name" type="text" x-model="form.data.item_name" alpine-error="form.getError('item_name')" required />
-                <x-input label="Jumlah (Kg)" name="quantity_kg" type="number" x-model="form.data.quantity_kg" alpine-error="form.getError('quantity_kg')" required step="0.01" min="0.01" max="999999999.99" />
-                <x-input label="Harga / Kg (Rp)" name="price_per_kg" :isCurrency="true" :currencyDecimals="2" x-model="form.data.price_per_kg" alpine-error="form.getError('price_per_kg')" required step="0.01" min="0" max="999999999.99" />
-            <div class="sm:col-span-2 rounded-lg bg-gray-50 p-4 text-sm font-medium text-gray-800 dark:text-gray-200">
-                Total PO: <span x-text="new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR'}).format((Number(form.data.quantity_kg) || 0) * (Number(form.data.price_per_kg) || 0))" class="text-right tabular-nums"></span>
-            </div>
+            <x-form-section title="Detail Barang & Harga" description="Tambahkan barang, jumlah, dan harga per kg untuk setiap barang pesanan.">
+                <div class="sm:col-span-2 space-y-3">
+                    <template x-for="(item, index) in form.data.items" :key="index">
+                        <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                            <div class="grid grid-cols-1 items-end gap-3 md:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+                                <p class="text-sm">Barang: Rumput Laut</p>
+                                <label class="text-sm">Jumlah (Kg)<input type="number" x-model="item.quantity_kg" required min="0.01" max="999999999.99" step="0.01" class="mt-1.5 h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"></label>
+                                <label class="text-sm">Harga / Kg (Rp)<input type="number" x-model="item.price_per_kg" required min="0" max="999999999.99" step="0.01" class="mt-1.5 h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"></label>
+                                <div class="text-sm">Subtotal<div class="mt-1.5 flex h-11 items-center justify-end text-right tabular-nums" x-text="formatCurrency(Number(item.quantity_kg || 0) * Number(item.price_per_kg || 0))"></div></div>
+                                <button type="button" x-show="!viewMode && form.data.items.length > 1" @click="form.data.items.splice(index, 1)" :aria-label="'Hapus barang ' + (index + 1)" class="h-11 rounded-lg border border-red-200 px-3 text-sm text-red-600">Hapus</button>
+                            </div>
+                            <p class="mt-1 text-xs text-error-500" x-text="form.getError('items.' + index + '.quality_grade_id') || form.getError('items.' + index + '.quantity_kg') || form.getError('items.' + index + '.price_per_kg') || form.getError('items.' + index) || form.getError('items.' + index + '.id')"></p>
+                        </div>
+                    </template>
+                    <button type="button" x-show="!viewMode" @click="form.data.items.push(newItem())" class="rounded-lg border border-brand-300 px-4 py-2 text-sm text-brand-600">+ Tambah Barang</button>
+                    <p class="text-xs text-error-500" x-text="form.getError('items')"></p>
+                    <div class="rounded-lg bg-gray-50 p-4 text-sm font-medium text-gray-800 dark:bg-gray-800 dark:text-gray-200">Total PO: <span x-text="formatCurrency(poTotal)" class="tabular-nums"></span></div>
+                </div>
             </x-form-section>
             <x-form-section title="Pengiriman & Catatan" description="Jadwal pengiriman dan informasi tambahan pesanan.">
                 <x-input label="Tanggal Pengiriman" name="delivery_date" type="date" x-model="form.data.delivery_date" alpine-error="form.getError('delivery_date')" />
@@ -43,7 +54,7 @@
                     <label for="po-file" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">File PO</label>
                     <input id="po-file" type="file" x-ref="poFile" accept=".pdf,.jpg,.jpeg,.png" @change="selectFile($event)" :disabled="form.processing"
                         class="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
-                    <p class="mt-1 text-xs text-gray-500">PDF, JPG, atau PNG. Maksimal 4 MB.</p>
+                    <x-info-help label="Format file PO">PDF, JPG, atau PNG. Maksimal 4 MB.</x-info-help>
                     <p x-show="form.getError('po_file')" x-text="form.getError('po_file')" class="mt-1 text-xs text-error-500"></p>
                 </div>
                 <template x-if="previewUrl">
@@ -107,9 +118,7 @@
                     customer_name: '',
                     customer_phone: '',
                     customer_address: '',
-                    item_name: '',
-                    quantity_kg: '',
-                    price_per_kg: '',
+                    items: [{id: null, quality_grade_id: '', quantity_kg: '', price_per_kg: ''}],
                     delivery_date: '',
                     notes: ''
                 }),
@@ -127,6 +136,7 @@
                     this.editId = null;
                     this.resetFile();
                     this.form.reset();
+                    this.form.data.items = [this.newItem()];
                     this.form.data.po_date = window.getLocalDateInputValue();
                     this.$dispatch('set-selected-po_factory_id', null);
                     this.form.clearErrors();
@@ -148,9 +158,7 @@
                         customer_name: item.customer_name ?? '',
                         customer_phone: item.customer_phone ?? '',
                         customer_address: item.customer_address ?? '',
-                        item_name: item.item_name ?? '',
-                        quantity_kg: item.quantity_kg ?? '',
-                        price_per_kg: item.price_per_kg ?? '',
+                        items: item.items?.length ? item.items.map(row => ({id: row.id, quality_grade_id: row.quality_grade_id || '', quantity_kg: row.quantity_kg, price_per_kg: row.price_per_kg})) : [{id: null, quality_grade_id: '', quantity_kg: item.quantity_kg, price_per_kg: item.price_per_kg}],
                         delivery_date: item.delivery_date ?? '',
                         notes: item.notes ?? ''
                     };
@@ -160,6 +168,9 @@
                     this.$dispatch('set-selected-po_factory_id', item.factory_id ?? null);
                     this.$dispatch('open-modal', 'entity-modal');
                 },
+
+                newItem() { return {id: null, quality_grade_id: '', quantity_kg: '', price_per_kg: ''}; },
+                get poTotal() { return this.form.data.items.reduce((sum, item) => sum + Number(item.quantity_kg || 0) * Number(item.price_per_kg || 0), 0); },
 
                 selectFactory(id) {
                     if (this.viewMode || String(this.form.data.factory_id || '') === String(id || '')) return;
@@ -232,7 +243,11 @@
                         transform: (data) => {
                             const body = new FormData();
                             Object.entries(data).forEach(([key, value]) => {
-                                if (value !== null && value !== undefined) body.append(key, typeof value === 'boolean' ? (value ? '1' : '0') : value);
+                                if (key === 'items') {
+                                    value.forEach((item, index) => Object.entries(item).forEach(([field, entry]) => {
+                                        if (entry !== null && entry !== undefined) body.append('items[' + index + '][' + field + ']', entry);
+                                    }));
+                                } else if (value !== null && value !== undefined) body.append(key, typeof value === 'boolean' ? (value ? '1' : '0') : value);
                             });
                             if (this.editMode) body.append('_method', 'PUT');
                             return body;

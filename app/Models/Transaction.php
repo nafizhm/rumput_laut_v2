@@ -17,6 +17,8 @@ class Transaction extends Model
         'description',
         'notes',
         'expense_category_id',
+        'chart_of_account_id',
+        'cash_account_id',
     ];
 
     protected $appends = [
@@ -35,5 +37,15 @@ class Transaction extends Model
     public function getTypeLabelAttribute(): string
     {
         return $this->type === 'income' ? 'Pemasukan' : 'Pengeluaran';
+    }
+
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id');
+    }
+
+    public function cashAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'cash_account_id');
     }
 }

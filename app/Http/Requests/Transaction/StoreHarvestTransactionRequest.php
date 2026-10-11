@@ -1,67 +1,27 @@
 <?php
-
 namespace App\Http\Requests\Transaction;
-
 use Illuminate\Foundation\Http\FormRequest;
-
 class StoreHarvestTransactionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()->can('manajemen-panen.create') && $this->user()->can('receiving.create') && $this->user()->can('receiving.confirm');
     }
-
     public function rules(): array
     {
         return [
-            'farmer_id' => 'required|exists:farmers,id',
-            'harvest_date' => 'required|date',
+            'submission_key' => 'required|uuid', 'confirm' => 'required|accepted',
+            'inventory_id' => 'required|integer|exists:inventories,id', 'lines' => 'required|array|min:1|max:50',
+            'lines.*.quality_grade_id' => 'nullable|integer|exists:quality_grades,id',
+            'lines.*.warehouse_area_id' => 'required|integer|exists:warehouse_areas,id',
+            'lines.*.actual_weight_kg' => 'required|numeric|decimal:0,2|min:0.01|max:999999999.99',
+            'lines.*.sack_count' => 'required|integer|min:1|max:1000000',
+            'farmer_id' => 'required|integer|exists:farmers,id',
+            'harvest_date' => 'required|date_format:Y-m-d|before_or_equal:today',
             'location' => 'required|string|max:255',
-            'total_weight' => 'required|numeric|min:0',
-            'sack_count' => 'required|integer|min:0',
-            'extra_per_sack' => 'required|numeric|min:0',
-            'warehouse_weight' => 'required|numeric|min:0',
-            'price_per_kg' => 'required|numeric|min:0',
-            'sale_deduction_type' => 'nullable|in:none,percentage,nominal,weight',
-            'sale_deduction_value' => 'nullable|numeric|min:0',
-            'notes' => 'nullable|string',
-            'cash_payout' => 'required|numeric|min:0',
+            'total_weight' => 'required|numeric|decimal:0,2|min:0.01|max:999999999.99',
+            'sack_count' => 'required|integer|min:1|max:1000000',
+            'extra_per_sack' => 'required|numeric|decimal:0,2|min:0|max:1000', 'notes' => 'nullable|string|max:5000',
         ];
-    }
-
-    public function withValidator($validator)
-    {
-        $validator->after(function ($validator) {
-            $totalWeight = $this->input('total_weight');
-            $price = $this->input('price_per_kg');
-            $cash = $this->input('cash_payout');
-            $deductionType = $this->input('sale_deduction_type', 'none');
-            $deductionValue = (float) $this->input('sale_deduction_value', 0);
-
-            if (is_numeric($totalWeight) && is_numeric($price)) {
-                $baseValue = $totalWeight * $price;
-                $deductionAmount = 0;
-
-                if ($deductionType === 'percentage') {
-                    if ($deductionValue > 100) {
-                        $validator->errors()->add('sale_deduction_value', 'Potongan persentase tidak boleh lebih dari 100%.');
-                    }
-                    $deductionAmount = $baseValue * ($deductionValue / 100);
-                } elseif ($deductionType === 'nominal') {
-                    $deductionAmount = $deductionValue;
-                } elseif ($deductionType === 'weight') {
-                    $deductionAmount = $deductionValue * $price;
-                }
-
-                if ($deductionAmount > $baseValue) {
-                    $validator->errors()->add('sale_deduction_value', 'Potongan penjualan tidak boleh melebihi total nilai panen.');
-                }
-
-                $totalValue = max(0, $baseValue - $deductionAmount);
-                if (is_numeric($cash) && $cash > $totalValue) {
-                    $validator->errors()->add('cash_payout', 'Pembayaran tunai tidak boleh melebihi total nilai panen.');
-                }
-            }
-        });
     }
 }

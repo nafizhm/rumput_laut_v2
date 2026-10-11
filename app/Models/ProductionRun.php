@@ -11,7 +11,7 @@ class ProductionRun extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['started_date' => 'date:Y-m-d', 'completed_date' => 'date:Y-m-d', 'packed_date' => 'date:Y-m-d'];
+    protected $casts = ['started_date' => 'date:Y-m-d', 'completed_date' => 'date:Y-m-d', 'packed_date' => 'date:Y-m-d', 'warehouse_only' => 'boolean'];
 
     public function inputs()
     {

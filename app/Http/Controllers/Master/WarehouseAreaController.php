@@ -7,7 +7,6 @@ use App\Models\FinishedBatch;
 use App\Models\GoodsReceiptLine;
 use App\Models\Inventory;
 use App\Models\ProductionRun;
-use App\Models\QualityGrade;
 use App\Models\WarehouseArea;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,14 +16,19 @@ use Illuminate\Validation\ValidationException;
 
 class WarehouseAreaController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return view('pages.master.warehouse-area.index', ['areas' => WarehouseArea::with(['inventory', 'grades'])->orderBy('code')->get()]);
+        $usage = $request->route('usage') ?? $request->validate(['usage' => 'nullable|in:receiving,processing,finished'])['usage'] ?? null;
+
+        return view('pages.master.warehouse-area.index', ['usage' => $usage, 'areas' => WarehouseArea::with('inventory')->when($usage, fn ($q) => $q->where('usage', $usage))->orderBy('code')->get()]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        return $this->form(new WarehouseArea(['usage' => 'receiving', 'is_active' => true]));
+        $data = $request->validate(['usage' => 'nullable|in:receiving,processing,finished']);
+        $usage = $data['usage'] ?? 'receiving';
+
+        return $this->form(new WarehouseArea(['usage' => $usage, 'is_active' => true, 'inventory_id' => Inventory::where('stock_stage', $usage === 'finished' ? 'finished' : 'material')->value('id')]));
     }
 
     public function edit(WarehouseArea $area_gudang)
@@ -36,7 +40,6 @@ class WarehouseAreaController extends Controller
     {
         return view('pages.master.warehouse-area.form', [
             'area' => $area, 'inventories' => Inventory::orderBy('item_name')->get(),
-            'grades' => QualityGrade::orderBy('sort_order')->get(),
         ]);
     }
 
@@ -44,14 +47,14 @@ class WarehouseAreaController extends Controller
     {
         $this->save($request);
 
-        return redirect()->route('area-gudang.index')->with('success', 'Area gudang ditambahkan.');
+        return redirect()->route('area-gudang.index', ['usage' => $request->input('usage')])->with('success', 'Area gudang ditambahkan.');
     }
 
     public function update(Request $request, WarehouseArea $area_gudang)
     {
         $this->save($request, $area_gudang);
 
-        return redirect()->route('area-gudang.index')->with('success', 'Area gudang diperbarui.');
+        return redirect()->route('area-gudang.index', ['usage' => $request->input('usage')])->with('success', 'Area gudang diperbarui.');
     }
 
     private function save(Request $request, ?WarehouseArea $area = null): void
@@ -64,7 +67,6 @@ class WarehouseAreaController extends Controller
             'name' => 'required|string|max:100', 'inventory_id' => 'required|integer|exists:inventories,id',
             'usage' => ['required', Rule::in(['receiving', 'processing', 'finished'])],
             'description' => 'nullable|string|max:2000', 'is_active' => 'required|boolean',
-            'grade_ids' => 'required|array|min:1', 'grade_ids.*' => 'required|integer|distinct|exists:quality_grades,id',
         ]);
         DB::transaction(function () use ($data, $area) {
             $inventory = Inventory::lockForUpdate()->findOrFail($data['inventory_id']);
@@ -87,10 +89,7 @@ class WarehouseAreaController extends Controller
             } else {
                 $area = new WarehouseArea;
             }
-            $gradeIds = $data['grade_ids'];
-            unset($data['grade_ids']);
             $area->fill($data)->save();
-            $area->grades()->sync($gradeIds);
         });
     }
 }

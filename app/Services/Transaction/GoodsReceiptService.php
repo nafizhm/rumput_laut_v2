@@ -6,7 +6,6 @@ use App\Models\GoodsReceipt;
 use App\Models\HarvestTransaction;
 use App\Models\Inventory;
 use App\Models\MaterialBatch;
-use App\Models\QualityGrade;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\WarehouseArea;
@@ -15,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 
 class GoodsReceiptService
 {
@@ -25,8 +25,19 @@ class GoodsReceiptService
                 $receipt = GoodsReceipt::lockForUpdate()->findOrFail($receipt->id);
                 $this->assertDraft($receipt);
             }
+            if (empty($data['source_reference'])) {
+                $data['source_reference'] = $receipt?->source_reference
+                    ?: 'KDT-'.str_replace('-', '', $data['received_date']).'-'.Str::uuid();
+            }
+            if ($receipt && ! array_key_exists('harvest_transaction_id', $data)) {
+                $data['harvest_transaction_id'] = $receipt->harvest_transaction_id;
+            }
             $this->checkSource($data, $receipt);
             $this->checkLines($data);
+            foreach ($data['lines'] as &$line) {
+                $line['quality_grade_id'] = $line['quality_grade_id'] ?? null;
+            }
+            unset($line);
             $lines = $data['lines'];
             unset($data['lines']);
             if (! $receipt) {
@@ -78,7 +89,7 @@ class GoodsReceiptService
                     'code' => 'BAT-'.$receipt->id.'-'.$line->id, 'goods_receipt_line_id' => $line->id,
                     'incoming_weight_kg' => $line->actual_weight_kg, 'incoming_sacks' => $line->sack_count,
                     'remaining_sacks' => $line->sack_count, 'status' => 'available',
-                ]);
+                ] + (Schema::hasColumn('material_batches', 'remaining_weight_kg') ? ['remaining_weight_kg' => $line->actual_weight_kg] : []));
             }
             StockMovement::create([
                 'inventory_id' => $inventory->id, 'goods_receipt_id' => $receipt->id,
@@ -128,18 +139,17 @@ class GoodsReceiptService
     private function checkLines(array $data): void
     {
         if (empty($data['lines'])) {
-            throw ValidationException::withMessages(['lines' => 'Isi rincian kualitas/area penerimaan.']);
+            throw ValidationException::withMessages(['lines' => 'Isi rincian area barang masuk.']);
         }
         $inventory = Inventory::lockForUpdate()->findOrFail($data['inventory_id']);
         if ($inventory->stock_stage !== 'material') {
             throw ValidationException::withMessages(['inventory_id' => 'Penerimaan baru hanya masuk gudang bahan, bukan stok barang jadi atau saldo lama.']);
         }
         foreach ($data['lines'] as $index => $line) {
-            $grade = QualityGrade::lockForUpdate()->findOrFail($line['quality_grade_id']);
             $area = WarehouseArea::lockForUpdate()->findOrFail($line['warehouse_area_id']);
-            if (! $grade->is_active || ! $area->is_active || $area->usage !== 'receiving'
-                || (int) $area->inventory_id !== (int) $inventory->id || ! $area->grades()->whereKey($grade->id)->exists()) {
-                throw ValidationException::withMessages(['lines.'.$index.'.warehouse_area_id' => 'Area harus aktif, sesuai gudang bahan, dan mengizinkan kualitas yang dipilih.']);
+            if (! $area->is_active || $area->usage !== 'receiving'
+                || (int) $area->inventory_id !== (int) $inventory->id) {
+                throw ValidationException::withMessages(['lines.'.$index.'.warehouse_area_id' => 'Pilih area barang masuk yang aktif dan sesuai gudang bahan.']);
             }
         }
     }
@@ -165,14 +175,16 @@ class GoodsReceiptService
         });
     }
 
-    private function valueBatches(GoodsReceipt $receipt): void
+    public function valueBatches(GoodsReceipt $receipt): void
     {
         if (! Schema::hasColumn('material_batches', 'remaining_cost_cents')) {
             return;
         }
-        $lines = $receipt->lines()->with('batch')->orderBy('id')->get();
+        $lines = $receipt->lines()->with(['batch' => fn ($query) => $query->lockForUpdate()])->orderBy('id')->get();
         $totalWeight = (int) round($lines->sum('actual_weight_kg') * 100);
-        $totalCost = $receipt->harvest_transaction_id ? (int) $receipt->harvest->total_harvest_value * 100 : 0;
+        $harvest = $receipt->harvest;
+        $isCosted = $harvest && (! $harvest->separate_payment || $harvest->priced_at);
+        $totalCost = $isCosted ? (int) $harvest->total_harvest_value * 100 : 0;
         $assigned = 0;
         $assignedWeight = 0;
         foreach ($lines as $index => $line) {
@@ -182,7 +194,13 @@ class GoodsReceiptService
             $assignedWeight += (int) round($line->actual_weight_kg * 100);
             $cost = (int) round($totalCost * $assignedWeight / $totalWeight) - $assigned;
             $assigned += $cost;
-            $line->batch->update(['remaining_weight_kg' => $line->actual_weight_kg, 'remaining_cost_cents' => $cost, 'is_costed' => (bool) $receipt->harvest_transaction_id]);
+            // Pricing may happen after warehouse processing. Value only the sacks
+            // still held as material; never restore consumed weight or stock.
+            // Costs of warehouse processing and finished goods are handled separately.
+            $remainingCost = (int) $line->batch->incoming_sacks > 0
+                ? (int) round($cost * $line->batch->remaining_sacks / $line->batch->incoming_sacks)
+                : 0;
+            $line->batch->update(['remaining_cost_cents' => $remainingCost, 'is_costed' => (bool) $isCosted]);
         }
     }
 }

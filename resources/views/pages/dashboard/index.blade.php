@@ -82,7 +82,7 @@
 
         <section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <div><h3 class="text-lg font-semibold text-gray-800 dark:text-white">Proses Harian / Produksi</h3><p class="mt-1 text-sm text-gray-500">Proses yang dimulai pada periode pilihan. Selesai proses berpindah ke WIP sampai packing selesai.</p></div>
+                <div><h3 class="text-lg font-semibold text-gray-800 dark:text-white">Proses Harian / Produksi</h3><x-info-help><p class="mt-1 text-sm text-gray-500">Proses yang dimulai pada periode pilihan. Selesai proses berpindah ke WIP sampai packing selesai.</p></x-info-help></div>
                 <a href="{{ route('manajemen-gudang.index') }}" class="text-sm font-semibold text-brand-600">Lihat Dashboard Gudang</a>
             </div>
             <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 text-sm text-gray-600 dark:text-gray-300">
@@ -114,8 +114,8 @@
                             <div>
                                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Pendapatan vs Pengeluaran
                                 </h3>
-                                <p class="text-theme-sm mt-1 text-gray-500 dark:text-gray-400">Tren performa keuangan
-                                    bulanan</p>
+                                <x-info-help><p class="text-theme-sm mt-1 text-gray-500 dark:text-gray-400">Tren performa keuangan
+                                    bulanan</p></x-info-help>
                             </div>
                         </div>
                         <div class="max-w-full overflow-hidden">
@@ -128,7 +128,7 @@
                                 <div class="mt-1 flex items-center gap-2">
                                     <h4 class="text-lg font-bold text-gray-800 dark:text-white"
                                         x-text="loading ? '...' : stats.shrinkageRate + '%'"></h4>
-                                    <span class="text-xs text-gray-400">(Rata-rata 6 bulan terakhir)</span>
+                                    <x-info-help label="Keterangan tingkat penyusutan">Rata-rata 6 bulan terakhir.</x-info-help>
                                 </div>
                             </div>
                             <div>
@@ -136,7 +136,7 @@
                                 <div class="mt-1 flex items-center gap-2">
                                     <h4 class="text-lg font-bold text-gray-800 dark:text-white"
                                         x-text="loading ? '...' : formatWeight(stats.logisticsDiscrepancy)"></h4>
-                                    <span class="text-xs text-gray-400">(Total kerugian/keuntungan)</span>
+                                    <x-info-help label="Keterangan selisih logistik">Total kerugian/keuntungan.</x-info-help>
                                 </div>
                             </div>
                         </div>

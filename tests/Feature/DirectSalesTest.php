@@ -39,6 +39,11 @@ beforeEach(function () {
         '2026_10_07_000006_add_delivery_confirmation_stock_flow.php',
         '2026_10_07_000007_create_quality_grades_table.php',
         '2026_10_07_000009_create_goods_receiving_flow.php',
+        '2026_10_06_000003_add_factory_and_file_to_customer_purchase_orders.php',
+        '2026_10_10_000001_link_sales_to_customer_purchase_orders.php',
+        '2026_10_10_000002_create_company_profile_and_document_numbering.php',
+        '2026_10_10_000003_add_delivery_note_template_fields.php',
+        '2026_10_10_000006_add_customer_purchase_order_items.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
     }
@@ -146,7 +151,7 @@ it('moves the old menu without duplicating it and retains historical sales refer
         ->and($historical->refresh()->invoice_number)->toBe('INV-LAMA-001')
         ->and($historical->remaining_amount)->toBe(0)
         ->and($historical->paid_amount)->toBeNull();
-    $this->get(route('manajemen-penjualan.index'))->assertOk()->assertSee('Penjualan Langsung')->assertSee('INV-LAMA-001')->assertSee('Gudang Basah');
+    $this->get(route('manajemen-penjualan.index'))->assertOk()->assertSee('Penjualan melalui PO konsumen')->assertSee('INV-LAMA-001')->assertSee('Gudang Basah');
 });
 
 it('links invoices to the existing sale and bills its net value without another stock movement', function () {
@@ -320,4 +325,140 @@ it('does not restore nonexistent stock when a deferred sale without shipments is
     $this->deleteJson(route('manajemen-penjualan.destroy', $sale))->assertOk();
     expect((float) $this->inventory->refresh()->current_stock_kg)->toBe(1000.0)
         ->and($this->inventory->current_sack_count)->toBe(40)->and(StockMovement::count())->toBe(0);
+});
+
+it('draws consumer and price from a PO and limits partial sales to its remaining quantity', function () {
+    $this->po->update(['factory_id' => $this->factory->id, 'price_per_kg' => 12345.67]);
+    $other = Factory::create(['name' => 'Pabrik Lain']);
+    $payload = array_merge($this->payload, [
+        'sale_source' => 'po', 'customer_purchase_order_id' => $this->po->id,
+        'factory_id' => $other->id, 'price_per_kg' => 1, 'sold_weight_kg' => 60,
+        'stock_mode' => 'delivery_note', 'deduction_weight_kg' => 0, 'deduction_type' => 'none',
+    ]);
+    $this->postJson(route('manajemen-penjualan.store'), $payload)->assertOk();
+    $sale = SalesTransaction::firstOrFail();
+    expect($sale->customer_purchase_order_id)->toBe($this->po->id)
+        ->and($sale->factory_id)->toBe($this->factory->id)
+        ->and((float) $sale->price_per_kg)->toBe(12345.67)
+        ->and((int) $sale->total_sale_value)->toBe(740740)
+        ->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(1000.0);
+    $this->getJson(route('manajemen-penjualan.purchase-orders'))->assertOk()->assertJsonPath('data.0.remaining_kg', 40);
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($payload, ['sold_weight_kg' => 41]))
+        ->assertUnprocessable()->assertJsonPath('message', 'Berat penjualan melebihi sisa jumlah PO konsumen.');
+    expect(SalesTransaction::count())->toBe(1);
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($payload, ['sold_weight_kg' => 40]))->assertOk();
+    $this->getJson(route('manajemen-penjualan.purchase-orders'))->assertOk()->assertJsonCount(0, 'data');
+    $this->deleteJson(route('manajemen-penjualan.destroy', $sale))->assertOk();
+    $this->getJson(route('manajemen-penjualan.purchase-orders'))->assertOk()->assertJsonPath('data.0.remaining_kg', 60);
+});
+
+it('requires a PO for PO sales and rejects a PO on direct sales', function () {
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($this->payload, ['sale_source' => 'po']))
+        ->assertUnprocessable()->assertJsonValidationErrors('customer_purchase_order_id');
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($this->payload, [
+        'sale_source' => 'direct', 'customer_purchase_order_id' => $this->po->id,
+    ]))->assertUnprocessable()->assertJsonValidationErrors('customer_purchase_order_id');
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($this->payload, [
+        'sale_source' => 'po', 'customer_purchase_order_id' => $this->po->id,
+    ]))->assertUnprocessable()->assertJsonPath('message', 'Lengkapi pabrik pada PO sebelum membuat penjualan.');
+    expect(SalesTransaction::count())->toBe(0);
+});
+
+it('keeps the sale PO on shipment and invoice documents', function () {
+    $this->po->update(['factory_id' => $this->factory->id]);
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($this->payload, [
+        'sale_source' => 'po', 'customer_purchase_order_id' => $this->po->id, 'stock_mode' => 'delivery_note',
+    ]))->assertOk();
+    $sale = SalesTransaction::firstOrFail();
+    $other = CustomerPurchaseOrder::create([
+        'po_number' => 'PO-OTHER', 'po_date' => '2026-10-07', 'factory_id' => $this->factory->id,
+        'customer_name' => 'Pabrik Test', 'item_name' => 'Rumput Laut', 'quantity_kg' => 100, 'price_per_kg' => 10000,
+    ]);
+    $this->postJson(route('surat-jalan.store'), array_merge($this->shipmentPayload, [
+        'sales_transaction_id' => $sale->id, 'customer_purchase_order_id' => $other->id,
+    ]))->assertUnprocessable()->assertJsonValidationErrors('customer_purchase_order_id');
+    $this->postJson(route('surat-jalan.store'), array_merge($this->shipmentPayload, [
+        'sales_transaction_id' => $sale->id, 'customer_purchase_order_id' => null,
+    ]))->assertOk();
+    expect(DeliveryNote::firstOrFail()->customer_purchase_order_id)->toBe($this->po->id);
+    $this->postJson(route('invoice.store'), array_merge($this->invoicePayload, [
+        'sales_transaction_id' => $sale->id, 'customer_purchase_order_id' => $other->id,
+    ]))->assertUnprocessable()->assertJsonValidationErrors('customer_purchase_order_id');
+});
+
+it('protects a linked PO from deletion and incompatible edits', function () {
+    $this->po->update(['factory_id' => $this->factory->id]);
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($this->payload, [
+        'sale_source' => 'po', 'customer_purchase_order_id' => $this->po->id, 'sold_weight_kg' => 60,
+    ]))->assertOk();
+    $payload = array_merge($this->po->toArray(), ['factory_id' => $this->factory->id]);
+    unset($payload['items']); // This scenario exercises the legacy single-item request.
+    $this->deleteJson(route('po-konsumen.destroy', $this->po))->assertUnprocessable()->assertJsonValidationErrors('po');
+    $this->putJson(route('po-konsumen.update', $this->po), array_merge($payload, ['quantity_kg' => 59]))
+        ->assertUnprocessable()->assertJsonValidationErrors('quantity_kg');
+    $this->putJson(route('po-konsumen.update', $this->po), array_merge($payload, ['price_per_kg' => 11000]))
+        ->assertUnprocessable()->assertJsonValidationErrors('price_per_kg');
+    $this->putJson(route('po-konsumen.update', $this->po), array_merge($payload, ['quantity_kg' => 120]))->assertOk();
+});
+
+it('fulfills PO grades independently and carries the grade through shipment and invoice', function () {
+    $a = \App\Models\QualityGrade::create(['code' => 'A', 'name' => 'Grade A', 'is_active' => true]);
+    $b = \App\Models\QualityGrade::create(['code' => 'B', 'name' => 'Grade B', 'is_active' => true]);
+    Schema::create('finished_batches', function (Blueprint $table) {
+        $table->id(); $table->unsignedBigInteger('inventory_id'); $table->unsignedBigInteger('quality_grade_id');
+        // Include production columns so Eloquent's guardable-column cache is
+        // consistent with the production schema in later tests in this process.
+        $table->string('code')->nullable(); $table->unsignedBigInteger('production_run_id')->nullable();
+        $table->unsignedBigInteger('warehouse_area_id')->nullable(); $table->decimal('weight_kg',12,2)->nullable();
+        $table->integer('package_count')->nullable(); $table->unsignedBigInteger('cost_cents')->default(0);
+        $table->unsignedBigInteger('remaining_cost_cents')->default(0);
+        $table->decimal('remaining_weight_kg', 12, 2); $table->integer('remaining_packages');
+        $table->timestamps();
+    });
+    Schema::table('sales_transactions', fn (Blueprint $table) => $table->unsignedBigInteger('finished_batch_id')->nullable());
+    $this->inventory->update(['stock_stage' => 'finished']);
+    $batchA = \App\Models\FinishedBatch::create(['inventory_id' => $this->inventory->id, 'quality_grade_id' => $a->id, 'remaining_weight_kg' => 1000, 'remaining_packages' => 40]);
+    $batchB = \App\Models\FinishedBatch::create(['inventory_id' => $this->inventory->id, 'quality_grade_id' => $b->id, 'remaining_weight_kg' => 1000, 'remaining_packages' => 40]);
+    $po = app(\App\Services\Sales\CustomerPurchaseOrderService::class)->store([
+        'factory_id' => $this->factory->id, 'po_number' => 'PO-MULTI', 'po_date' => '2026-10-07',
+        'items' => [
+            ['quality_grade_id' => $a->id, 'quantity_kg' => 100, 'price_per_kg' => 15000],
+            ['quality_grade_id' => $b->id, 'quantity_kg' => 50, 'price_per_kg' => 12000],
+        ],
+    ]);
+    $itemA = $po->items()->where('quality_grade_id', $a->id)->firstOrFail();
+    $itemB = $po->items()->where('quality_grade_id', $b->id)->firstOrFail();
+    $payload = array_merge($this->payload, [
+        'sale_source' => 'po', 'stock_mode' => 'delivery_note', 'customer_purchase_order_id' => $po->id,
+        'customer_purchase_order_item_id' => $itemA->id, 'finished_batch_id' => $batchA->id,
+        'sold_weight_kg' => 60, 'deduction_weight_kg' => 0, 'deduction_type' => 'none',
+    ]);
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($payload, ['finished_batch_id' => $batchB->id]))
+        ->assertUnprocessable()->assertJsonPath('message', 'Grade batch barang jadi harus sesuai grade pada baris PO yang dipilih.');
+    $this->postJson(route('manajemen-penjualan.store'), $payload)->assertOk();
+    $sale = SalesTransaction::firstOrFail();
+    expect((float) $sale->price_per_kg)->toBe(15000.0)->and($sale->customer_purchase_order_item_id)->toBe($itemA->id);
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($payload, ['sold_weight_kg' => 41]))->assertUnprocessable();
+    $this->postJson(route('manajemen-penjualan.store'), array_merge($payload, [
+        'customer_purchase_order_item_id' => $itemB->id, 'finished_batch_id' => $batchB->id, 'sold_weight_kg' => 50,
+    ]))->assertOk();
+    expect((float) SalesTransaction::latest('id')->first()->price_per_kg)->toBe(12000.0);
+    $this->postJson(route('surat-jalan.store'), array_merge($this->shipmentPayload, [
+        'sales_transaction_id' => $sale->id, 'customer_purchase_order_id' => $po->id, 'quantity_kg' => 60,
+    ]))->assertOk();
+    $note = DeliveryNote::firstOrFail();
+    expect($note->item_name)->toBe('Rumput Laut - Grade A');
+    $this->get(route('surat-jalan.print', $note))->assertOk()->assertSee('Rumput Laut - Grade A');
+    $this->postJson(route('invoice.store'), array_merge($this->invoicePayload, [
+        'sales_transaction_id' => $sale->id, 'customer_purchase_order_id' => $po->id,
+    ]))->assertOk();
+    $invoice = Invoice::firstOrFail();
+    expect($invoice->item_name)->toBe('Rumput Laut - Grade A')->and($invoice->total_amount)->toBe(900000.0);
+    $this->get(route('invoice.print', $invoice))->assertOk()->assertSee('Rumput Laut - Grade A')->assertSee('Rp900.000,00');
+    $poPayload = ['factory_id' => $this->factory->id, 'po_number' => 'PO-MULTI', 'po_date' => '2026-10-07',
+        'items' => $po->items->map(fn ($item) => $item->only(['id', 'quality_grade_id', 'quantity_kg', 'price_per_kg']))->all()];
+    $poPayload['items'][0]['quantity_kg'] = 59;
+    $this->putJson(route('po-konsumen.update', $po), $poPayload)->assertUnprocessable()->assertJsonValidationErrors('items.0.quantity_kg');
+    $poPayload['items'] = [$poPayload['items'][1]];
+    $this->putJson(route('po-konsumen.update', $po), $poPayload)->assertUnprocessable()->assertJsonValidationErrors('items');
 });

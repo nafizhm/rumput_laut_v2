@@ -6,7 +6,6 @@ use App\Models\FinishedBatch;
 use App\Models\Inventory;
 use App\Models\MaterialBatch;
 use App\Models\ProductionRun;
-use App\Models\QualityGrade;
 use App\Models\StockMovement;
 use App\Models\User;
 use App\Models\WarehouseArea;
@@ -18,9 +17,26 @@ use Illuminate\Validation\ValidationException;
 
 class ProductionService
 {
+    public function updateDetails(ProductionRun $run, array $data): ProductionRun
+    {
+        return DB::transaction(function () use ($run, $data) {
+            $run = ProductionRun::lockForUpdate()->findOrFail($run->id);
+            if ($run->status !== 'processing') {
+                $this->fail('production', 'Hanya proses aktif yang dapat diedit.');
+            }
+            $run->update([
+                'pic' => $data['pic'], 'work_type' => $data['work_type'],
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            return $run;
+        });
+    }
+
     public function start(array $data, User $user): ProductionRun
     {
         return DB::transaction(function () use ($data, $user) {
+            $warehouseOnly = (bool) ($data['warehouse_only'] ?? false);
             $this->date($data['started_date']);
             $area = WarehouseArea::lockForUpdate()->findOrFail($data['warehouse_area_id']);
             if (! $area->is_active || $area->usage !== 'processing') {
@@ -31,7 +47,8 @@ class ProductionService
                 $this->fail('inputs', 'Isi batch berbeda untuk setiap baris.');
             }
             $run = ProductionRun::create(['started_date' => $data['started_date'], 'warehouse_area_id' => $area->id, 'pic' => $data['pic'],
-                'work_type' => $data['work_type'], 'notes' => $data['notes'] ?? null, 'processing_cost_cents' => AccountingMoney::cents($data['processing_cost'] ?? '0'),
+                'work_type' => $data['work_type'], 'notes' => $data['notes'] ?? null, 'processing_cost_cents' => $warehouseOnly ? 0 : AccountingMoney::cents($data['processing_cost'] ?? '0'),
+                'warehouse_only' => $warehouseOnly,
                 'created_by' => $user->id, 'created_by_name' => $user->name]);
             $run->number = 'PRD-'.str_replace('-', '', $data['started_date']).'-'.str_pad($run->id, 6, '0', STR_PAD_LEFT);
             $run->save();
@@ -39,15 +56,18 @@ class ProductionService
             $sacks = 0;
             $cost = 0;
             foreach ($inputs as $input) {
-                $batch = MaterialBatch::with('line.receipt')->lockForUpdate()->findOrFail($input['material_batch_id']);
+                $batch = MaterialBatch::with('line.receipt.harvest')->lockForUpdate()->findOrFail($input['material_batch_id']);
                 $taken = (int) $input['sack_count'];
-                if (! $batch->is_costed || ! $batch->line->receipt->harvest_transaction_id) {
-                    $this->fail('inputs', 'Hubungkan penerimaan '.$batch->line->receipt->number.' ke pembelian petani sebelum bahan diproses.');
+                if (! $warehouseOnly && (! $batch->is_costed || ! $batch->line->receipt->harvest_transaction_id)) {
+                    $this->fail('inputs', 'Penerimaan '.$batch->line->receipt->number.' harus terhubung ke pembelian dengan harga yang sudah ditetapkan oleh keuangan sebelum bahan diproses.');
                 }
-                if ($batch->line->receipt->status !== 'confirmed' || $taken < 1 || $taken > $batch->remaining_sacks) {
+                if ($batch->status !== 'available' || $batch->line->receipt->status !== 'confirmed' || $taken < 1 || $taken > $batch->remaining_sacks) {
                     $this->fail('inputs', 'Karung batch '.$batch->code.' tidak tersedia atau sudah dipakai.');
                 }
                 $this->date($data['started_date'], $batch->line->receipt->received_date->format('Y-m-d'));
+                if (! $warehouseOnly && $batch->line->receipt->harvest?->separate_payment) {
+                    $this->date($data['started_date'], $batch->line->receipt->harvest->purchase_date->format('Y-m-d'));
+                }
                 // Book weight/cost allocated by source sacks; actual output is weighed at packing.
                 $whole = $taken === (int) $batch->remaining_sacks;
                 $reference = $whole ? (int) round($batch->remaining_weight_kg * 100) : (int) round($batch->remaining_weight_kg * 100 * $taken / $batch->remaining_sacks);
@@ -109,16 +129,15 @@ class ProductionService
             if (! $totalWeight || count($outputs) > 50) {
                 $this->fail('outputs', 'Isi 1–50 baris hasil timbang aktual.');
             }
-            $packingCost = AccountingMoney::cents($data['packing_cost'] ?? '0');
+            $packingCost = $run->warehouse_only ? 0 : AccountingMoney::cents($data['packing_cost'] ?? '0');
             $totalCost = (int) $run->material_cost_cents + (int) $run->processing_cost_cents + $packingCost;
             $allocated = 0;
             $allocatedWeight = 0;
             foreach ($outputs as $index => $output) {
                 $area = WarehouseArea::lockForUpdate()->findOrFail($output['warehouse_area_id']);
-                $grade = QualityGrade::lockForUpdate()->findOrFail($output['quality_grade_id']);
                 $inventory = Inventory::lockForUpdate()->findOrFail($area->inventory_id);
-                if (! $area->is_active || $area->usage !== 'finished' || $inventory->stock_stage !== 'finished' || ! $grade->is_active || ! $area->grades()->whereKey($grade->id)->exists()) {
-                    $this->fail('outputs', 'Pilih kualitas dan area barang jadi yang sesuai dan aktif.');
+                if (! $area->is_active || $area->usage !== 'finished' || $inventory->stock_stage !== 'finished') {
+                    $this->fail('outputs', 'Pilih area barang ready yang aktif dan sesuai gudang barang jadi.');
                 }
                 $kg = (int) round($output['weight_kg'] * 100);
                 // Round cumulative shares so small outputs never inherit a negative remainder.
@@ -126,7 +145,7 @@ class ProductionService
                 $cost = (int) round($totalCost * $allocatedWeight / $totalWeight) - $allocated;
                 $allocated += $cost;
                 $batch = FinishedBatch::create(['code' => 'FG-'.$run->id.'-'.($index + 1), 'production_run_id' => $run->id, 'inventory_id' => $inventory->id,
-                    'warehouse_area_id' => $area->id, 'quality_grade_id' => $grade->id, 'weight_kg' => $kg / 100, 'package_count' => $output['package_count'],
+                    'warehouse_area_id' => $area->id, 'quality_grade_id' => $output['quality_grade_id'] ?? null, 'weight_kg' => $kg / 100, 'package_count' => $output['package_count'],
                     'remaining_weight_kg' => $kg / 100, 'remaining_packages' => $output['package_count'], 'cost_cents' => $cost, 'remaining_cost_cents' => $cost]);
                 $inventory->increment('current_stock_kg', $kg / 100);
                 $inventory->increment('current_sack_count', $output['package_count']);
@@ -141,11 +160,54 @@ class ProductionService
         });
     }
 
+    public function allocateGrade(int $inventoryId, int $gradeId, float $weight, int $packages, string $date, bool $consume = true): array
+    {
+        $this->date($date);
+        $batches = FinishedBatch::with('run')->where('inventory_id', $inventoryId)->where('quality_grade_id', $gradeId)
+            ->where('remaining_weight_kg', '>', 0)->where('remaining_packages', '>', 0)
+            ->whereHas('grade', fn ($q) => $q->where('is_active', true))
+            ->whereHas('area', fn ($q) => $q->where('is_active', true)->where('usage', 'finished'))
+            ->whereHas('run', fn ($q) => $q->where('status', 'packed')->whereDate('packed_date', '<=', $date))
+            ->orderBy(ProductionRun::select('packed_date')->whereColumn('production_runs.id', 'finished_batches.production_run_id'))
+            ->orderBy('id')->lockForUpdate()->get();
+        $remaining = (int) round($weight * 100);
+        $parts = [];
+        foreach ($batches as $batch) {
+            if ($remaining <= 0) break;
+            $available = (int) round($batch->remaining_weight_kg * 100);
+            $taken = min($remaining, $available);
+            $full = $taken === $available;
+            if (! $full && (int) $batch->remaining_packages < 2) {
+                $this->fail('sold_sacks', 'Sisa batch hanya satu kemasan. Ambil seluruh beratnya atau sesuaikan jumlah penjualan.');
+            }
+            $parts[] = ['batch' => $batch, 'weight_kg' => $taken / 100,
+                'minimum' => $full ? (int) $batch->remaining_packages : 1,
+                'maximum' => $full ? (int) $batch->remaining_packages : (int) $batch->remaining_packages - 1];
+            $remaining -= $taken;
+        }
+        if ($remaining > 0 || ! $parts || $packages < array_sum(array_column($parts, 'minimum')) || $packages > array_sum(array_column($parts, 'maximum'))) {
+            $this->fail('sold_sacks', 'Berat atau jumlah kemasan tidak sesuai stok grade dan urutan FIFO. Periksa berat dan kemasan yang tersedia.');
+        }
+        $extra = $packages - array_sum(array_column($parts, 'minimum'));
+        $allocations = [];
+        foreach ($parts as $part) {
+            $addition = min($extra, $part['maximum'] - $part['minimum']);
+            $count = $part['minimum'] + $addition;
+            $extra -= $addition;
+            $allocation = $consume
+                ? $this->consumeFinished($part['batch']->id, $inventoryId, $part['weight_kg'], $count, $date)
+                : ['finished_batch_id' => $part['batch']->id];
+            $allocations[] = $allocation + ['weight_kg' => $part['weight_kg'], 'sack_count' => $count];
+        }
+
+        return $allocations;
+    }
+
     public function consumeFinished(int $batchId, int $inventoryId, float $weight, int $packages, string $date): array
     {
         $batch = FinishedBatch::with(['run', 'area', 'grade'])->lockForUpdate()->findOrFail($batchId);
-        if (! $batch->area->is_active || ! $batch->grade->is_active) {
-            $this->fail('finished_batch_id', 'Kualitas atau area batch jadi nonaktif.');
+        if (! $batch->area->is_active || $batch->area->usage !== 'finished') {
+            $this->fail('finished_batch_id', 'Area barang ready nonaktif atau tidak sesuai.');
         }
         $kg = (int) round($weight * 100);
         $remaining = (int) round($batch->remaining_weight_kg * 100);

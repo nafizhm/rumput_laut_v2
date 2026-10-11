@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\PaySaleRequest;
 use App\Http\Requests\Transaction\StoreSaleRequest;
 use App\Models\Factory;
+use App\Models\CustomerPurchaseOrder;
 use App\Models\FinishedBatch;
 use App\Models\Inventory;
 use App\Models\SalesTransaction;
@@ -26,9 +27,11 @@ class SalesController extends Controller
     {
         $columns = [
             ['key' => 'invoice_number', 'label' => 'No. Penjualan', 'sortable' => true],
+            ['key' => 'purchase_order.po_number', 'label' => 'Referensi PO', 'render' => 'purchase_order'],
             ['key' => 'sale_date', 'label' => 'Tanggal', 'render' => 'date', 'sortable' => true],
             ['key' => 'factory.name', 'label' => 'Pabrik'],
             ['key' => 'inventory.item_name', 'label' => 'Gudang'],
+            ['key' => 'grade.name', 'label' => 'Grade'],
             ['key' => 'stock_mode', 'label' => 'Pengeluaran Stok', 'render' => 'stock_mode'],
             ['key' => 'total_weight_kg', 'label' => 'Berat (Kg)', 'render' => 'weight', 'sortable' => true, 'align' => 'right'],
             ['key' => 'price_per_kg', 'label' => 'Harga / Kg', 'render' => 'currency', 'align' => 'right'],
@@ -42,7 +45,9 @@ class SalesController extends Controller
 
         $data = $this->service->getAllSales();
         $factories = Factory::orderBy('name')->get()->map(fn ($f) => ['value' => $f->id, 'label' => $f->name]);
-        $inventories = Inventory::where('stock_stage', '!=', 'material')->orderBy('item_name')->get()->map(fn ($i) => [
+        $finishedBatches = $this->finishedBatchOptions();
+        $inventories = Inventory::where('stock_stage', 'finished')
+            ->whereIn('id', $finishedBatches->pluck('inventory_id'))->orderBy('item_name')->get()->map(fn ($i) => [
             'value' => $i->id,
             'label' => $i->item_name,
             'stock_stage' => $i->stock_stage,
@@ -50,15 +55,40 @@ class SalesController extends Controller
             'current_sacks' => (int) $i->current_sack_count,
         ]);
 
-        $finishedBatches = $this->finishedBatchOptions();
+        $purchaseOrders = $this->purchaseOrderOptions();
 
-        return view('pages.transaction.sales.index', compact('data', 'columns', 'factories', 'inventories', 'finishedBatches'));
+        return view('pages.transaction.sales.index', compact('data', 'columns', 'factories', 'inventories', 'finishedBatches', 'purchaseOrders'));
+    }
+
+    private function purchaseOrderOptions()
+    {
+        return CustomerPurchaseOrder::whereNotNull('factory_id')->with(['items' => fn ($q) => $q->withSum('salesTransactions', 'total_weight_kg')])->withSum('salesTransactions', 'total_weight_kg')
+            ->orderByDesc('po_date')->get()->map(fn ($po) => [
+                'id' => $po->id, 'label' => $po->po_number.' - '.$po->customer_name,
+                'factory_id' => $po->factory_id, 'item_name' => $po->item_name,
+                'price_per_kg' => $po->price_per_kg,
+                'items' => $po->items->map(fn ($item) => [
+                    'id' => $item->id, 'description' => $item->description, 'quality_grade_id' => $item->quality_grade_id,
+                    'price_per_kg' => $item->price_per_kg,
+                    'remaining_kg' => max(0, round((float) $item->quantity_kg - (float) $item->sales_transactions_sum_total_weight_kg, 2)),
+                ])->filter(fn ($item) => $item['remaining_kg'] > 0)->values(),
+                'remaining_kg' => max(0, round((float) $po->quantity_kg - (float) $po->sales_transactions_sum_total_weight_kg, 2)),
+            ])->filter(fn ($po) => $po['remaining_kg'] > 0)->values();
+    }
+
+    public function purchaseOrders()
+    {
+        return $this->successResponse('PO tersedia untuk penjualan', $this->purchaseOrderOptions());
     }
 
     private function finishedBatchOptions()
     {
-        return Schema::hasTable('finished_batches') ? FinishedBatch::with(['grade', 'area'])->where('remaining_weight_kg', '>', 0)->get()->map(fn ($b) => [
-            'id' => $b->id, 'inventory_id' => $b->inventory_id, 'label' => $b->code.' / '.$b->grade->name.' / '.$b->area->code.' / '.$b->remaining_weight_kg.' kg / '.$b->remaining_packages.' kemasan',
+        return Schema::hasTable('finished_batches') ? FinishedBatch::with(['grade', 'area'])->where('remaining_weight_kg', '>', 0)
+            ->where('remaining_packages', '>', 0)->whereHas('run', fn ($q) => $q->where('status', 'packed'))
+            ->whereHas('area', fn ($q) => $q->where('is_active', true)->where('usage', 'finished'))
+            ->get()->map(fn ($b) => [
+            'id' => $b->id, 'inventory_id' => $b->inventory_id, 'quality_grade_id' => $b->quality_grade_id, 'label' => $b->area->name.' / '.$b->code.' / '.$b->remaining_weight_kg.' kg / '.$b->remaining_packages.' kemasan',
+            'area_name' => $b->area->name, 'weight_kg' => (float) $b->remaining_weight_kg, 'packages' => (int) $b->remaining_packages,
         ])->values() : collect();
     }
 

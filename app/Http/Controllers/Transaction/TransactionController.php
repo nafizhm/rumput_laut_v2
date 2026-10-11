@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Transaction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\StoreTransactionRequest;
 use App\Http\Requests\Transaction\UpdateTransactionRequest;
-use App\Services\Master\ExpenseCategoryService;
+use App\Models\ChartOfAccount;
 use App\Services\Transaction\TransactionService;
 use App\Traits\JsonResponser;
 
@@ -14,8 +14,7 @@ class TransactionController extends Controller
     use JsonResponser;
 
     public function __construct(
-        protected TransactionService $service,
-        protected ExpenseCategoryService $categoryService
+        protected TransactionService $service
     ) {}
 
     public function index()
@@ -23,17 +22,18 @@ class TransactionController extends Controller
         $columns = [
             ['key' => 'date', 'label' => 'Tanggal', 'render' => 'date', 'sortable' => true],
             ['key' => 'type_label', 'label' => 'Jenis', 'render' => 'typeBadge', 'sortable' => true],
-            ['key' => 'category.name', 'label' => 'Kategori', 'sortable' => true],
+            ['key' => 'account.name', 'label' => 'Akun COA', 'render' => 'account'],
+            ['key' => 'cash_account.name', 'label' => 'Kas / Bank', 'render' => 'cashAccount'],
             ['key' => 'amount', 'label' => 'Jumlah', 'render' => 'amount', 'sortable' => true, 'align' => 'right'],
             ['key' => 'description', 'label' => 'Keterangan'],
             ['key' => 'action', 'label' => 'Aksi', 'width' => '170px', 'render' => 'action'],
         ];
 
         $data = $this->service->getAll();
-        $incomeCategories = $this->categoryService->getCategoryOptions('income');
-        $expenseCategories = $this->categoryService->getCategoryOptions('expense');
+        $accounts = ChartOfAccount::where('is_active', true)->orderBy('code')->get()->map(fn ($account) => ['value' => $account->id, 'label' => $account->code.' - '.$account->name]);
+        $cashAccounts = ChartOfAccount::where('is_active', true)->where('category', 'Harta')->where('account_group', 'Kas dan Bank')->where('normal_balance', 'Debit')->orderBy('code')->get()->map(fn ($account) => ['value' => $account->id, 'label' => $account->code.' - '.$account->name]);
 
-        return view('pages.transaction.transaction.index', compact('data', 'columns', 'incomeCategories', 'expenseCategories'));
+        return view('pages.transaction.transaction.index', compact('data', 'columns', 'accounts', 'cashAccounts'));
     }
 
     public function data()

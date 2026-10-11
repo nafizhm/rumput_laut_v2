@@ -3,6 +3,7 @@
 namespace App\Services\Transaction;
 
 use App\Models\FinishedBatch;
+use App\Models\CustomerPurchaseOrder;
 use App\Models\Inventory;
 use App\Models\SalesTransaction;
 use App\Models\StockMovement;
@@ -22,7 +23,7 @@ class SalesService
      */
     public function getAllSales()
     {
-        return SalesTransaction::with(['factory', 'inventory', 'invoice'])->orderBy('sale_date', 'desc')->get();
+        return SalesTransaction::with(['factory', 'inventory', 'grade', 'invoice', 'purchaseOrder', 'purchaseOrderItem'])->orderBy('sale_date', 'desc')->get();
     }
 
     /**
@@ -31,16 +32,57 @@ class SalesService
     public function createSale(array $data): SalesTransaction
     {
         return $this->transaction(function () use ($data) {
+            $poItem = null;
+            if (! empty($data['customer_purchase_order_id'])) {
+                $order = CustomerPurchaseOrder::lockForUpdate()->findOrFail($data['customer_purchase_order_id']);
+                if (! $order->factory_id) {
+                    throw new Exception('Lengkapi pabrik pada PO sebelum membuat penjualan.');
+                }
+                if (! $order->items()->exists()) {
+                    $item = $order->items()->create($order->only(['item_name', 'quantity_kg', 'price_per_kg']));
+                    $order->salesTransactions()->whereNull('customer_purchase_order_item_id')->update(['customer_purchase_order_item_id' => $item->id]);
+                }
+                $poItem = ! empty($data['customer_purchase_order_item_id'])
+                    ? $order->items()->lockForUpdate()->find($data['customer_purchase_order_item_id'])
+                    : ($order->items()->count() === 1 ? $order->items()->lockForUpdate()->first() : null);
+                if (! $poItem) {
+                    throw new Exception('Pilih baris grade yang akan dipenuhi dari PO ini.');
+                }
+                $remaining = (int) round((float) $poItem->quantity_kg * 100)
+                    - (int) round((float) $poItem->salesTransactions()->sum('total_weight_kg') * 100);
+                if ((int) round((float) $data['sold_weight_kg'] * 100) > $remaining) {
+                    throw new Exception('Berat penjualan melebihi sisa jumlah PO konsumen.');
+                }
+                $data['factory_id'] = $order->factory_id;
+                $data['price_per_kg'] = $poItem->price_per_kg;
+                $data['customer_purchase_order_item_id'] = $poItem->id;
+            } elseif (! empty($data['customer_purchase_order_item_id'])) {
+                throw new Exception('Baris PO harus disertai referensi PO konsumen.');
+            }
             $inventory = Inventory::lockForUpdate()->findOrFail($data['inventory_id']);
             if ($inventory->stock_stage === 'material') {
                 throw new Exception('Bahan masuk belum menjadi barang jadi dan tidak dapat dijual.');
             }
+            if ($poItem?->quality_grade_id && $inventory->stock_stage !== 'finished') {
+                throw new Exception('Pilih gudang dan batch barang jadi sesuai grade pesanan.');
+            }
             $soldWeight = $data['sold_weight_kg'];
             $allocation = [];
-            if ($inventory->stock_stage === 'finished') {
+            $allocations = [];
+            $gradeSale = ! empty($data['quality_grade_id']);
+            if ($gradeSale) {
+                if ($inventory->stock_stage !== 'finished' || ($poItem?->quality_grade_id && (int) $poItem->quality_grade_id !== (int) $data['quality_grade_id'])) {
+                    throw new Exception('Pilih grade barang jadi sesuai pesanan.');
+                }
+                unset($data['finished_batch_id']);
+                app(ProductionService::class)->allocateGrade($inventory->id, (int) $data['quality_grade_id'], (float) $soldWeight, (int) ($data['sold_sacks'] ?? 0), $data['sale_date'], false);
+            } elseif ($inventory->stock_stage === 'finished') {
                 $batch = FinishedBatch::lockForUpdate()->find($data['finished_batch_id'] ?? null);
                 if (! $batch || (int) $batch->inventory_id !== (int) $inventory->id) {
                     throw new Exception('Pilih batch barang jadi sesuai gudang, kualitas, dan area.');
+                }
+                if ($poItem?->quality_grade_id && (int) $batch->quality_grade_id !== (int) $poItem->quality_grade_id) {
+                    throw new Exception('Grade batch barang jadi harus sesuai grade pada baris PO yang dipilih.');
                 }
                 if ($soldWeight > $batch->remaining_weight_kg || ($data['sold_sacks'] ?? 0) < 1 || $data['sold_sacks'] > $batch->remaining_packages) {
                     throw new Exception('Berat atau kemasan penjualan melebihi batch barang jadi.');
@@ -60,16 +102,15 @@ class SalesService
             }
 
             if ($immediate) {
-                if ($inventory->stock_stage === 'finished') {
-                    $allocation = app(ProductionService::class)->consumeFinished($data['finished_batch_id'], (int) $inventory->id, (float) $soldWeight, (int) $data['sold_sacks'], $data['sale_date']);
+                if ($gradeSale) {
+                    $allocations = app(ProductionService::class)->allocateGrade($inventory->id, (int) $data['quality_grade_id'], (float) $soldWeight, (int) $data['sold_sacks'], $data['sale_date']);
+                } else {
+                    if ($inventory->stock_stage === 'finished') {
+                        $allocation = app(ProductionService::class)->consumeFinished($data['finished_batch_id'], (int) $inventory->id, (float) $soldWeight, (int) $data['sold_sacks'], $data['sale_date']);
+                    }
+                    $allocations = [$allocation + ['weight_kg' => $soldWeight, 'sack_count' => $data['sold_sacks'] ?? 0]];
                 }
-                $inventory->current_stock_kg -= $soldWeight;
-                if (isset($data['sold_sacks'])) {
-                    $inventory->current_sack_count -= $data['sold_sacks'];
-                }
-                $inventory->save();
             }
-
             $data['invoice_number'] = $this->generateSaleNumber();
 
             $soldWeight = $data['sold_weight_kg'];
@@ -105,21 +146,17 @@ class SalesService
 
             $sale = SalesTransaction::create($data);
 
-            if ($immediate) {
+            foreach ($allocations as $allocation) {
+                $inventory->decrement('current_stock_kg', $allocation['weight_kg']);
+                $inventory->decrement('current_sack_count', $allocation['sack_count']);
                 $movement = StockMovement::create($allocation + [
-                    'inventory_id' => $inventory->id,
-                    'sales_transaction_id' => $sale->id,
-                    'movement_date' => $data['sale_date'] ?? now(),
-                    'direction' => 'out',
-                    'type' => 'out',
-                    'weight_kg' => $soldWeight,
-                    'sack_count' => $data['sold_sacks'] ?? 0,
+                    'inventory_id' => $inventory->id, 'sales_transaction_id' => $sale->id,
+                    'movement_date' => $data['sale_date'], 'direction' => 'out', 'type' => 'out',
                     'balance_after_kg' => $inventory->current_stock_kg,
                     'description' => 'Penjualan langsung ke '.$sale->factory->name.' (No. Penjualan: '.$sale->invoice_number.')',
                 ]);
                 app(OperationalAccountingService::class)->shipment($movement);
             }
-
             return $sale;
         });
     }
@@ -127,6 +164,9 @@ class SalesService
     public function deleteSale(SalesTransaction $sale): bool
     {
         return $this->transaction(function () use ($sale) {
+            if ($sale->customer_purchase_order_id) {
+                CustomerPurchaseOrder::lockForUpdate()->findOrFail($sale->customer_purchase_order_id);
+            }
             $sale = SalesTransaction::lockForUpdate()->findOrFail($sale->id);
             if ((int) $sale->paid_amount > 0 || $sale->payment_status === 'paid') {
                 throw new Exception('Penjualan dengan pembayaran tidak dapat dihapus.');

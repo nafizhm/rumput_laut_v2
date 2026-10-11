@@ -9,7 +9,7 @@
     <form method="POST" action="{{ $entry->exists?route('jurnal.update',$entry):route($entry->kind==='opening'?'saldo-awal.store':'jurnal.store') }}" x-data="journalEditor(@js($initialRows))" class="space-y-5 rounded-xl border border-gray-200 bg-white p-4 text-gray-800 sm:p-6 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
         @csrf @if($entry->exists) @method('PUT') @endif
         @if($errors->any())<ul class="rounded-lg bg-red-50 p-4 text-sm text-red-700">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>@endif
-        <p class="text-sm leading-6 text-gray-500">{{ $entry->kind==='opening'?'Gunakan angka saldo awal yang sudah diperiksa. Hanya akun Harta, Utang, dan Modal. Jangan memasukkan penjualan atau beban masa lalu ke akun Pendapatan/Biaya; saldo laba awal masuk Laba Ditahan.' : 'Pilih akun sesuai transaksi. Isi salah satu sisi Debit atau Kredit pada setiap baris. Penyesuaian HPP, penyusutan, pajak, dan beban terutang dicatat berdasarkan angka yang diverifikasi.' }}</p>
+        <x-info-help><p class="text-sm leading-6 text-gray-500">{{ $entry->kind==='opening'?'Gunakan angka saldo awal yang sudah diperiksa. Hanya akun Harta, Utang, dan Modal. Jangan memasukkan penjualan atau beban masa lalu ke akun Pendapatan/Biaya; saldo laba awal masuk Laba Ditahan.' : 'Pilih akun sesuai transaksi. Isi salah satu sisi Debit atau Kredit pada setiap baris. Penyesuaian HPP, penyusutan, pajak, dan beban terutang dicatat berdasarkan angka yang diverifikasi.' }}</p></x-info-help>
         <div class="grid gap-4 sm:grid-cols-2">
             <label class="text-sm">{{ $entry->kind==='opening'?'Tanggal Mulai Pembukuan':'Tanggal Jurnal' }}<input name="entry_date" type="date" required value="{{ old('entry_date',$entry->entry_date->format('Y-m-d')) }}" class="{{ $input }}"></label>
             <label class="text-sm">Referensi Sumber (Opsional, Unik)<input name="source_reference" maxlength="150" value="{{ old('source_reference',$entry->source_reference) }}" class="{{ $input }}" placeholder="Nomor bukti transaksi atau rekonsiliasi"></label>
@@ -31,7 +31,7 @@
             <div><p class="text-sm text-gray-500">Total Kredit</p><p class="text-right tabular-nums mt-1 break-words font-semibold" x-text="format(total('credit'))"></p></div>
             <div><p class="text-sm text-gray-500">Pemeriksaan</p><p class="mt-1 font-semibold" x-text="total('debit')===total('credit') && total('debit')>0n ? 'Seimbang' : 'Belum seimbang'"></p></div>
         </div>
-        <p class="text-xs leading-5 text-gray-500">Pemisah ribuan tampil otomatis. Gunakan koma untuk desimal, misalnya 1.500.000,50. Draft boleh belum seimbang; posting harus seimbang.</p>
+        <x-info-help><p class="text-xs leading-5 text-gray-500">Pemisah ribuan tampil otomatis. Gunakan koma untuk desimal, misalnya 1.500.000,50. Draft boleh belum seimbang; posting harus seimbang.</p></x-info-help>
         <div class="flex flex-col gap-3 sm:flex-row"><button class="min-h-11 rounded-lg bg-brand-600 px-5 py-2 text-sm font-semibold text-white">Simpan Draft</button><a href="{{ route($entry->kind==='opening'?'saldo-awal.index':'jurnal.index') }}" class="min-h-11 rounded-lg border border-gray-300 px-5 py-2 text-center text-sm dark:border-gray-700">Batal</a></div>
     </form>
 @endsection

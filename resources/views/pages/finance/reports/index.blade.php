@@ -15,7 +15,7 @@
         @else
             <div class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900 dark:border-sky-800 dark:bg-sky-500/10 dark:text-sky-200"><strong>Laporan internal dari jurnal Posted.</strong> Transaksi operasional belum masuk otomatis. Pastikan saldo awal, HPP, penyusutan, pajak, dan penyesuaian periode sudah lengkap. {{ $report['posted_count'] }} jurnal diposting untuk tanggal transaksi bulan ini. Pembukuan dimulai {{ $report['start_date']->format('d/m/Y') }}.</div>
             @if($type==='balance')
-                <p class="text-sm leading-6 text-gray-500">Saldo mencakup saldo awal dan seluruh mutasi sampai akhir bulan terpilih. Angka dalam kurung merupakan saldo pengurang atau saldo negatif.</p>
+                <x-info-help><p class="text-sm leading-6 text-gray-500">Saldo mencakup saldo awal dan seluruh mutasi sampai akhir bulan terpilih. Angka dalam kurung merupakan saldo pengurang atau saldo negatif.</p></x-info-help>
                 <div class="grid items-start gap-5 xl:grid-cols-2">
                     @include('pages.finance.reports._section',['sectionTitle'=>'Harta','sectionRows'=>$report['assets'],'sectionTotal'=>$report['asset_total']])
                     <div class="space-y-5">

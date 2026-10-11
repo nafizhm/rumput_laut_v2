@@ -48,11 +48,18 @@
         <x-slot:amount>
             <span class="text-right tabular-nums text-gray-900 dark:text-gray-400 text-sm font-medium" x-text="'Rp ' + Number(item.amount).toLocaleString('id-ID')"></span>
         </x-slot:amount>
+        <x-slot:account>
+            <span x-text="item.account ? item.account.code + ' - ' + item.account.name : 'Data lama' + (item.category ? ' · ' + item.category.name : '')"></span>
+        </x-slot:account>
+        <x-slot:cashAccount>
+            <span x-text="item.cash_account ? item.cash_account.code + ' - ' + item.cash_account.name : 'Belum dipetakan'"></span>
+        </x-slot:cashAccount>
 
         <x-slot:action>
             <div class="flex items-center gap-2">
                 <button 
                     type="button" 
+                    x-show="item.chart_of_account_id && item.cash_account_id"
                     @click="$dispatch('edit-entity', item)" 
                     class="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
                 >

@@ -16,7 +16,7 @@ class SaveInvoiceRequest extends FormRequest
     {
         return [
             'sales_transaction_id' => [$this->route('invoice') ? 'nullable' : 'required', 'integer', 'exists:sales_transactions,id'],
-            'number' => ['required', 'string', 'max:100', Rule::unique('invoices')->ignore($this->route('invoice'))],
+            'number' => [$this->route('invoice') ? 'required' : 'nullable', 'string', 'max:100', Rule::unique('invoices')->ignore($this->route('invoice'))],
             'invoice_date' => ['required', 'date_format:Y-m-d'],
             'due_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:invoice_date'],
             'customer_purchase_order_id' => ['required', 'integer', 'exists:customer_purchase_orders,id'],

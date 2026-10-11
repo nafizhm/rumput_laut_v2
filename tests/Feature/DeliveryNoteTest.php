@@ -29,6 +29,8 @@ beforeEach(function () {
         '2026_10_06_225852_create_invoice_payments_table.php',
         '2026_10_07_000005_link_invoices_to_sales.php',
         '2026_10_07_000006_add_delivery_confirmation_stock_flow.php',
+        '2026_10_10_000002_create_company_profile_and_document_numbering.php',
+        '2026_10_10_000003_add_delivery_note_template_fields.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
     }
@@ -58,7 +60,7 @@ it('creates, lists, edits, prints and deletes a delivery note', function () {
     $this->get(route('surat-jalan.index'))->assertOk()->assertSee('Cetak');
     $this->putJson(route('surat-jalan.update', $note), array_merge($this->payload, ['quantity_kg' => 1500]))->assertOk();
     $this->get(route('surat-jalan.print', $note))->assertOk()
-        ->assertSee('PT ALBAGRO INDO SEJAHTERA')->assertSee('images/branding/albagro.jpeg')
+        ->assertSee('PT ALBAGRO INDO SEJAHTERA')->assertSee('images/branding/albagro.png')
         ->assertSee('SJ-2026-001')->assertSee('PT Maju Jaya')->assertSee('1.500,00 kg')
         ->assertSee('40 bale')->assertSee('Pengirim Uji')->assertSee('window.print()');
     $this->deleteJson(route('surat-jalan.destroy', $note))->assertOk();
@@ -105,4 +107,19 @@ it('places Surat jalan after PO and protects all endpoints with login', function
     $this->putJson(route('surat-jalan.update', 1), $this->payload)->assertUnauthorized();
     $this->deleteJson(route('surat-jalan.destroy', 1))->assertUnauthorized();
     $this->getJson(route('surat-jalan.print', 1))->assertUnauthorized();
+});
+
+it('automatically numbers shipments and stores optional transport and weighing details', function () {
+    $payload = array_merge($this->payload, [
+        'number' => '', 'vehicle_plate' => 'KT 1234 AB', 'vehicle_type' => 'Truk', 'driver_name' => 'Sopir Uji',
+        'condition' => 'Kering', 'gross_weight_kg' => 2020, 'tare_weight_kg' => 20, 'moisture_percent' => 25.5,
+    ]);
+    $this->postJson(route('surat-jalan.store'), $payload)->assertOk();
+    $note = DeliveryNote::firstOrFail();
+    expect($note->number)->toBe('SJ/0001/10/2026')->and($note->vehicle_plate)->toBe('KT 1234 AB');
+    $this->get(route('surat-jalan.print', $note))->assertOk()->assertSee('KT 1234 AB')->assertSee('Sopir Uji')
+        ->assertSee('2.020,00')->assertSee('25,50')->assertSee('NETTO (KG)');
+    $this->postJson(route('surat-jalan.store'), array_merge($payload, ['moisture_percent' => 101]))
+        ->assertUnprocessable()->assertJsonValidationErrors('moisture_percent');
+    expect(DeliveryNote::count())->toBe(1);
 });

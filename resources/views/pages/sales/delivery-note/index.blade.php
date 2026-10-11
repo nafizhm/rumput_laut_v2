@@ -13,7 +13,7 @@
 @endsection
 
 @section('content')
-    <p class="mb-4 rounded-lg bg-white p-4 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-400">Surat Jalan baru berstatus Draft dan belum memotong stok. Konfirmasi Dikirim hanya saat barang benar-benar keluar dari gudang. Dokumen Data Lama tidak dapat memotong stok lagi.</p>
+    <x-info-help><p class="mb-4 rounded-lg bg-white p-4 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-400">Surat Jalan baru berstatus Draft dan belum memotong stok. Konfirmasi Dikirim hanya saat barang benar-benar keluar dari gudang. Dokumen Data Lama tidak dapat memotong stok lagi.</p></x-info-help>
     <x-data-table 
         id="deliveryNoteTable" 
         :rows="$data" 

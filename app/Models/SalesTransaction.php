@@ -19,7 +19,10 @@ class SalesTransaction extends Model
     use HasOperationalJournals;
 
     protected $fillable = [
+        'customer_purchase_order_id',
+        'customer_purchase_order_item_id',
         'finished_batch_id',
+        'quality_grade_id',
         'stock_mode',
         'factory_id',
         'inventory_id',
@@ -53,6 +56,26 @@ class SalesTransaction extends Model
     public function factory(): BelongsTo
     {
         return $this->belongsTo(Factory::class);
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(CustomerPurchaseOrder::class, 'customer_purchase_order_id');
+    }
+
+    public function purchaseOrderItem(): BelongsTo
+    {
+        return $this->belongsTo(CustomerPurchaseOrderItem::class, 'customer_purchase_order_item_id');
+    }
+
+    public function getDocumentItemNameAttribute(): string
+    {
+        return $this->purchaseOrderItem?->description ?? $this->grade?->name ?? $this->inventory->item_name;
+    }
+
+    public function grade(): BelongsTo
+    {
+        return $this->belongsTo(QualityGrade::class, 'quality_grade_id');
     }
 
     public function inventory(): BelongsTo

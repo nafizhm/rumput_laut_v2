@@ -71,9 +71,9 @@ class JournalController extends Controller
         return view('pages.finance.journal.form', compact('entry', 'accounts', 'rows'));
     }
 
-    public function show(JournalEntry $jurnal)
+    public function show(Request $request, JournalEntry $jurnal)
     {
-        return view('pages.finance.journal.show', ['entry' => $jurnal->load(['lines', 'reversal', 'original'])]);
+        return view($request->boolean('modal') ? 'pages.finance.journal._detail' : 'pages.finance.journal.show', ['entry' => $jurnal->load(['lines', 'reversal', 'original'])]);
     }
 
     public function store(Request $request)

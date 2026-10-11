@@ -6,6 +6,7 @@ use App\Models\Farmer;
 use App\Models\GoodsReceipt;
 use App\Models\HarvestTransaction;
 use App\Models\Inventory;
+use App\Models\User;
 use App\Services\Finance\OperationalAccountingService;
 use App\Traits\HandlesTransaction;
 use Carbon\Carbon;
@@ -15,6 +16,43 @@ use Illuminate\Validation\ValidationException;
 class HarvestTransactionService
 {
     use HandlesTransaction;
+
+    public function createAndReceive(array $data, User $user): HarvestTransaction
+    {
+        return $this->transaction(function () use ($data, $user) {
+            Farmer::lockForUpdate()->findOrFail($data['farmer_id']);
+            if (HarvestTransaction::where('submission_key', $data['submission_key'])->exists()) {
+                throw ValidationException::withMessages(['confirm' => 'Panen ini sudah dikonfirmasi. Muat ulang daftar untuk melihat hasilnya.']);
+            }
+            $expectedWeight = round((float) $data['total_weight'] + (int) $data['sack_count'] * (float) $data['extra_per_sack'], 2);
+            $actualWeight = round(array_sum(array_column($data['lines'], 'actual_weight_kg')), 2);
+            $actualSacks = array_sum(array_column($data['lines'], 'sack_count'));
+            if ((int) round($expectedWeight * 100) !== (int) round($actualWeight * 100) || (int) $actualSacks !== (int) $data['sack_count']) {
+                throw ValidationException::withMessages(['lines' => 'Total rincian penerimaan harus sama dengan berat gudang dan jumlah karung pada panen.']);
+            }
+            $receiptData = [
+                'farmer_id' => $data['farmer_id'], 'received_date' => $data['harvest_date'],
+                'inventory_id' => $data['inventory_id'], 'note_weight_kg' => $expectedWeight,
+                'lines' => $data['lines'], 'notes' => $data['notes'] ?? null,
+            ];
+            unset($data['inventory_id'], $data['lines'], $data['confirm']);
+            // Warehouse input never accepts or posts financial values.
+            $data = array_intersect_key($data, array_flip(['farmer_id', 'submission_key', 'harvest_date', 'location', 'total_weight', 'sack_count', 'extra_per_sack', 'notes']));
+            $harvest = new HarvestTransaction($data + [
+                'batch_code' => $this->generateBatchCode(), 'warehouse_weight' => $expectedWeight,
+                'separate_payment' => true, 'price_per_kg' => 0, 'total_harvest_value' => 0,
+                'cash_payout' => 0, 'debt_deduction' => 0, 'sale_deduction_type' => 'none',
+                'sale_deduction_value' => 0, 'sale_deduction_amount' => 0,
+            ]);
+            $harvest->receipt_mode = 'separate';
+            $harvest->save();
+            $receiptData['harvest_transaction_id'] = $harvest->id;
+            $receiving = app(GoodsReceiptService::class);
+            $receipt = $receiving->save($receiptData);
+            $receiving->confirm($receipt, $user);
+            return $harvest->fresh(['farmer', 'receipt.lines']);
+        });
+    }
 
     /**
      * Get all harvest transactions with farmer relationship.

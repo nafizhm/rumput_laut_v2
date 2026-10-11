@@ -176,6 +176,13 @@ class BusinessFlowAuditTest extends TestCase
             '2026_10_07_000009_create_goods_receiving_flow.php',
             '2026_10_07_000012_create_accounting_journals.php',
             '2026_10_07_000015_connect_production_and_operational_accounting.php',
+            '2026_10_10_000001_link_sales_to_customer_purchase_orders.php',
+            '2026_10_10_000004_link_cash_transactions_to_coa.php',
+            '2026_10_10_000007_add_harvest_submission_key.php',
+            '2026_10_10_000008_separate_harvest_receiving_and_payments.php',
+            '2026_10_10_000010_enable_independent_warehouse_processing.php',
+            '2026_10_10_000015_add_grade_to_sales.php',
+            '2026_10_10_000016_allow_multiple_shipment_batches.php',
         ] as $migration) {
             (require database_path('migrations/'.$migration))->up();
         }
@@ -340,7 +347,12 @@ class BusinessFlowAuditTest extends TestCase
     public function test_harvest_debt_deduction_cannot_exceed_outstanding_debt(): void
     {
         $this->loan(100000);
-        $this->postJson(route('manajemen-panen.store'), $this->harvestData())->assertUnprocessable();
+        try {
+            app(HarvestTransactionService::class)->createHarvest($this->harvestData());
+            $this->fail('Legacy purchase deducted more than the farmer debt.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('cash_payout', $e->errors());
+        }
         $this->assertSame(100000, (int) $this->farmer->refresh()->current_debt);
     }
 
@@ -363,6 +375,9 @@ class BusinessFlowAuditTest extends TestCase
 
     public function test_changing_harvest_farmer_reconciles_both_debt_balances(): void
     {
+        foreach (['manajemen-panen.update', 'harvest-finance.price'] as $name) {
+            $this->user->givePermissionTo(Permission::findOrCreate($name, 'web'));
+        }
         $this->loan();
         $harvest = app(HarvestTransactionService::class)->createHarvest($this->harvestData());
         $other = Farmer::create(['name' => 'Petani Lain', 'current_debt' => 1000000]);
@@ -389,7 +404,9 @@ class BusinessFlowAuditTest extends TestCase
 
     public function test_dashboard_includes_expenses_entered_through_the_current_finance_menu(): void
     {
-        app(TransactionService::class)->create(['type' => 'expense', 'date' => '2026-10-04', 'amount' => 50000, 'description' => 'Biaya Audit']);
+        $cash = \App\Models\ChartOfAccount::create(['code'=>'11101','name'=>'Kas Operasional','category'=>'Harta','account_group'=>'Kas dan Bank','normal_balance'=>'Debit','is_active'=>true]);
+        $expense = \App\Models\ChartOfAccount::create(['code'=>'54102','name'=>'Biaya Lain-lain','category'=>'Biaya','account_group'=>'Biaya Lainnya','normal_balance'=>'Debit','is_active'=>true]);
+        app(TransactionService::class)->create(['type' => 'expense', 'date' => '2026-10-04', 'amount' => 50000, 'description' => 'Biaya Audit', 'chart_of_account_id'=>$expense->id, 'cash_account_id'=>$cash->id]);
         $this->getJson(route('dashboard.stats'))->assertOk()->assertJsonPath('weeklyExpense.value', 50000);
     }
 
@@ -439,6 +456,55 @@ class BusinessFlowAuditTest extends TestCase
         app(GoodsReceiptService::class)->confirm($this->receipt($harvest), $this->user);
 
         return MaterialBatch::firstOrFail();
+    }
+
+    public function test_grade_sales_allocate_fifo_across_batches_restore_stock_and_dispatch_once(): void
+    {
+        $batches = [];
+        foreach ([1, 2] as $index) {
+            $this->sourceBatch();
+            $run = $this->production(MaterialBatch::latest('id')->firstOrFail());
+            app(ProductionService::class)->complete($run, '2026-10-03');
+            $this->packing($run, ['packed_date' => $index === 1 ? '2026-10-04' : '2026-10-05', 'packing_cost' => $index === 1 ? '50000' : '150000']);
+            $batches[] = $run->outputs()->firstOrFail();
+        }
+        $payload = ['factory_id' => $this->factory->id, 'inventory_id' => $batches[0]->inventory_id,
+            'quality_grade_id' => $this->grade->id, 'sale_date' => '2026-10-06',
+            'sold_weight_kg' => 120, 'sold_sacks' => 6, 'price_per_kg' => 20000];
+        try {
+            app(SalesService::class)->createSale(array_replace($payload, ['sold_weight_kg' => 200]));
+            $this->fail('Insufficient grade stock accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('sold_sacks', $exception->errors());
+        }
+        $this->assertEquals(160, FinishedBatch::sum('remaining_weight_kg'));
+        $sale = app(SalesService::class)->createSale($payload);
+        $this->assertNull($sale->finished_batch_id);
+        $this->assertCount(2, $sale->stockMovements);
+        $this->assertEquals(0, $batches[0]->fresh()->remaining_weight_kg);
+        $this->assertEquals(40, $batches[1]->fresh()->remaining_weight_kg);
+        $this->assertEquals(170000000, $sale->stockMovements()->sum('cost_cents'));
+        app(SalesService::class)->deleteSale($sale);
+        foreach ($batches as $index => $batch) {
+            $this->assertEquals(80, $batch->fresh()->remaining_weight_kg);
+            $this->assertEquals(4, $batch->fresh()->remaining_packages);
+            $this->assertEquals($index === 0 ? 110000000 : 120000000, $batch->fresh()->remaining_cost_cents);
+        }
+        $sale = app(SalesService::class)->createSale($payload + ['stock_mode' => 'delivery_note']);
+        $this->assertCount(0, $sale->stockMovements);
+        $note = app(DeliveryNoteService::class)->store(['sales_transaction_id' => $sale->id,
+            'number' => 'SJ-GRADE-FIFO', 'delivery_date' => '2026-10-06', 'quantity_kg' => 120,
+            'sack_count' => 6, 'destination_address' => 'Alamat', 'origin' => 'Gudang']);
+        app(DeliveryNoteService::class)->dispatch($note, '2026-10-06', $this->user);
+        $this->assertCount(2, $sale->fresh()->stockMovements);
+        $this->assertEquals(40, $batches[1]->fresh()->remaining_weight_kg);
+        try {
+            app(DeliveryNoteService::class)->dispatch($note, '2026-10-06', $this->user);
+            $this->fail('Shipment repeated.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('surat_jalan', $exception->errors());
+        }
+        $this->assertCount(2, $sale->fresh()->stockMovements);
     }
 
     public function test_full_flow_from_zero_stock_with_real_production_partial_shipments_and_balanced_finance(): void
@@ -592,6 +658,42 @@ class BusinessFlowAuditTest extends TestCase
         $this->assertSame(0, FarmerLedger::count());
     }
 
+    public function test_production_history_and_edit_preserve_stock_and_reject_completed_runs(): void
+    {
+        foreach (['production.read', 'production.create', 'receiving.read'] as $permission) {
+            $this->user->givePermissionTo(Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']));
+        }
+        $this->withoutVite();
+        $batch = $this->sourceBatch();
+        $run = $this->production($batch);
+        $movements = StockMovement::count();
+        $sacks = $batch->fresh()->remaining_sacks;
+        $this->get(route('produksi.index'))->assertOk()->assertSee($run->number)->assertSee('Edit');
+        $this->get(route('produksi.edit', $run))->assertOk();
+        $this->get(route('produksi.show', $run), ['X-Warehouse-Detail' => 'modal'])
+            ->assertOk()->assertViewIs('pages.transaction.production._detail')->assertSee($run->number);
+        $this->get(route('penerimaan-barang.show', $batch->line->receipt), ['X-Warehouse-Detail' => 'modal'])
+            ->assertOk()->assertViewIs('pages.transaction.receiving._detail')->assertSee($batch->code);
+        $this->put(route('produksi.update', $run), [
+            'pic' => 'PIC Baru', 'work_type' => 'Jemur', 'notes' => 'Koreksi PIC',
+            'input_sacks' => 999, 'status' => 'packed',
+        ])->assertRedirect(route('produksi.show', $run))->assertSessionHasNoErrors();
+        $this->assertSame('PIC Baru', $run->fresh()->pic);
+        $this->assertSame('processing', $run->fresh()->status);
+        $this->assertEquals(4, $run->fresh()->input_sacks);
+        $this->assertEquals($sacks, $batch->fresh()->remaining_sacks);
+        $this->assertSame($movements, StockMovement::count());
+        app(ProductionService::class)->complete($run, '2026-10-03');
+        $this->get(route('produksi.index', ['status' => 'wip']))->assertOk()->assertSee($run->number);
+        $this->get(route('produksi.index', ['status' => 'processing']))->assertOk()->assertDontSee($run->number);
+        $this->get(route('produksi.edit', $run))->assertForbidden();
+        $this->putJson(route('produksi.update', $run), ['pic' => 'Ditolak', 'work_type' => 'Jemur'])
+            ->assertUnprocessable()->assertJsonValidationErrors('production');
+        $this->assertSame('PIC Baru', $run->fresh()->pic);
+        $this->user->revokePermissionTo('production.create');
+        $this->putJson(route('produksi.update', $run), ['pic' => 'Ditolak', 'work_type' => 'Jemur'])->assertForbidden();
+    }
+
     public function test_production_forms_stage_pages_permissions_and_confirmation(): void
     {
         foreach (['production.read', 'production.create', 'production.confirm', 'receiving.read', 'journal.read', 'journal.post'] as $permission) {
@@ -610,12 +712,15 @@ class BusinessFlowAuditTest extends TestCase
         $this->get(route('produksi.show', $run))->assertOk()->assertSee('Press, timbang aktual');
         $area = WarehouseArea::where('usage', 'finished')->firstOrFail();
         $area->grades()->syncWithoutDetaching([$this->grade->id]);
-        $this->post(route('produksi.pack', $run), ['packed_date' => '2026-10-04', 'packing_cost' => 0, 'outputs' => [['warehouse_area_id' => $area->id, 'quality_grade_id' => $this->grade->id, 'weight_kg' => 80, 'package_count' => 4]], 'confirm' => 1])->assertRedirect();
+        $this->post(route('produksi.pack', $run), ['packed_date' => '2026-10-04', 'outputs' => [['warehouse_area_id' => $area->id, 'quality_grade_id' => $this->grade->id, 'weight_kg' => 80, 'package_count' => 4]], 'confirm' => 1])->assertRedirect()->assertSessionHasNoErrors();
         $this->get(route('produksi.show', $run))->assertOk()->assertSee('Batch barang jadi');
         foreach (['process', 'wip', 'press', 'finished'] as $stage) {
             $this->get(route('manajemen-gudang.stage', $stage))->assertOk();
         }
-        $this->get(route('manajemen-penjualan.index'))->assertOk()->assertSee('Batch barang jadi / kualitas / area');
+        $this->get(route('manajemen-penjualan.index'))->assertOk()->assertSee('Area Ready / Batch Siap Jual')
+            ->assertViewHas('inventories', fn ($options) => $options->isNotEmpty()
+                && $options->every(fn ($option) => $option['stock_stage'] === 'finished'))
+            ->assertViewHas('finishedBatches', fn ($options) => $options->pluck('id')->contains(FinishedBatch::firstOrFail()->id));
         $this->get(route('jurnal.show', JournalEntry::where('kind', 'operational')->firstOrFail()))->assertOk()->assertSee('Jurnal dari transaksi operasional');
         $this->user->revokePermissionTo('production.create');
         $this->get(route('produksi.create'))->assertForbidden();
@@ -711,6 +816,151 @@ class BusinessFlowAuditTest extends TestCase
         $this->assertSame(0, $this->cashIn('Penjualan Rumput Laut'));
         $this->assertSame(160000000, $this->accountNet('11202'));
         $this->assertSame(0, app(FinancialReportService::class)->month('2026-10')['difference']);
+    }
+
+    public function test_pricing_after_partial_processing_or_packing_preserves_physical_stock(): void
+    {
+        foreach ([2, 4] as $sacks) {
+            $harvest = app(HarvestTransactionService::class)->createAndReceive($this->harvestData() + [
+                'submission_key' => (string) \Illuminate\Support\Str::uuid(), 'inventory_id' => $this->material->id,
+                'lines' => [['quality_grade_id' => $this->grade->id, 'warehouse_area_id' => $this->area->id, 'actual_weight_kg' => 104, 'sack_count' => 4]],
+            ], $this->user);
+            $batch = $harvest->receipt->lines()->firstOrFail()->batch;
+            $run = app(ProductionService::class)->start([
+                'warehouse_only' => true, 'started_date' => '2026-10-03',
+                'warehouse_area_id' => WarehouseArea::where('usage', 'processing')->firstOrFail()->id,
+                'pic' => 'Gudang', 'work_type' => 'Jemur', 'inputs' => [['material_batch_id' => $batch->id, 'sack_count' => $sacks]],
+            ], $this->user);
+            if ($sacks === 4) {
+                app(ProductionService::class)->complete($run, '2026-10-03');
+                $this->packing($run);
+            }
+            $weight = $batch->fresh()->remaining_weight_kg;
+            $inventoryWeight = $this->material->fresh()->current_stock_kg;
+            $finishedWeight = FinishedBatch::sum('remaining_weight_kg');
+            $movements = StockMovement::count();
+            $finance = app(\App\Services\Finance\HarvestFinanceService::class);
+            $finance->price($harvest, ['purchase_date' => '2026-10-05', 'price_per_kg' => 10000, 'sale_deduction_type' => 'none'], $this->user);
+            $this->assertNotNull($harvest->fresh()->priced_at);
+            $this->assertEquals(1000000, $harvest->fresh()->outstanding_payable);
+            $this->assertEquals($weight, $batch->fresh()->remaining_weight_kg);
+            $this->assertEquals(4 - $sacks, $batch->fresh()->remaining_sacks);
+            $this->assertEquals($sacks === 2 ? 50000000 : 0, $batch->fresh()->remaining_cost_cents);
+            $this->assertEquals($inventoryWeight, $this->material->fresh()->current_stock_kg);
+            $this->assertEquals($finishedWeight, FinishedBatch::sum('remaining_weight_kg'));
+            $this->assertSame($movements, StockMovement::count());
+            $journalCount = JournalEntry::count();
+            try {
+                $finance->price($harvest, ['purchase_date' => '2026-10-05', 'price_per_kg' => 20000], $this->user);
+                $this->fail('Confirmed price changed.');
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('purchase_date', $exception->errors());
+            }
+            app(\App\Services\Finance\OperationalJournalBackfillService::class)->run();
+            $this->assertSame($journalCount, JournalEntry::count());
+        }
+    }
+
+    public function test_warehouse_processes_unpriced_harvest_to_finished_stock_without_finance_or_duplicate_stock(): void
+    {
+        foreach (['production.read', 'production.create', 'production.confirm', 'receiving.read'] as $name) {
+            $this->user->givePermissionTo(Permission::findOrCreate($name,'web'));
+        }
+        $this->withoutVite();
+        $harvest = app(HarvestTransactionService::class)->createAndReceive($this->harvestData() + [
+            'submission_key'=>(string) \Illuminate\Support\Str::uuid(), 'inventory_id'=>$this->material->id,
+            'lines'=>[['quality_grade_id'=>$this->grade->id,'warehouse_area_id'=>$this->area->id,'actual_weight_kg'=>104,'sack_count'=>4]],
+        ], $this->user);
+        $batch = MaterialBatch::firstOrFail();
+        $this->assertFalse((bool) $batch->is_costed);
+        $this->assertNull($harvest->priced_at);
+        $journals = JournalEntry::count();
+        $this->get(route('produksi.create'))->assertOk()->assertSee($batch->code)->assertDontSee('Biaya proses dibayar tunai');
+        $processPayload = ['started_date'=>'2026-10-03','warehouse_area_id'=>WarehouseArea::where('usage','processing')->firstOrFail()->id,'pic'=>'Petugas','work_type'=>'Jemur',
+            'warehouse_only'=>false,'processing_cost'=>999999,'inputs'=>[['material_batch_id'=>$batch->id,'sack_count'=>4]],'confirm'=>1];
+        $this->post(route('produksi.store'),$processPayload)->assertRedirect()->assertSessionHasNoErrors();
+        $run = ProductionRun::firstOrFail();
+        $this->assertTrue($run->warehouse_only);
+        $this->assertSame(0,(int) $run->processing_cost_cents);
+        $this->assertSame(0,(int) $batch->refresh()->remaining_sacks);
+        $this->assertSame(0.0,(float) $this->material->refresh()->current_stock_kg);
+        $this->get(route('produksi.show',$run))->assertOk()->assertDontSee('Biaya bahan')->assertDontSee('Jurnal terkait');
+        $this->postJson(route('produksi.store'),$processPayload)->assertUnprocessable();
+        $this->assertSame(1,ProductionRun::count());
+        $this->post(route('produksi.complete',$run),['completed_date'=>'2026-10-03','confirm'=>1])->assertRedirect()->assertSessionHasNoErrors();
+        $this->get(route('produksi.show',$run))->assertOk()->assertDontSee('Biaya packing dibayar tunai');
+        $area = WarehouseArea::where('usage','finished')->firstOrFail();
+        $area->grades()->syncWithoutDetaching([$this->grade->id]);
+        $payload = ['packed_date'=>'2026-10-04','confirm'=>1,'outputs'=>[['warehouse_area_id'=>$area->id,'quality_grade_id'=>$this->grade->id,'weight_kg'=>80,'package_count'=>4]]];
+        $this->post(route('produksi.pack',$run),$payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('packed',$run->refresh()->status);
+        $this->assertSame(80.0,(float) FinishedBatch::sum('remaining_weight_kg'));
+        $this->assertSame(4,(int) FinishedBatch::sum('remaining_packages'));
+        $this->get(route('produksi.show',$run))->assertOk()->assertSee('Batch barang jadi')->assertDontSee('Nilai hasil');
+        $this->postJson(route('produksi.pack',$run),$payload)->assertUnprocessable();
+        $this->assertSame(1,FinishedBatch::count());
+        $this->assertSame($journals,JournalEntry::count());
+        app(\App\Services\Finance\OperationalJournalBackfillService::class)->run();
+        $this->assertSame($journals,JournalEntry::count());
+        $this->assertNull($harvest->refresh()->priced_at);
+        $this->assertSame(0,(int) $harvest->cash_payout);
+    }
+
+    public function test_warehouse_accepts_confirmed_receipts_without_purchase_and_keeps_partial_stock_correct(): void
+    {
+        $receipt = app(GoodsReceiptService::class)->save([
+            'farmer_id'=>$this->farmer->id,'received_date'=>'2026-10-02','inventory_id'=>$this->material->id,
+            'lines'=>[['quality_grade_id'=>$this->grade->id,'warehouse_area_id'=>$this->area->id,'actual_weight_kg'=>104,'sack_count'=>4]],
+        ]);
+        app(GoodsReceiptService::class)->confirm($receipt,$this->user);
+        $batch = MaterialBatch::firstOrFail();
+        $run = app(ProductionService::class)->start([
+            'warehouse_only'=>true,'started_date'=>'2026-10-03','warehouse_area_id'=>WarehouseArea::where('usage','processing')->firstOrFail()->id,
+            'pic'=>'Gudang','work_type'=>'Jemur','inputs'=>[['material_batch_id'=>$batch->id,'sack_count'=>2]],
+        ],$this->user);
+        $this->assertTrue($run->warehouse_only);
+        $this->assertSame(2,(int) $batch->refresh()->remaining_sacks);
+        $this->assertSame(52.0,(float) $batch->remaining_weight_kg);
+        $this->assertSame(52.0,(float) $this->material->refresh()->current_stock_kg);
+        $this->assertSame(0,JournalEntry::count());
+        $this->assertSame(0,HarvestTransaction::count());
+    }
+
+    public function test_unpaid_harvest_can_enter_production_only_after_pricing_and_backfill_keeps_separate_journals(): void
+    {
+        $this->legacy->update(['current_stock_kg'=>0, 'current_sack_count'=>0]);
+        app(JournalService::class)->startZero('2026-10-01', $this->user);
+        $this->loan(100000);
+        $harvest = app(HarvestTransactionService::class)->createAndReceive($this->harvestData() + [
+            'submission_key'=>(string) \Illuminate\Support\Str::uuid(), 'inventory_id'=>$this->material->id,
+            'lines'=>[['quality_grade_id'=>$this->grade->id,'warehouse_area_id'=>$this->area->id,'actual_weight_kg'=>104,'sack_count'=>4]],
+        ], $this->user);
+        $batch = MaterialBatch::firstOrFail();
+        $this->assertSame(100000,(int) $this->farmer->refresh()->current_debt);
+        $this->assertFalse((bool) $batch->is_costed);
+        try {
+            $this->production($batch);
+            $this->fail('Unpriced harvest entered production.');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('inputs',$e->errors());
+        }
+        $finance = app(\App\Services\Finance\HarvestFinanceService::class);
+        $finance->price($harvest, ['purchase_date'=>'2026-10-03','price_per_kg'=>10000,'sale_deduction_type'=>'none'], $this->user);
+        $this->assertSame(1000000,$harvest->refresh()->outstanding_payable);
+        $this->assertTrue((bool) $batch->refresh()->is_costed);
+        $run = $this->production($batch);
+        $this->assertSame(100000000,(int) $run->material_cost_cents);
+        $this->assertSame(1000000,$harvest->refresh()->outstanding_payable, 'Unpaid stock can be processed after pricing.');
+        $cash = \App\Models\ChartOfAccount::where('code','11101')->firstOrFail();
+        $finance->pay($harvest,['submission_key'=>(string) \Illuminate\Support\Str::uuid(),'payment_date'=>'2026-10-04','amount'=>200000,'debt_deduction'=>100000,'cash_account_id'=>$cash->id],$this->user);
+        $this->assertSame(700000,$harvest->refresh()->outstanding_payable);
+        $this->assertSame(0,(int) $this->farmer->refresh()->current_debt);
+        $journalCount = JournalEntry::count();
+        $recovery = app(\App\Services\Finance\OperationalJournalBackfillService::class)->run();
+        $this->assertSame(0,$recovery['created']);
+        $this->assertSame($journalCount,JournalEntry::count());
+        $this->assertSame(0,app(FinancialReportService::class)->month('2026-10')['difference']);
+        $this->assertSame(0,DB::table('operational_events')->where('source_type',GoodsReceipt::class)->count());
     }
 
     public function test_posted_loan_correction_keeps_prior_cash_period_and_puts_difference_in_correction_period(): void

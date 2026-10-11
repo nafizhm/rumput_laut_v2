@@ -6,6 +6,7 @@ use App\Models\Transaction;
 use App\Services\Finance\OperationalAccountingService;
 use App\Traits\HandlesTransaction;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 class TransactionService
 {
@@ -13,7 +14,7 @@ class TransactionService
 
     public function getAll(): Collection
     {
-        return Transaction::with('category')
+        return Transaction::with(['category', 'account', 'cashAccount'])
             ->orderBy('date', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -22,6 +23,9 @@ class TransactionService
     public function create(array $data): Transaction
     {
         return $this->transaction(function () use ($data) {
+            if (empty($data['chart_of_account_id']) || empty($data['cash_account_id'])) {
+                throw ValidationException::withMessages(['chart_of_account_id' => 'Pilih akun COA transaksi dan akun kas/bank.']);
+            }
             $transaction = Transaction::create($data);
             app(OperationalAccountingService::class)->transaction($transaction);
 
@@ -33,6 +37,9 @@ class TransactionService
     {
         return $this->transaction(function () use ($id, $data) {
             $transaction = Transaction::lockForUpdate()->findOrFail($id);
+            if (! $transaction->chart_of_account_id || ! $transaction->cash_account_id) {
+                throw ValidationException::withMessages(['chart_of_account_id' => 'Transaksi lama belum dipetakan ke COA. Pengubahan data lama akan ditangani pada tahap berikutnya.']);
+            }
             $transaction->update($data);
             app(OperationalAccountingService::class)->transaction($transaction);
 

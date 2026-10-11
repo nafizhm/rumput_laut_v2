@@ -15,8 +15,13 @@ beforeEach(function () {
         '2026_01_01_130309_create_permission_tables.php',
         '2026_01_01_130425_create_menus_table.php',
         '2026_04_26_153352_create_factories_table.php',
+        '2026_04_26_153147_create_inventories_table.php',
+        '2026_04_26_153448_create_sales_transactions_table.php',
         '2026_10_06_000001_create_customer_purchase_orders_table.php',
         '2026_10_06_000003_add_factory_and_file_to_customer_purchase_orders.php',
+        '2026_10_10_000001_link_sales_to_customer_purchase_orders.php',
+        '2026_10_07_000007_create_quality_grades_table.php',
+        '2026_10_10_000006_add_customer_purchase_order_items.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
     }
@@ -135,4 +140,41 @@ it('rejects invalid uploads and deletes the attachment with its PO', function ()
     Storage::disk('local')->assertMissing($path);
     auth()->logout();
     $this->getJson(route('po-konsumen.file', $order))->assertUnauthorized();
+});
+
+it('stores multiple grades with independent prices and accurate PO totals', function () {
+    $a = \App\Models\QualityGrade::create(['code' => 'A', 'name' => 'Grade A', 'is_active' => true]);
+    $b = \App\Models\QualityGrade::create(['code' => 'B', 'name' => 'Grade B', 'is_active' => true]);
+    $payload = $this->payload;
+    unset($payload['item_name'], $payload['quantity_kg'], $payload['price_per_kg']);
+    $payload['items'] = [
+        ['quality_grade_id' => $a->id, 'quantity_kg' => 1000, 'price_per_kg' => 15000.25],
+        ['quality_grade_id' => $b->id, 'quantity_kg' => 500, 'price_per_kg' => 12000],
+    ];
+    $this->postJson(route('po-konsumen.store'), $payload)->assertOk();
+    $po = CustomerPurchaseOrder::firstOrFail();
+    expect($po->items()->count())->toBe(2)->and((float) $po->quantity_kg)->toBe(1500.0)
+        ->and($po->total_amount)->toBe(21000250.0);
+    $this->getJson(route('po-konsumen.data'))->assertOk()->assertJsonPath('data.0.total_amount', 21000250)
+        ->assertJsonPath('data.0.items.0.description', 'Rumput Laut - Grade A');
+    $this->get(route('po-konsumen.index'))->assertOk()->assertSee('Tambah Barang')->assertSee('Grade A');
+    $rows = $po->items->map(fn ($item) => $item->only(['id', 'quality_grade_id', 'quantity_kg', 'price_per_kg']))->all();
+    $rows[1]['quantity_kg'] = 600;
+    $this->putJson(route('po-konsumen.update', $po), array_merge($payload, ['items' => $rows]))->assertOk();
+    expect($po->fresh()->total_amount)->toBe(22200250.0);
+});
+
+it('requires valid distinct grades and prevents using another POs row', function () {
+    $grade = \App\Models\QualityGrade::create(['code' => 'A', 'name' => 'Grade A', 'is_active' => true]);
+    $payload = $this->payload;
+    unset($payload['item_name'], $payload['quantity_kg'], $payload['price_per_kg']);
+    $row = ['quality_grade_id' => $grade->id, 'quantity_kg' => 100, 'price_per_kg' => 15000];
+    $this->postJson(route('po-konsumen.store'), array_merge($payload, ['items' => [$row, $row]]))
+        ->assertUnprocessable()->assertJsonValidationErrors('items.0.quality_grade_id');
+    $this->postJson(route('po-konsumen.store'), array_merge($payload, ['items' => [array_merge($row, ['quality_grade_id' => null])]]))
+        ->assertSuccessful();
+    $item = CustomerPurchaseOrder::first()->items()->first();
+    $this->postJson(route('po-konsumen.store'), array_merge($payload, ['po_number' => 'PO-OTHER', 'items' => [array_merge($row, ['id' => $item->id])]]))
+        ->assertUnprocessable()->assertJsonValidationErrors('items.0.id');
+    expect(CustomerPurchaseOrder::count())->toBe(1);
 });

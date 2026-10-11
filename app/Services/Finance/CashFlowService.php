@@ -4,6 +4,7 @@ namespace App\Services\Finance;
 
 use App\Models\FarmerPayment;
 use App\Models\HarvestTransaction;
+use App\Models\HarvestPayment;
 use App\Models\InvoicePayment;
 use App\Models\JournalEntry;
 use App\Models\Loan;
@@ -71,18 +72,18 @@ class CashFlowService
             ->where(function ($q) {
                 $q->where('status', 'posted')->orWhere(fn ($draft) => $draft->where('is_automatic', true)->where('status', 'draft'));
             })
-            ->where('kind', '!=', 'opening')->whereHas('lines', fn ($q) => $q->whereIn('account_code', ['11101', '11102', '11103']))->orderBy('entry_date')->orderBy('id')->get();
+            ->where('kind', '!=', 'opening')->whereHas('lines', fn ($q) => $q->where('category', 'Harta')->where('account_group', 'Kas dan Bank'))->orderBy('entry_date')->orderBy('id')->get();
         foreach ($entries as $entry) {
-            $cash = $entry->lines->whereIn('account_code', ['11101', '11102', '11103']);
+            $cash = $entry->lines->where('category', 'Harta')->where('account_group', 'Kas dan Bank');
             $net = (int) $cash->sum('debit_cents') - (int) $cash->sum('credit_cents');
             if (! $net) {
                 continue;
             }
-            $originalCash = $entry->original ? $entry->original->lines->whereIn('account_code', ['11101', '11102', '11103']) : $cash;
+            $originalCash = $entry->original ? $entry->original->lines->where('category', 'Harta')->where('account_group', 'Kas dan Bank') : $cash;
             $wasIncome = $originalCash->sum('debit_cents') > $originalCash->sum('credit_cents');
             $group = match ($entry->source_type) {
                 InvoicePayment::class, SalesTransaction::class => 1,
-                HarvestTransaction::class => 2, Loan::class => 3, FarmerPayment::class => 6, ProductionRun::class => 7,
+                HarvestTransaction::class, HarvestPayment::class => 2, Loan::class => 3, FarmerPayment::class => 6, ProductionRun::class => 7,
                 Transaction::class => $wasIncome ? 5 : 4,
                 default => $wasIncome ? 8 : 9,
             };

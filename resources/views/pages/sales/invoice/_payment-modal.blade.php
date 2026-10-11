@@ -7,7 +7,7 @@
             <x-input label="Tanggal Pembayaran" name="invoice_payment_date" type="date" x-model="form.data.payment_date" alpine-error="form.getError('payment_date')" required />
             <x-input label="Jumlah Pembayaran (Rp)" name="invoice_payment_amount" x-model="form.data.amount" :isCurrency="true" alpine-error="form.getError('amount')" required />
             <x-input label="Catatan" name="invoice_payment_notes" x-model="form.data.notes" alpine-error="form.getError('notes')" />
-            <p class="text-xs text-gray-500">Pembayaran dapat dicicil. Jumlah dibayar dan sisa tagihan pada penjualan terkait ikut diperbarui.</p>
+            <x-info-help><p class="text-xs text-gray-500">Pembayaran dapat dicicil. Jumlah dibayar dan sisa tagihan pada penjualan terkait ikut diperbarui.</p></x-info-help>
             <div class="flex justify-end gap-3">
                 <button type="button" @click="$dispatch('close-modal', 'invoice-payment-modal')" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-500">Batal</button>
                 <button type="submit" :disabled="form.processing" class="rounded-lg bg-brand-500 px-4 py-2 text-sm text-white">Simpan Pembayaran</button>

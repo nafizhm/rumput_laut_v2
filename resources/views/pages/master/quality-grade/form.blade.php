@@ -27,14 +27,14 @@
                 </select>
             </label>
         </div>
-        <p class="text-sm text-gray-500">Kode harus unik, menggunakan huruf, angka, tanda hubung atau garis bawah. Kualitas yang tidak dipakai lagi dapat dinonaktifkan.</p>
+        <x-info-help><p class="text-sm text-gray-500">Kode harus unik, menggunakan huruf, angka, tanda hubung atau garis bawah. Kualitas yang tidak dipakai lagi dapat dinonaktifkan.</p></x-info-help>
         <label class="block text-sm">Keterangan
             <textarea name="description" maxlength="2000" rows="3" class="mt-2 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700">{{ old('description', $grade->description) }}</textarea>
         </label>
         <label class="block text-sm">Kriteria Penilaian
             <textarea name="criteria" maxlength="5000" rows="4" placeholder="Isi spesifikasi hasil kesepakatan dengan client." class="mt-2 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700">{{ old('criteria', $grade->criteria) }}</textarea>
         </label>
-        <p class="text-sm text-gray-500">Kriteria dapat mencakup kadar air, kebersihan, kondisi barang, atau spesifikasi pembeli. Batas penilaian tidak diisi otomatis.</p>
+        <x-info-help><p class="text-sm text-gray-500">Kriteria dapat mencakup kadar air, kebersihan, kondisi barang, atau spesifikasi pembeli. Batas penilaian tidak diisi otomatis.</p></x-info-help>
         <div class="flex gap-3">
             <button class="rounded-lg bg-brand-500 px-5 py-2 text-sm text-white">Simpan Kualitas</button>
             <a href="{{ route('kualitas-barang.index') }}" class="rounded-lg border border-gray-300 px-5 py-2 text-sm dark:border-gray-700">Batal</a>

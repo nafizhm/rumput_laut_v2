@@ -7,8 +7,7 @@
                     <div class="px-6 lg:px-10 pt-6 lg:pt-10 pb-0 mb-4">
                         <h4 class="text-lg font-medium text-gray-800 dark:text-white/90"
                             x-text="'Rincian ' + item.category"></h4>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Daftar transaksi kas untuk periode terpilih
-                        </p>
+                        <x-info-help>Daftar transaksi kas untuk periode terpilih.</x-info-help>
                     </div>
 
                     <!-- Body -->

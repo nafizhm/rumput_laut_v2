@@ -24,7 +24,7 @@ class FinanceMenuSeeder extends Seeder
                 'permission' => null, 'order' => $order, 'is_active' => true,
             ])->save();
 
-            foreach (['manajemen-pinjaman.index' => 1, 'cash-flow.index' => 2, 'manajemen-pemasukan-pengeluaran.index' => 4] as $route => $order) {
+            foreach (['manajemen-pemasukan-pengeluaran.index' => 1, 'manajemen-pinjaman.index' => 2, 'cash-flow.index' => 4] as $route => $order) {
                 Menu::where('route', $route)->update(['parent_id' => $finance->id, 'order' => $order]);
             }
         });

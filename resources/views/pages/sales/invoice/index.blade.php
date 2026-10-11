@@ -13,7 +13,7 @@
 @endsection
 
 @section('content')
-    <p class="mb-4 rounded-lg bg-white p-4 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-400">Catat penjualan terlebih dahulu di Penjualan Langsung, lalu pilih nomor penjualan saat membuat invoice. Invoice tidak mengurangi stok lagi. Invoice lama yang belum terhubung ditandai pada daftar.</p>
+    <x-info-help><p class="mb-4 rounded-lg bg-white p-4 text-sm text-gray-600 dark:bg-gray-900 dark:text-gray-400">Catat penjualan terlebih dahulu di Penjualan Langsung, lalu pilih nomor penjualan saat membuat invoice. Invoice tidak mengurangi stok lagi. Invoice lama yang belum terhubung ditandai pada daftar.</p></x-info-help>
     <x-data-table 
         id="invoiceTable" 
         :rows="$data" 

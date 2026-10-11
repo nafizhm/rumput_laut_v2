@@ -8,11 +8,12 @@
 @section('content')
     <div class="space-y-6 text-gray-800 dark:text-gray-200">
         <div class="rounded-xl border border-gray-200 bg-white p-5 text-sm leading-6 dark:border-gray-800 dark:bg-gray-900">
-            <h2 class="font-semibold">Panduan memilih akun usaha rumput laut</h2>
+            <x-info-help label="Panduan memilih akun usaha rumput laut"><h2 class="font-semibold">Panduan memilih akun usaha rumput laut</h2>
             <p class="mt-2">COA adalah daftar akun, bukan tempat mengisi nominal. Isi nominal melalui Saldo Awal atau Jurnal Umum. Untuk setoran pemilik: debit Kas/Bank dan kredit akun Modal Pemilik.</p>
             <a href="{{ route('coa.index', ['q' => 'Modal Pemilik']) }}" class="mt-2 inline-block font-semibold text-brand-500 underline">Cari akun Modal Pemilik</a>
             <p class="mt-2">Alur nilai persediaan: bahan basah/kering → Dalam Proses (WIP) → Barang Jadi → HPP ketika terjual. Pemindahan tahap mengurangi akun asal dan menambah akun tujuan; barang yang sama tidak dicatat dua kali.</p>
             <p class="mt-2">Nilai persediaan memakai biaya, bukan kilogram atau harga jual. Biaya produksi yang dialokasikan ke persediaan jangan sekaligus dibebankan sebagai biaya operasional. Selisih berat saja belum menentukan kerugian persediaan.</p>
+        </x-info-help>
         </div>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             @foreach ($categories as $category => $prefix)
@@ -24,7 +25,7 @@
         </div>
         <div class="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
             <div class="border-b border-gray-200 p-5 dark:border-gray-800">
-                <p class="mb-4 text-sm text-gray-500">Daftar kode akun untuk pencatatan keuangan usaha rumput laut. Kode akun berbeda dari nomor dokumen transaksi (invoice, PO, atau batch panen).</p>
+                <x-info-help><p class="mb-4 text-sm text-gray-500">Daftar kode akun untuk pencatatan keuangan usaha rumput laut. Kode akun berbeda dari nomor dokumen transaksi (invoice, PO, atau batch panen).</p></x-info-help>
                 <form method="GET" action="{{ route('coa.index') }}" class="flex flex-wrap items-center gap-3">
                     <input name="q" value="{{ request('q') }}" placeholder="Cari kode, nama, atau subkelompok" aria-label="Cari akun" class="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm dark:border-gray-700">
                     <select name="category" aria-label="Kategori akun" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900">

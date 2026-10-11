@@ -6,8 +6,8 @@
 @section('content')
     <div class="rounded-xl border border-gray-200 bg-white text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
         <div class="border-b border-gray-200 p-5 dark:border-gray-800">
-            <p class="mb-2 text-sm text-gray-500">Daftar klasifikasi kualitas barang rumput laut. Kualitas dicatat pada barang/batch, bukan ditetapkan permanen pada petani.</p>
-            <p class="mb-5 text-sm text-gray-500">Isi kriteria setelah disepakati dengan client. Area penyimpanan dan status proses dicatat terpisah. Penandaan Reject tidak otomatis mengurangi stok fisik.</p>
+            <x-info-help><p class="mb-2 text-sm text-gray-500">Daftar klasifikasi kualitas barang rumput laut. Kualitas dicatat pada barang/batch, bukan ditetapkan permanen pada petani.</p>
+<p class="mb-5 text-sm text-gray-500">Isi kriteria setelah disepakati dengan client. Area penyimpanan dan status proses dicatat terpisah. Penandaan Reject tidak otomatis mengurangi stok fisik.</p></x-info-help>
             <form method="GET" action="{{ route('kualitas-barang.index') }}" class="flex flex-wrap items-center gap-3">
                 <input name="q" value="{{ request('q') }}" maxlength="100" placeholder="Cari kode atau nama kualitas" aria-label="Cari kualitas" class="rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm dark:border-gray-700">
                 <select name="status" aria-label="Status kualitas" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900">
