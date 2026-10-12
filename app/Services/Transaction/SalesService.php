@@ -18,20 +18,131 @@ class SalesService
 {
     use HandlesTransaction;
 
+    public function createCart(array $data): array
+    {
+        return $this->transaction(function () use ($data) {
+            $items = $data['items'];
+            unset($data['items']);
+            $inventory = Inventory::where('stock_stage', 'finished')->orderBy('id')->firstOrFail();
+            $data['stock_mode'] = 'delivery_note';
+            $bases = [];
+            foreach ($items as $index => $item) {
+                $bonus = (int) $item['sold_sacks'] * (float) $data['deduction_weight_kg'];
+                if ($bonus > (float) $item['sold_weight_kg']) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['deduction_weight_kg' => 'Bonus per kemasan melebihi berat salah satu barang.']);
+                }
+                $bases[$index] = (int) round(((float) $item['sold_weight_kg'] - $bonus) * (float) $item['price_per_kg']);
+            }
+            $baseTotal = array_sum($bases);
+            $type = $data['deduction_type'];
+            $value = (float) $data['deduction_value'];
+            $totalWeight = array_sum(array_column($items, 'sold_weight_kg'));
+            if (($type === 'percentage' && $value > 100) || ($type === 'weight' && $value > $totalWeight)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['deduction_value' => 'Potongan melebihi total transaksi.']);
+            }
+            $discount = $type === 'percentage' ? (int) round($baseTotal * $value / 100)
+                : ($type === 'nominal' ? (int) round($value) : ($type === 'weight' ? (int) round($baseTotal * $value / $totalWeight) : 0));
+            if ($discount > (int) round($baseTotal)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['deduction_value' => 'Potongan melebihi nilai transaksi.']);
+            }
+            $allocated = 0;
+            $cumulative = 0;
+            $sales = [];
+            $number = null;
+            foreach ($items as $index => $item) {
+                $cumulative += $bases[$index];
+                $share = $baseTotal > 0 ? (int) round($discount * $cumulative / $baseTotal) - $allocated : 0;
+                $allocated += $share;
+                $item['deduction_type'] = 'nominal';
+                $item['deduction_value'] = $share;
+                $item['deduction_weight_kg'] = $data['deduction_weight_kg'];
+                try {
+                    $sale = $this->createSale($item + $data + ['inventory_id' => $inventory->id], true, true);
+                } catch (Exception $e) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['items.'.$index => $e->getMessage()]);
+                }
+                $number ??= $sale->invoice_number;
+                $sale->update(['sale_group_number' => $number]);
+                $sales[] = $sale;
+            }
+            return $sales;
+        });
+    }
+
     /**
      * Get all sales transactions.
      */
     public function getAllSales()
     {
-        return SalesTransaction::with(['factory', 'inventory', 'grade', 'invoice', 'purchaseOrder', 'purchaseOrderItem'])->orderBy('sale_date', 'desc')->get();
+        return SalesTransaction::with(['factory', 'inventory', 'grade', 'invoice', 'purchaseOrder', 'purchaseOrderItem'])->withCount('deliveryNotes')->orderBy('sale_date', 'desc')->get();
+    }
+
+    public function getSaleNotes()
+    {
+        return $this->getAllSales()->groupBy(fn ($sale) => $sale->sale_group_number ? 'group:'.$sale->sale_group_number : 'sale:'.$sale->id)
+            ->map(function ($items) {
+                $first = $items->sortBy('id')->first();
+                $row = $first->toArray();
+                $row['items'] = $items->sortBy('id')->values()->toArray();
+                $row['total_sale_value'] = (int) $items->sum('total_sale_value');
+                $row['remaining_amount'] = (int) $items->sum('remaining_amount');
+                $row['paid_amount'] = $row['total_sale_value'] - $row['remaining_amount'];
+                $row['payment_status'] = $row['remaining_amount'] === 0 ? 'paid' : 'unpaid';
+                $row['payment_status_label'] = $row['remaining_amount'] === 0 ? 'Lunas' : ($row['paid_amount'] > 0 ? 'Sebagian Dibayar' : 'Belum Dibayar');
+                $row['has_invoice'] = $items->contains(fn ($item) => $item->invoice !== null);
+                $row['can_pay'] = !$row['has_invoice'] && $row['remaining_amount'] > 0;
+                $row['can_delete'] = !$row['has_invoice'] && $row['paid_amount'] === 0 && !$items->contains(fn ($item) => $item->payment_status === 'paid' || $item->delivery_notes_count > 0);
+                return $row;
+            })->values();
+    }
+
+    private function noteItems(SalesTransaction $sale)
+    {
+        return SalesTransaction::when($sale->sale_group_number,
+            fn ($q) => $q->where('sale_group_number', $sale->sale_group_number),
+            fn ($q) => $q->where('id', $sale->id))->orderBy('id')->lockForUpdate()->get();
+    }
+
+    private function payNote(SalesTransaction $sale, array $data): SalesTransaction
+    {
+        $proof = null;
+        try {
+            return $this->transaction(function () use ($sale, $data, &$proof) {
+                $items = $this->noteItems($sale);
+                if ($items->contains(fn ($item) => $item->invoice()->exists())) {
+                    throw new Exception('Nota ini menggunakan invoice. Catat pembayaran melalui invoice terkait.');
+                }
+                $remaining = (int) $items->sum('remaining_amount');
+                if (!$remaining) throw new Exception('Penjualan ini sudah lunas.');
+                if ((int) round($data['paid_amount']) !== $remaining) throw new Exception('Nominal pelunasan harus sama dengan sisa tagihan seluruh nota.');
+                if (Carbon::parse($data['payment_date'])->startOfDay()->lt($items->max('sale_date')->startOfDay())) {
+                    throw new Exception('Tanggal bayar tidak boleh sebelum tanggal penjualan.');
+                }
+                if (($data['payment_proof'] ?? null) instanceof UploadedFile) {
+                    $proof = $data['payment_proof']->store('sales-payments', 'public');
+                    if (!$proof) throw new Exception('Bukti pembayaran gagal disimpan.');
+                }
+                foreach ($items as $item) {
+                    if (!$item->remaining_amount) continue;
+                    $item->update(['payment_status' => 'paid', 'payment_date' => $data['payment_date'],
+                        'paid_amount' => (int) $item->total_sale_value, 'payment_notes' => $data['payment_notes'] ?? null,
+                        'payment_proof_path' => $proof ?: $item->payment_proof_path]);
+                    app(OperationalAccountingService::class)->salePayments($item);
+                }
+                return $sale->fresh(['factory', 'inventory']);
+            });
+        } catch (\Throwable $e) {
+            if ($proof) Storage::disk('public')->delete($proof);
+            throw $e;
+        }
     }
 
     /**
      * Create a sales transaction and reduce stock.
      */
-    public function createSale(array $data): SalesTransaction
+    public function createSale(array $data, bool $editablePrice = false, bool $unallocated = false): SalesTransaction
     {
-        return $this->transaction(function () use ($data) {
+        return $this->transaction(function () use ($data, $editablePrice, $unallocated) {
             $poItem = null;
             if (! empty($data['customer_purchase_order_id'])) {
                 $order = CustomerPurchaseOrder::lockForUpdate()->findOrFail($data['customer_purchase_order_id']);
@@ -54,7 +165,7 @@ class SalesService
                     throw new Exception('Berat penjualan melebihi sisa jumlah PO konsumen.');
                 }
                 $data['factory_id'] = $order->factory_id;
-                $data['price_per_kg'] = $poItem->price_per_kg;
+                if (!$editablePrice) $data['price_per_kg'] = $poItem->price_per_kg;
                 $data['customer_purchase_order_item_id'] = $poItem->id;
             } elseif (! empty($data['customer_purchase_order_item_id'])) {
                 throw new Exception('Baris PO harus disertai referensi PO konsumen.');
@@ -70,7 +181,11 @@ class SalesService
             $allocation = [];
             $allocations = [];
             $gradeSale = ! empty($data['quality_grade_id']);
-            if ($gradeSale) {
+            if ($unallocated) {
+                $data['stock_mode'] = 'delivery_note';
+                $data['quality_grade_id'] = $poItem?->quality_grade_id;
+                unset($data['finished_batch_id']);
+            } elseif ($gradeSale) {
                 if ($inventory->stock_stage !== 'finished' || ($poItem?->quality_grade_id && (int) $poItem->quality_grade_id !== (int) $data['quality_grade_id'])) {
                     throw new Exception('Pilih grade barang jadi sesuai pesanan.');
                 }
@@ -161,8 +276,20 @@ class SalesService
         });
     }
 
-    public function deleteSale(SalesTransaction $sale): bool
+    public function deleteSale(SalesTransaction $sale, bool $single = false): bool
     {
+        if ($sale->sale_group_number && !$single) {
+            return $this->transaction(function () use ($sale) {
+                $items = $this->noteItems($sale);
+                foreach ($items as $item) {
+                    if ($item->payment_status === 'paid' || (int) $item->paid_amount > 0 || $item->invoice()->exists() || $item->deliveryNotes()->exists()) {
+                        throw new Exception('Nota dengan pembayaran, invoice, atau surat jalan tidak dapat dihapus.');
+                    }
+                }
+                foreach ($items as $item) $this->deleteSale($item, true);
+                return true;
+            });
+        }
         return $this->transaction(function () use ($sale) {
             if ($sale->customer_purchase_order_id) {
                 CustomerPurchaseOrder::lockForUpdate()->findOrFail($sale->customer_purchase_order_id);
@@ -201,6 +328,7 @@ class SalesService
 
     public function paySale(SalesTransaction $sale, array $data): SalesTransaction
     {
+        if ($sale->sale_group_number) return $this->payNote($sale, $data);
         return $this->transaction(function () use ($sale, $data) {
             $sale = SalesTransaction::lockForUpdate()->findOrFail($sale->id);
             if ($sale->invoice()->exists()) {
@@ -211,8 +339,8 @@ class SalesService
             }
             $paidAmount = (int) round($data['paid_amount']);
 
-            if ($paidAmount !== (int) $sale->total_sale_value) {
-                throw new Exception('Nominal pelunasan harus sama dengan total penjualan.');
+            if ($paidAmount !== (int) $sale->remaining_amount) {
+                throw new Exception('Nominal pelunasan harus sama dengan sisa tagihan penjualan.');
             }
             if (Carbon::parse($data['payment_date'])->startOfDay()->lt($sale->sale_date->startOfDay())) {
                 throw new Exception('Tanggal bayar tidak boleh sebelum tanggal penjualan.');
@@ -230,7 +358,7 @@ class SalesService
             $sale->update([
                 'payment_status' => 'paid',
                 'payment_date' => $data['payment_date'],
-                'paid_amount' => $paidAmount,
+                'paid_amount' => (int) $sale->paid_amount + $paidAmount,
                 'payment_proof_path' => $proofPath ?? $sale->payment_proof_path,
                 'payment_notes' => $data['payment_notes'] ?? null,
             ]);

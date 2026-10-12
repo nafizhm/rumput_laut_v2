@@ -21,19 +21,24 @@
         :url="route('surat-jalan.data')" 
     >
         <x-slot:headerAction>
-            <button 
-                type="button" 
-                @click="$dispatch('create-entity')" 
+            <a
+                href="{{ route('surat-jalan.create') }}"
                 class="flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3"
             >
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
                 Tambah Surat Jalan
-            </button>
+            </a>
         </x-slot:headerAction>
 
-        <x-slot:date><span x-text="formatDisplayDate(item.delivery_date)"></span></x-slot:date>
+        <x-slot:document>
+            <div class="flex min-w-0 flex-col gap-1 text-sm">
+                <span class="text-gray-500 dark:text-gray-400" x-text="formatDisplayDate(item.delivery_date)"></span>
+                <span class="break-words font-semibold text-gray-800 dark:text-gray-200" x-text="item.number"></span>
+                <span class="break-words text-gray-500 dark:text-gray-400" x-text="'No. Penjualan: ' + (item.sale?.sale_reference || item.sale?.invoice_number || '-')"></span>
+            </div>
+        </x-slot:document>
         <x-slot:weight><span x-text="formatWeight(item.quantity_kg)"></span></x-slot:weight>
         <x-slot:status><span x-text="item.status === 'shipped' ? 'Dikirim' : (item.status === 'draft' ? 'Draft — belum dikirim' : 'Data Lama')" class="text-sm font-semibold"></span></x-slot:status>
         <x-slot:shipped_date><span x-text="item.shipped_date ? formatDisplayDate(item.shipped_date) : '-'"></span></x-slot:shipped_date>
@@ -47,7 +52,7 @@
                 <button 
                     type="button" 
                     x-show="item.status !== 'shipped'"
-                    @click="$dispatch('edit-entity', item)" 
+                    @click="item.status === 'draft' ? window.location.href = `{{ url('surat-jalan') }}/${item.id}/edit` : $dispatch('edit-entity', item)"
                     class="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
                 >
                     Edit

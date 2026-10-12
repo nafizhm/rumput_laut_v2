@@ -7,7 +7,7 @@
 @endsection
 
 @section('content')
-    <x-info-help><p class="mb-4 rounded-lg bg-white p-4 text-sm text-gray-500 dark:bg-gray-900">Catat petani, hasil timbang dan area barang masuk. Konfirmasi penerimaan menambah stok dan batch sekali, lalu mengunci rincian barang.</p></x-info-help>
+    <x-info-help><p class="mb-4 rounded-lg bg-white p-4 text-sm text-gray-500 dark:bg-gray-900">Input sekali setelah perhitungan selesai. Panen, penerimaan, stok, dan batch langsung tercatat.</p></x-info-help>
     <x-data-table id="harvestTransactionTable" :rows="$data" :columns="$columns" :url="route('harvest-data')">
         <x-slot:headerAction>
             @if(auth()->user()->can('manajemen-panen.create') && auth()->user()->can('receiving.create') && auth()->user()->can('receiving.confirm'))
@@ -19,7 +19,7 @@
                     <path d="M5 12h14" />
                     <path d="M12 5v14" />
                 </svg>
-                Tambah Data
+                Tambah Penerimaan Panen
             </button>
             @endif
         </x-slot:headerAction>
@@ -31,7 +31,6 @@
             <span x-show="item.receipt_mode !== 'separate'" class="text-sm text-gray-500">Alur Lama</span>
             <template x-if="item.receipt_mode === 'separate'"><div>
                 <span class="text-sm" x-text="item.is_received ? 'Diterima' : (item.receipt ? 'Draft Penerimaan' : 'Belum Diterima')"></span>
-                @can('receiving.read')<a x-show="item.receipt" :href="`{{ url('penerimaan-barang') }}/${item.receipt?.id}`" @click.prevent="$dispatch('warehouse-detail', { url: $el.href })" class="block text-sm text-brand-500">Lihat Penerimaan</a>@endcan
                 @can('receiving.create')<a x-show="!item.receipt" :href="`{{ route('penerimaan-barang.create') }}?harvest_id=${item.id}`" class="block text-sm text-brand-500">Buat Penerimaan</a>@endcan
             </div></template>
         </x-slot:receipt>

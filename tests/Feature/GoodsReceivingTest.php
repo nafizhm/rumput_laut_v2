@@ -73,6 +73,51 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
+it('records daily area transfers atomically and allocates oldest received stock first', function () {
+    foreach (['2026_10_07_000012_create_accounting_journals.php', '2026_10_07_000015_connect_production_and_operational_accounting.php', '2026_10_10_000010_enable_independent_warehouse_processing.php', '2026_10_11_000002_use_warehouse_locations.php'] as $migration) {
+        (require database_path('migrations/'.$migration))->up();
+    }
+    $this->seed(\Database\Seeders\WarehouseLocationSeeder::class);
+    foreach (['2026-10-06', '2026-10-05'] as $date) {
+        $payload = $this->payload;
+        $payload['received_date'] = $date;
+        unset($payload['source_reference']);
+        $payload['lines'][0]['actual_weight_kg'] = 100;
+        $payload['lines'][0]['sack_count'] = 4;
+        $this->post(route('penerimaan-barang.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $receipt = GoodsReceipt::latest('id')->firstOrFail();
+        $this->post(route('penerimaan-barang.confirm', $receipt), ['confirm' => 1])->assertRedirect()->assertSessionHasNoErrors();
+    }
+    $payload = ['date' => '2026-10-07',
+        'sources' => [['warehouse_area_id' => $this->area->id, 'sack_count' => 5]],
+        'outputs' => [['warehouse_area_id' => $this->area->id, 'weight_kg' => 80, 'package_count' => 2]],
+    ];
+    $this->get(route('produksi.create'))->assertOk()->assertSee('Area 1')->assertSee('Area D')->assertDontSee('Batch sumber');
+    $this->postJson(route('produksi.store'), $payload)->assertUnprocessable();
+    expect(\App\Models\ProductionRun::count())->toBe(0)
+        ->and((int) MaterialBatch::sum('remaining_sacks'))->toBe(8)
+        ->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(200.0);
+    $payload['outputs'][0]['warehouse_area_id'] = WarehouseArea::where('code', 'BJ-D')->value('id');
+    $this->post(route('produksi.store'), $payload)->assertRedirect(route('produksi.index'))->assertSessionHasNoErrors();
+    $run = \App\Models\ProductionRun::firstOrFail();
+    expect($run->status)->toBe('packed')->and((int) $run->input_sacks)->toBe(5)
+        ->and((int) MaterialBatch::oldest('id')->first()->remaining_sacks)->toBe(3)
+        ->and((int) MaterialBatch::latest('id')->first()->remaining_sacks)->toBe(0)
+        ->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(75.0)
+        ->and((float) \App\Models\FinishedBatch::sum('weight_kg'))->toBe(80.0);
+    $this->get(route('produksi.index'))->assertOk()->assertSee('Area 1')->assertSee('Area D')->assertSee('5 karung');
+    $dashboard = $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Area 1')->assertSee('Area D');
+    expect((int) $dashboard->viewData('sacks'))->toBe(3)
+        ->and((float) $dashboard->viewData('remainingWeight'))->toBe(75.0)
+        ->and((int) $dashboard->viewData('processedSacks'))->toBe(5)
+        ->and((float) $dashboard->viewData('packedWeight'))->toBe(80.0)
+        ->and((float) $dashboard->viewData('finishedWeight'))->toBe(80.0)
+        ->and((int) $dashboard->viewData('finishedPackages'))->toBe(2)
+        ->and($dashboard->viewData('stageCounts')['process'])->toBe(1);
+    $this->postJson(route('produksi.store'), $payload)->assertUnprocessable();
+    expect(\App\Models\ProductionRun::count())->toBe(1);
+});
+
 it('receives and packs by dynamic locations without selecting quality', function () {
     foreach (['2026_10_07_000012_create_accounting_journals.php', '2026_10_07_000015_connect_production_and_operational_accounting.php', '2026_10_10_000010_enable_independent_warehouse_processing.php', '2026_10_11_000002_use_warehouse_locations.php'] as $migration) {
         (require database_path('migrations/'.$migration))->up();
@@ -181,7 +226,7 @@ it('separates purchasing from physical receiving and prevents a second receipt f
 it('shows clickable warehouse stages and farmer receiving history without guessing production figures', function () {
     $this->post(route('penerimaan-barang.store'), $this->payload)->assertRedirect();
     $this->post(route('penerimaan-barang.confirm', GoodsReceipt::first()), ['confirm' => 1])->assertRedirect();
-    $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Barang Datang')->assertSee('Press + Timbang + Packing')->assertDontSee('Saldo Gudang Lama');
+    $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Penerimaan')->assertSee('Proses Harian')->assertSee('Bahan Siap Jual')->assertDontSee('Saldo Gudang Lama');
     $this->get(route('manajemen-gudang.stage', 'incoming'))->assertOk()->assertSee('Petani Test')->assertDontSee('>Kualitas<', false)->assertSee('3.386,00');
     foreach (['process', 'wip', 'press', 'finished'] as $stage) {
         $this->get(route('manajemen-gudang.stage', $stage))->assertOk()->assertSee('Belum ada')->assertDontSee('Pencatatan tahap ini belum tersedia');
@@ -247,8 +292,8 @@ it('shows warehouse dashboard first and moves income and expenses under finance'
     $this->user->removeRole('owner');
     $this->user->givePermissionTo('receiving.read');
     $this->get(route('manajemen-gudang.index', ['inventory_id' => $this->inventory->id]))->assertOk()
-        ->assertSee('Dashboard Gudang')->assertSee('Barang Datang sampai Barang Jadi')
-        ->assertSee('Barang Datang')->assertSee('Press + Timbang + Packing');
+        ->assertSee('Dashboard Gudang')->assertSee('Penerimaan sampai Siap Jual')
+        ->assertSee('Penerimaan')->assertSee('Proses Harian')->assertSee('Bahan Siap Jual');
     $menus = SidebarService::getSidebarMenu();
     expect($menus->firstWhere('name', 'Manajemen Gudang')->children->pluck('name')->all())->toContain('Dashboard Gudang');
 });
@@ -273,7 +318,7 @@ it('summarizes confirmed batches per area and keeps received kg separate from re
     expect($areaA->batch_count)->toBe(1)->and((int) $areaA->remaining_sacks)->toBe(20)
         ->and((float) $areaA->received_weight)->toBe(2000.0)
         ->and((int) $areaB->remaining_sacks)->toBe(24)->and((float) $areaB->received_weight)->toBe(1386.0);
-    $detail = $this->get(route('manajemen-gudang.area', $this->area))->assertOk()->assertSee('BM-A')->assertSee('2.000,00');
+    $detail = $this->get(route('manajemen-gudang.area', $this->area))->assertOk()->assertSee('Area 1')->assertSee('2.000,00');
     expect($detail->viewData('batches')->count())->toBe(1)->and($detail->viewData('batches')->sum('remaining_sacks'))->toBe(20);
     $this->get(route('manajemen-gudang.area',999999))->assertNotFound();
 });
@@ -342,6 +387,7 @@ it('receives physical harvest once without financial posting or trusting injecte
     enableHarvestFinance($this);
     $payload = unifiedHarvestPayload($this);
     $payload['price_per_kg'] = 5000;
+    unset($payload['inventory_id']); // The selected area determines the warehouse.
     $payload['cash_payout'] = 200000;
     $payload['debt_deduction'] = 50000;
     $this->postJson(route('manajemen-panen.store'), $payload)->assertSuccessful();
@@ -356,7 +402,9 @@ it('receives physical harvest once without financial posting or trusting injecte
         ->and(\App\Models\JournalEntry::count())->toBe(0)->and(\App\Models\FarmerLedger::count())->toBe(0);
     $this->postJson(route('manajemen-panen.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('confirm');
     expect(StockMovement::count())->toBe(1)->and(GoodsReceipt::count())->toBe(1);
-    $this->get(route('manajemen-panen.index'))->assertOk()->assertDontSee('Ringkasan Hutang')->assertDontSee('Harga / Kg');
+    $page = $this->get(route('manajemen-panen.index'))->assertOk()->assertDontSee('Ringkasan Hutang')->assertDontSee('Harga / Kg')
+        ->assertDontSee('Pilih gudang bahan');
+    expect($page->viewData('areas')->firstWhere('id', $this->area->id)['name'])->toBe('Area 1');
     $row = $this->getJson(route('harvest-data'))->assertOk()->json('data.0');
     expect($row)->not->toHaveKeys(['cash_payout', 'price_per_kg', 'debt_deduction', 'total_harvest_value', 'remaining_debt_after_payment'])
         ->and($row['farmer'])->not->toHaveKey('current_debt');
@@ -485,4 +533,82 @@ it('preserves old purchase journals and prevents legacy double payment', functio
     $this->postJson(route('harvest-finance.price',$harvest),harvestPricePayload())->assertUnprocessable();
     $this->postJson(route('harvest-finance.pay',$harvest),harvestPaymentPayload())->assertUnprocessable();
     expect(\App\Models\HarvestPayment::count())->toBe(0)->and(\App\Models\JournalEntry::count())->toBe(1);
+});
+
+
+it('shows legacy warehouse balances in Area Lama without moving or duplicating stock', function () {
+    $legacy = Inventory::create(['item_name' => 'Gudang Basah', 'stock_stage' => 'legacy', 'current_stock_kg' => 150, 'current_sack_count' => 3]);
+    $response = $this->getJson(route('manajemen-gudang.adjustment-data'))->assertOk();
+    $area = collect($response->json('data'))->firstWhere('label', 'Area Lama');
+    $row = collect($area['items'])->firstWhere('id', $legacy->id);
+    expect($row['actual_weight'])->toBe(150)->and($legacy->fresh()->current_stock_kg)->toEqual(150);
+    $this->postJson(route('manajemen-gudang.adjustment'), [
+        'movement_date' => '2026-10-07', 'description' => 'Hitung fisik',
+        'items' => [array_merge($row, ['actual_weight' => 120, 'actual_count' => 2])],
+    ])->assertOk();
+    expect($legacy->fresh()->current_stock_kg)->toEqual(120)->and($legacy->fresh()->current_sack_count)->toBe(2);
+    $movement = StockMovement::where('inventory_id', $legacy->id)->firstOrFail();
+    expect($movement->type)->toBe('adjustment')->and($movement->direction)->toBe('out')
+        ->and($movement->description)->toContain('Area Lama', '150 ? 120', 'Hitung fisik');
+    $this->postJson(route('manajemen-gudang.adjustment'), [
+        'movement_date' => '2026-10-07', 'description' => 'Form lama', 'items' => [$row],
+    ])->assertUnprocessable()->assertJsonValidationErrors('items');
+    expect($legacy->fresh()->current_stock_kg)->toEqual(120);
+});
+
+it('records unchanged stock counts as dated adjustment history', function () {
+    $legacy = Inventory::create(['item_name' => 'Gudang Kering', 'stock_stage' => 'legacy', 'current_stock_kg' => 100, 'current_sack_count' => 2]);
+    $areas = app(\App\Services\Transaction\AreaStockAdjustmentService::class)->areas();
+    $row = collect(collect($areas)->firstWhere('label', 'Area Lama')['items'])->firstWhere('id', $legacy->id);
+    $this->postJson(route('manajemen-gudang.adjustment'), ['movement_date' => '2026-10-07', 'description' => 'Sesuai fisik', 'items' => [$row]])->assertOk();
+    expect(StockMovement::where('inventory_id', $legacy->id)->where('type', 'adjustment')->count())->toBe(1);
+    expect($legacy->fresh()->current_stock_kg)->toEqual(100);
+});
+
+it('formats adjustment rows safely when historical batch grades are missing', function () {
+    $service = app(\App\Services\Transaction\AreaStockAdjustmentService::class);
+    $method = new ReflectionMethod($service, 'row');
+    $method->setAccessible(true);
+    $line = new \App\Models\GoodsReceiptLine();
+    $line->setRelation('grade', null);
+    $material = new MaterialBatch(['code' => 'OLD-MATERIAL', 'remaining_sacks' => 2, 'remaining_weight_kg' => 100]);
+    $material->setRelation('line', $line);
+    $finished = new \App\Models\FinishedBatch(['code' => 'OLD-READY', 'remaining_packages' => 2, 'remaining_weight_kg' => 50]);
+    $finished->setRelation('grade', null);
+    $finished->setRelation('inventory', new Inventory(['item_name' => 'Barang Jadi']));
+    expect($method->invoke($service, 'material', $material, 'Area 1')['name'])->toBe('Barang masuk tanpa grade');
+    expect($method->invoke($service, 'finished', $finished, 'Area A')['name'])->toBe('Barang Jadi');
+});
+
+it('transfers area stock within one warehouse type while preserving totals and history', function () {
+    Schema::table('material_batches', fn (Blueprint $table) => $table->decimal('remaining_weight_kg', 12, 2)->default(0));
+    Schema::table('material_batches', fn (Blueprint $table) => $table->unsignedBigInteger('remaining_cost_cents')->default(0));
+    Schema::table('material_batches', fn (Blueprint $table) => $table->boolean('is_costed')->default(false));
+    $this->post(route('penerimaan-barang.store'), $this->payload)->assertRedirect();
+    $receipt = GoodsReceipt::firstOrFail();
+    $this->post(route('penerimaan-barang.confirm', $receipt), ['confirm' => 1])->assertRedirect();
+    $target = WarehouseArea::create(['code' => 'TRF-TARGET', 'name' => 'Area Tujuan', 'inventory_id' => $this->inventory->id, 'usage' => 'receiving', 'is_active' => true]);
+    $batch = MaterialBatch::firstOrFail();
+    $payload = ['usage' => 'receiving', 'source_kind' => 'area', 'from_id' => $this->area->id, 'to_area_id' => $target->id,
+        'transfer_date' => '2026-10-07', 'weight_kg' => 100, 'sack_count' => 2, 'description' => 'Pindah lokasi'];
+    $before = (float) $this->inventory->fresh()->current_stock_kg;
+    $this->postJson(route('manajemen-gudang.transfer'), $payload)->assertOk();
+    expect((float) $this->inventory->fresh()->current_stock_kg)->toBe($before);
+    expect(MaterialBatch::whereHas('line', fn ($query) => $query->where('warehouse_area_id', $target->id))->sum('remaining_weight_kg'))->toEqual(100);
+    expect(StockMovement::where('type', 'transfer')->count())->toBe(2);
+    $this->postJson(route('manajemen-gudang.transfer'), array_merge($payload, ['usage' => 'finished']))->assertUnprocessable();
+    $this->postJson(route('manajemen-gudang.transfer'), array_merge($payload, ['to_area_id' => $this->area->id]))->assertUnprocessable();
+});
+
+it('moves legacy stock into an incoming area and rejects legacy destinations', function () {
+    Schema::table('goods_receipts', fn (Blueprint $table) => $table->unsignedBigInteger('farmer_id')->nullable()->change());
+    Schema::table('material_batches', fn (Blueprint $table) => $table->decimal('remaining_weight_kg', 12, 2)->default(0));
+    $legacy = Inventory::create(['item_name' => 'Gudang Basah', 'stock_stage' => 'legacy', 'current_stock_kg' => 100, 'current_sack_count' => 2]);
+    $payload = ['usage' => 'receiving', 'source_kind' => 'legacy', 'from_id' => $legacy->id, 'to_area_id' => $this->area->id,
+        'transfer_date' => '2026-10-07', 'weight_kg' => 50, 'sack_count' => 1, 'description' => 'Stok lama'];
+    $this->postJson(route('manajemen-gudang.transfer'), $payload)->assertOk();
+    expect((float) $legacy->fresh()->current_stock_kg)->toBe(50.0)->and($legacy->fresh()->current_sack_count)->toBe(1);
+    expect(MaterialBatch::sum('remaining_weight_kg'))->toEqual(50);
+    expect(GoodsReceipt::firstOrFail()->status)->toBe('confirmed');
+    $this->postJson(route('manajemen-gudang.transfer'), array_merge($payload, ['source_kind' => 'legacy-destination']))->assertUnprocessable();
 });

@@ -38,6 +38,27 @@ beforeEach(function () {
     ];
 });
 
+it('preserves distinct product names through creation listing and editing', function () {
+    $payload = $this->payload;
+    unset($payload['item_name'], $payload['quantity_kg'], $payload['price_per_kg']);
+    $payload['items'] = [
+        ['item_name' => 'Rumput Laut Kering', 'quantity_kg' => 10, 'price_per_kg' => 20000],
+        ['item_name' => 'Rumput Laut Kadar Air 35%', 'quantity_kg' => 20, 'price_per_kg' => 15000],
+    ];
+    $this->postJson(route('po-konsumen.store'), $payload)->assertOk();
+    $order = CustomerPurchaseOrder::firstOrFail();
+    $this->getJson(route('po-konsumen.data'))->assertOk()
+        ->assertJsonPath('data.0.items.0.description', 'Rumput Laut Kering')
+        ->assertJsonPath('data.0.items.1.description', 'Rumput Laut Kadar Air 35%');
+    $rows = $order->items->map(fn ($item) => $item->only(['id', 'item_name', 'quantity_kg', 'price_per_kg']))->all();
+    $rows[1]['item_name'] = 'Rumput Laut Bersih';
+    $this->putJson(route('po-konsumen.update', $order), array_merge($payload, ['items' => $rows]))->assertOk();
+    expect($order->items()->orderBy('id')->pluck('item_name')->all())->toBe(['Rumput Laut Kering', 'Rumput Laut Bersih']);
+    $rows[1]['item_name'] = '';
+    $this->putJson(route('po-konsumen.update', $order), array_merge($payload, ['items' => $rows]))
+        ->assertUnprocessable()->assertJsonValidationErrors('items.1.item_name');
+});
+
 it('creates, lists, edits and deletes a consumer PO', function () {
     $this->postJson(route('po-konsumen.store'), $this->payload)->assertOk();
     $order = CustomerPurchaseOrder::firstOrFail();

@@ -3,6 +3,14 @@ namespace App\Http\Requests\Transaction;
 use Illuminate\Foundation\Http\FormRequest;
 class StoreHarvestTransactionRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $areaId = $this->input('lines.0.warehouse_area_id');
+        $this->merge(['inventory_id' => is_scalar($areaId)
+            ? \App\Models\WarehouseArea::where('id', $areaId)->value('inventory_id')
+            : null]);
+    }
+
     public function authorize(): bool
     {
         return $this->user()->can('manajemen-panen.create') && $this->user()->can('receiving.create') && $this->user()->can('receiving.confirm');

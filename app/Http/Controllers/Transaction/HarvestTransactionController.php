@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\StoreHarvestTransactionRequest;
 use App\Http\Requests\Transaction\UpdateHarvestTransactionRequest;
 use App\Models\HarvestTransaction;
-use App\Models\Inventory;
 use App\Models\WarehouseArea;
 use App\Services\Master\FarmerService;
 use App\Services\Transaction\HarvestTransactionService;
@@ -36,12 +35,14 @@ class HarvestTransactionController extends Controller
 
         $data = $this->physicalData();
         $farmers = $this->farmerService->getFarmerOptions();
-        $inventories = Inventory::where('stock_stage', 'material')->get(['id', 'item_name']);
-        $areas = WarehouseArea::query()->where('is_active', true)->where('usage', 'receiving')->get()->map(fn ($area) => [
-            'id' => $area->id, 'name' => $area->code.' - '.$area->name, 'inventory_id' => $area->inventory_id,
-        ]);
+        $areas = WarehouseArea::query()->where('usage', 'receiving')
+            ->whereHas('inventory', fn ($query) => $query->where('stock_stage', 'material'))
+            ->orderBy('id')->get()->map(fn ($area, $index) => [
+                'id' => $area->id, 'name' => 'Area '.($index + 1),
+                'inventory_id' => $area->inventory_id, 'is_active' => $area->is_active,
+            ])->filter(fn ($area) => $area['is_active'])->values();
 
-        return view('pages.transaction.harvest.index', compact('data', 'columns', 'farmers', 'inventories', 'areas'));
+        return view('pages.transaction.harvest.index', compact('data', 'columns', 'farmers', 'areas'));
     }
 
     public function data()

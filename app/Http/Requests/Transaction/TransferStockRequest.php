@@ -14,11 +14,13 @@ class TransferStockRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'from_inventory_id' => 'required|exists:inventories,id|different:to_inventory_id',
-            'to_inventory_id' => 'required|exists:inventories,id',
-            'transfer_date' => 'required|date',
-            'weight_kg' => 'required|numeric|min:0.01',
-            'sack_count' => 'required|integer|min:0',
+            'usage' => 'required|in:receiving,finished',
+            'source_kind' => 'required|in:area,legacy',
+            'from_id' => 'required|integer|min:1',
+            'to_area_id' => 'required|integer|exists:warehouse_areas,id',
+            'transfer_date' => 'required|date|before_or_equal:today',
+            'weight_kg' => 'required|numeric|decimal:0,2|min:0.01|max:9999999999.99',
+            'sack_count' => 'required|integer|min:1|max:4294967295',
             'description' => 'nullable|string|max:255',
         ];
     }

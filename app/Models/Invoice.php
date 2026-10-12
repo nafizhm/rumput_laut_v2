@@ -12,7 +12,27 @@ class Invoice extends Model
 
     protected $casts = ['delivery_note_references' => 'array', 'invoice_date' => 'date:Y-m-d', 'due_date' => 'date:Y-m-d', 'quantity_kg' => 'decimal:2', 'price_per_kg' => 'decimal:2'];
 
-    protected $appends = ['total_amount', 'term_days', 'days_until_due', 'due_label', 'remaining_amount', 'payment_status_label', 'deduction_amount'];
+    protected $appends = ['total_amount', 'term_days', 'days_until_due', 'due_label', 'remaining_amount', 'payment_status_label', 'deduction_amount', 'document_items'];
+
+    public function saleItems()
+    {
+        $sale = $this->sale;
+        return $sale ? SalesTransaction::with(['inventory'])
+            ->when($sale->sale_group_number, fn ($query) => $query->where('sale_group_number', $sale->sale_group_number), fn ($query) => $query->whereKey($sale->id))
+            ->orderBy('id')->get() : collect();
+    }
+
+    public function getDocumentItemsAttribute(): array
+    {
+        $items = $this->saleItems();
+        if ($items->isEmpty()) {
+            return [['id' => 'legacy', 'item_name' => $this->item_name, 'quantity_kg' => $this->quantity_kg,
+                'price_per_kg' => $this->price_per_kg, 'subtotal' => (float) $this->quantity_kg * (float) $this->price_per_kg]];
+        }
+        return $items->map(fn ($item) => ['id' => $item->id, 'item_name' => $item->document_item_name,
+            'quantity_kg' => $item->total_weight_kg, 'price_per_kg' => $item->price_per_kg,
+            'subtotal' => (float) $item->total_weight_kg * (float) $item->price_per_kg])->all();
+    }
 
     public function sale(): BelongsTo
     {
@@ -27,7 +47,13 @@ class Invoice extends Model
     public function getDeliveryNoteReferencesAttribute($value): array
     {
         if ($this->sales_transaction_id && $this->sale?->stock_mode === 'delivery_note') {
-            return DeliveryNote::where('sales_transaction_id', $this->sales_transaction_id)->where('status', 'shipped')
+            return DeliveryNote::where(function ($query) {
+                $ids = $this->saleItems()->pluck('id');
+                $query->whereIn('sales_transaction_id', $ids);
+                if (\Illuminate\Support\Facades\Schema::hasTable('delivery_note_items')) {
+                    $query->orWhereHas('items', fn ($items) => $items->whereIn('sales_transaction_id', $ids));
+                }
+            })->where('customer_purchase_order_id', $this->customer_purchase_order_id)->where('status', 'shipped')
                 ->orderBy('shipped_date')->orderBy('id')->get()->map(fn ($note) => [
                     'id' => $note->id, 'number' => $note->number, 'date' => $note->shipped_date->format('d/m/Y'),
                 ])->all();
@@ -49,7 +75,7 @@ class Invoice extends Model
 
     public function getDeductionAmountAttribute(): float
     {
-        return max(0, round((float) $this->quantity_kg * (float) $this->price_per_kg, 2) - $this->total_amount);
+        return max(0, round(collect($this->document_items)->sum('subtotal'), 2) - $this->total_amount);
     }
 
     public function getTotalAmountAttribute(): float

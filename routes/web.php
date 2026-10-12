@@ -123,20 +123,22 @@ Route::middleware('auth')->group(function () {
     Route::get('warehouse-data', [WarehouseController::class, 'data'])->name('manajemen-gudang.data');
     Route::post('manajemen-gudang/receive', [WarehouseController::class, 'receive'])->name('manajemen-gudang.receive');
     Route::post('manajemen-gudang/shrinkage', [WarehouseController::class, 'shrinkage'])->name('manajemen-gudang.shrinkage');
+    Route::get('manajemen-gudang/transfer-data', [WarehouseController::class, 'transferData'])->name('manajemen-gudang.transfer-data');
     Route::post('manajemen-gudang/transfer', [WarehouseController::class, 'transfer'])->name('manajemen-gudang.transfer');
+    Route::get('manajemen-gudang/adjustment-data', [WarehouseController::class, 'adjustmentData'])->name('manajemen-gudang.adjustment-data');
     Route::post('manajemen-gudang/adjustment', [WarehouseController::class, 'adjustment'])->name('manajemen-gudang.adjustment');
 
     // Sales
     Route::post('invoice/{invoice}/pay', [InvoiceController::class, 'pay'])->name('invoice.pay');
     Route::get('invoice-data', [InvoiceController::class, 'data'])->name('invoice.data');
     Route::get('invoice/{invoice}/cetak', [InvoiceController::class, 'print'])->name('invoice.print');
-    Route::resource('invoice', InvoiceController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('invoice', InvoiceController::class)->only(['index', 'create', 'edit', 'store', 'update', 'destroy']);
 
     Route::get('surat-jalan-data', [DeliveryNoteController::class, 'data'])->name('surat-jalan.data');
     Route::post('surat-jalan/{surat_jalan}/dispatch', [DeliveryNoteController::class, 'dispatch'])->name('surat-jalan.dispatch')->middleware('can:manajemen-penjualan.create');
     Route::get('surat-jalan/{surat_jalan}/cetak', [DeliveryNoteController::class, 'print'])->name('surat-jalan.print');
     Route::resource('surat-jalan', DeliveryNoteController::class)
-        ->parameters(['surat-jalan' => 'surat_jalan'])->only(['index', 'store', 'update', 'destroy']);
+        ->parameters(['surat-jalan' => 'surat_jalan'])->only(['index', 'create', 'edit', 'store', 'update', 'destroy']);
     Route::get('po-konsumen/{po_konsumen}/file', [CustomerPurchaseOrderController::class, 'file'])->name('po-konsumen.file');
     Route::get('po-konsumen-data', [CustomerPurchaseOrderController::class, 'data'])->name('po-konsumen.data');
     Route::resource('po-konsumen', CustomerPurchaseOrderController::class)

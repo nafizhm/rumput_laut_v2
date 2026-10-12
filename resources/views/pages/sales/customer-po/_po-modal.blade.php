@@ -29,7 +29,7 @@
                     <template x-for="(item, index) in form.data.items" :key="index">
                         <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
                             <div class="grid grid-cols-1 items-end gap-3 md:grid-cols-[2fr_1fr_1fr_1fr_auto]">
-                                <p class="text-sm">Barang: Rumput Laut</p>
+                                <label class="text-sm">Nama / Pembeda Barang<input type="text" x-model="item.item_name" required maxlength="255" placeholder="Contoh: Rumput Laut Kering" class="mt-1.5 h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"><span class="mt-1 block text-xs text-error-500" x-text="form.getError('items.' + index + '.item_name')"></span></label>
                                 <label class="text-sm">Jumlah (Kg)<input type="number" x-model="item.quantity_kg" required min="0.01" max="999999999.99" step="0.01" class="mt-1.5 h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"></label>
                                 <label class="text-sm">Harga / Kg (Rp)<input type="number" x-model="item.price_per_kg" required min="0" max="999999999.99" step="0.01" class="mt-1.5 h-11 w-full rounded-lg border border-gray-300 px-3 dark:border-gray-700 dark:bg-gray-900"></label>
                                 <div class="text-sm">Subtotal<div class="mt-1.5 flex h-11 items-center justify-end text-right tabular-nums" x-text="formatCurrency(Number(item.quantity_kg || 0) * Number(item.price_per_kg || 0))"></div></div>
@@ -118,7 +118,7 @@
                     customer_name: '',
                     customer_phone: '',
                     customer_address: '',
-                    items: [{id: null, quality_grade_id: '', quantity_kg: '', price_per_kg: ''}],
+                    items: [{id: null, item_name: 'Rumput Laut', quality_grade_id: '', quantity_kg: '', price_per_kg: ''}],
                     delivery_date: '',
                     notes: ''
                 }),
@@ -158,7 +158,7 @@
                         customer_name: item.customer_name ?? '',
                         customer_phone: item.customer_phone ?? '',
                         customer_address: item.customer_address ?? '',
-                        items: item.items?.length ? item.items.map(row => ({id: row.id, quality_grade_id: row.quality_grade_id || '', quantity_kg: row.quantity_kg, price_per_kg: row.price_per_kg})) : [{id: null, quality_grade_id: '', quantity_kg: item.quantity_kg, price_per_kg: item.price_per_kg}],
+                        items: item.items?.length ? item.items.map(row => ({id: row.id, item_name: row.item_name || 'Rumput Laut', quality_grade_id: row.quality_grade_id || '', quantity_kg: row.quantity_kg, price_per_kg: row.price_per_kg})) : [{id: null, item_name: item.item_name || 'Rumput Laut', quality_grade_id: '', quantity_kg: item.quantity_kg, price_per_kg: item.price_per_kg}],
                         delivery_date: item.delivery_date ?? '',
                         notes: item.notes ?? ''
                     };
@@ -169,7 +169,7 @@
                     this.$dispatch('open-modal', 'entity-modal');
                 },
 
-                newItem() { return {id: null, quality_grade_id: '', quantity_kg: '', price_per_kg: ''}; },
+                newItem() { return {id: null, item_name: 'Rumput Laut', quality_grade_id: '', quantity_kg: '', price_per_kg: ''}; },
                 get poTotal() { return this.form.data.items.reduce((sum, item) => sum + Number(item.quantity_kg || 0) * Number(item.price_per_kg || 0), 0); },
 
                 selectFactory(id) {

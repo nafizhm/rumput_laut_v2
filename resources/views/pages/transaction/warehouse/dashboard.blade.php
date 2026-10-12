@@ -1,140 +1,39 @@
 @extends('layouts.app')
-
 @section('title', 'Dashboard Gudang')
-
-@section('breadcrumb')
-    <x-breadcrumb pageTitle="Dashboard Gudang" :links="[['name' => 'Manajemen Gudang', 'url' => route('manajemen-gudang.index')]]" />
-@endsection
-
+@section('breadcrumb')<x-breadcrumb pageTitle="Dashboard Gudang" :links="[['name'=>'Manajemen Gudang','url'=>route('manajemen-gudang.index')]]" />@endsection
 @section('content')
-    @php
-        $stageDetails = [
-            'incoming' => ['icon' => 'package-open', 'description' => 'Barang diterima, ditimbang, dan dipisahkan menurut area barang masuk.', 'color' => 'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300'],
-            'process' => ['icon' => 'wind', 'description' => 'Karung dari satu atau beberapa batch masuk proses blower atau jemur.', 'color' => 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300'],
-            'wip' => ['icon' => 'hourglass', 'description' => 'Barang selesai diproses dan menunggu press. Berat resmi belum ditentukan.', 'color' => 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'],
-            'press' => ['icon' => 'scale', 'description' => 'Press, timbang aktual, dan packing diselesaikan dalam satu pencatatan.', 'color' => 'bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300'],
-            'finished' => ['icon' => 'package-check', 'description' => 'Hasil jadi disimpan menurut area barang ready, lalu tersedia untuk penjualan.', 'color' => 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300'],
-        ];
-        $metrics = [
-            ['label' => 'Karung Belum Diproses', 'value' => number_format($sacks, 0, ',', '.'), 'unit' => 'karung', 'note' => 'Sisa bahan dari batch penerimaan', 'url' => route('manajemen-gudang.stage', 'incoming')],
-            ['label' => 'Batch Penerimaan', 'value' => number_format($batchCount, 0, ',', '.'), 'unit' => 'batch', 'note' => 'Sudah dikonfirmasi diterima', 'url' => route('manajemen-gudang.stage', 'incoming')],
-            ['label' => 'Total Berat Diterima', 'value' => number_format($weight, 2, ',', '.'), 'unit' => 'kg', 'note' => 'Akumulasi penerimaan, bukan berat jadi', 'url' => route('manajemen-gudang.stage', 'incoming')],
-            ['label' => 'Draft Penerimaan', 'value' => number_format($drafts, 0, ',', '.'), 'unit' => 'dokumen', 'note' => 'Belum menambah stok gudang', 'url' => route('penerimaan-barang.index')],
-        ];
-    @endphp
-
-    <div class="space-y-6 text-gray-800 sm:space-y-8 dark:text-gray-200">
-        <div class="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div class="min-w-0">
-                <h2 class="text-xl leading-tight font-semibold tracking-tight text-gray-900 sm:text-2xl dark:text-white">Barang Datang sampai Barang Jadi</h2>
-                <x-info-help><p class="mt-2 max-w-2xl text-sm leading-6 text-gray-600 dark:text-gray-400">Pantau penerimaan bahan, alur pekerjaan, dan lokasi penyimpanan dalam satu halaman.</p></x-info-help>
-            </div>
-            <div class="grid shrink-0 gap-3 sm:flex sm:flex-wrap">
-                @can('receiving.create')
-                    <a href="{{ route('penerimaan-barang.create') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
-                        <i data-lucide="plus" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
-                        Penerimaan Barang
-                    </a>
-                @endcan
-            </div>
-        </div>
-
-        <x-info-help label="Keterangan ringkasan penerimaan">
-            <ul class="list-disc space-y-2 pl-5">@foreach($metrics as $metric)<li><strong>{{ $metric['label'] }}:</strong> {{ $metric['note'] }}</li>@endforeach</ul>
-        </x-info-help>
-        <section aria-label="Ringkasan penerimaan" class="grid grid-cols-1 gap-3 min-[375px]:grid-cols-2 sm:gap-4 xl:grid-cols-4">
-            @foreach ($metrics as $metric)
-                <a href="{{ $metric['url'] }}" class="min-w-0 rounded-2xl border border-gray-200 bg-white p-4 transition hover:border-brand-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:p-5 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-brand-700">
-                    <p class="min-h-10 text-sm leading-5 font-medium text-gray-600 dark:text-gray-400">{{ $metric['label'] }}</p>
-                    <p class="mt-3 break-words text-2xl leading-tight font-semibold tracking-tight text-gray-900 sm:text-3xl dark:text-white">{{ $metric['value'] }}</p>
-                    <p class="mt-1 text-sm font-medium text-gray-600 dark:text-gray-400">{{ $metric['unit'] }}</p>
-                </a>
-            @endforeach
-        </section>
-
-        <section aria-labelledby="warehouse-flow-title">
-            <div class="mb-4 flex flex-col gap-1 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <h3 id="warehouse-flow-title" class="text-lg font-semibold text-gray-900 dark:text-white">Alur Stok Fisik</h3>
-                    <x-info-help label="Keterangan alur stok fisik">
-                        <p>Pilih tahapan untuk melihat rincian dan cara pencatatannya.</p>
-                        <ul class="list-disc space-y-2 pl-5">@foreach($stages as $key => $label)<li><strong>{{ $label }}:</strong> {{ $stageDetails[$key]['description'] }}</li>@endforeach</ul>
-                    </x-info-help>
-                </div>
-                <span class="text-xs leading-5 text-gray-500 dark:text-gray-400">5 tahapan dari penerimaan hingga siap jual</span>
-            </div>
-            <ol class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-5">
-                @foreach ($stages as $key => $label)
-                    @php($detail = $stageDetails[$key])
-                    <li class="min-w-0">
-                        <a href="{{ route('manajemen-gudang.stage', $key) }}" class="group flex h-full flex-col rounded-2xl border bg-white p-5 transition hover:border-brand-400 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:p-6 {{ $key === 'incoming' ? 'border-brand-300 dark:border-brand-700' : 'border-gray-200 dark:border-gray-800' }} dark:bg-gray-900">
-                            <div class="flex items-center justify-between gap-3">
-                                <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {{ $detail['color'] }}"><i data-lucide="{{ $detail['icon'] }}" class="h-5 w-5" aria-hidden="true"></i></span>
-                                <span class="text-xs font-semibold tracking-wide text-gray-500 dark:text-gray-400">TAHAP {{ str_pad($loop->iteration, 2, '0', STR_PAD_LEFT) }}</span>
-                            </div>
-                            <h4 class="mt-4 text-base leading-6 font-semibold text-gray-900 dark:text-white">{{ $label }}</h4>
-                            <div class="mt-4">
-                                @if ($key === 'incoming')
-                                    <p class="mb-3 text-2xl font-semibold text-gray-900 dark:text-white">{{ number_format($sacks, 0, ',', '.') }} <span class="text-sm font-medium text-gray-500 dark:text-gray-400">karung</span></p>
-                                    <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">{{ number_format($batchCount, 0, ',', '.') }} batch penerimaan</p>
-                                    <span class="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">Pencatatan tersedia</span>
-                                @else
-                                    <p class="mb-3 text-2xl font-semibold text-gray-900 dark:text-white">{{ number_format($stageCounts[$key], 0, ',', '.') }} <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ $key === 'finished' ? 'batch tersedia' : ($key === 'press' ? 'proses menunggu packing' : 'proses') }}</span></p>
-                                    <span class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">{{ $stageCounts[$key] > 0 ? 'Lihat pekerjaan tercatat' : 'Belum ada pekerjaan pada tahap ini' }}</span>
-                                @endif
-                            </div>
-                            <span class="mt-auto flex items-center justify-between gap-3 pt-5 text-sm font-semibold text-brand-700 dark:text-brand-300">
-                                {{ $key === 'incoming' ? 'Lihat Detail Batch' : 'Lihat Detail Tahap' }}
-                                <i data-lucide="arrow-right" class="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true"></i>
-                            </span>
-                        </a>
-                    </li>
-                @endforeach
-            </ol>
-        </section>
-
-        <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 sm:p-5 dark:border-sky-900 dark:bg-sky-500/10">
-            <i data-lucide="info" class="mt-0.5 h-5 w-5 shrink-0 text-sky-700 dark:text-sky-300" aria-hidden="true"></i>
-            <x-info-help><p class="text-sm leading-6 text-gray-700 dark:text-gray-300"><strong class="font-semibold text-gray-900 dark:text-white">Karung untuk kontrol proses, kg untuk hasil akhir.</strong> Berat resmi barang jadi berasal dari hasil press, timbang aktual, dan packing. Selisih berat tidak otomatis dianggap kehilangan.</p></x-info-help>
-        </div>
-
-        <section aria-labelledby="warehouse-area-title" class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 dark:border-gray-800 dark:bg-gray-900">
-            <div class="mb-5">
-                <h3 id="warehouse-area-title" class="text-lg font-semibold text-gray-900 dark:text-white">Jumlah Barang per Area</h3>
-                <x-info-help><p class="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-400">Sisa karung berasal dari batch yang sudah diterima. Kg di bawah merupakan total berat saat penerimaan, bukan perkiraan berat sisa atau barang jadi.</p></x-info-help>
-            </div>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                @forelse ($areas as $area)
-                    <a href="{{ route('manajemen-gudang.area', $area) }}" class="group min-w-0 rounded-xl border border-gray-200 p-4 transition hover:border-brand-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:p-5 dark:border-gray-700">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0"><p class="text-xs font-semibold text-brand-700 dark:text-brand-300">{{ $area->code }}</p><h4 class="mt-1 break-words text-base font-semibold text-gray-900 dark:text-white">{{ $area->name }}</h4></div>
-                            <span class="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">{{ $area->is_active ? 'Aktif' : 'Nonaktif' }}</span>
-                        </div>
-                        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ $area->inventory->item_name }} &middot; {{ ['receiving'=>'Barang Datang','processing'=>'Proses / WIP','finished'=>'Barang Jadi'][$area->usage] }}</p>
-                        @if ($area->usage === 'receiving')
-                            <p class="mt-4 break-words text-2xl font-semibold text-gray-900 dark:text-white">{{ number_format($area->remaining_sacks ?? 0, 0, ',', '.') }} <span class="text-sm font-medium text-gray-500 dark:text-gray-400">karung belum diproses</span></p>
-                            <div class="mt-3 grid grid-cols-2 gap-3 border-t border-gray-100 pt-3 dark:border-gray-800">
-                                <div><p class="text-xs leading-5 text-gray-500 dark:text-gray-400">Batch diterima</p><p class="mt-1 text-sm font-semibold">{{ number_format($area->batch_count, 0, ',', '.') }} batch</p></div>
-                                <div><p class="text-xs leading-5 text-gray-500 dark:text-gray-400">Berat diterima kumulatif</p><p class="mt-1 break-words text-sm font-semibold">{{ number_format($area->received_weight ?? 0, 2, ',', '.') }} kg</p></div>
-                            </div>
-                        @else
-                            <p class="mt-4 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ $area->usage==='processing' ? number_format($area->process_count ?? 0).' proses / '.number_format($area->process_sacks ?? 0).' karung sumber dalam proses dan WIP' : number_format($area->finished_weight ?? 0,2,',','.').' kg / '.number_format($area->finished_packages ?? 0).' kemasan jadi tersedia' }}</p>
-                        @endif
-                        <span class="mt-4 flex items-center justify-between gap-3 text-sm font-semibold text-brand-700 dark:text-brand-300">Lihat Detail Area<i data-lucide="arrow-right" class="h-4 w-4 shrink-0" aria-hidden="true"></i></span>
-                    </a>
-                @empty
-                    <p class="col-span-full text-sm text-gray-500 dark:text-gray-400">Belum ada area gudang yang dikonfigurasi.</p>
-                @endforelse
-            </div>
-        </section>
-
-        <x-info-help label="Aturan Pencatatan" class="rounded-xl border border-gray-200 bg-white p-4 sm:p-5 dark:border-gray-800 dark:bg-gray-900">
-            <ul class="mt-4 list-disc space-y-2 pl-5 text-sm leading-6 text-gray-600 dark:text-gray-400">
-                <li>Draft penerimaan belum menambah stok gudang.</li>
-                <li>Konfirmasi penerimaan membentuk batch bahan satu kali.</li>
-                <li>Berat datang disimpan sebagai riwayat; kg tidak perlu ditebak saat karung diproses.</li>
-
-            </ul>
-        </x-info-help>
-    </div>
+<div class="space-y-6 text-gray-800 dark:text-gray-200">
+<div class="flex flex-wrap items-center justify-between gap-3">
+<div><h2 class="text-xl font-semibold">Penerimaan sampai Siap Jual</h2><p class="mt-2 text-sm text-gray-500">Pantau sisa bahan, pengambilan proses harian, dan hasil packing.</p></div>
+<div class="flex flex-wrap gap-3">
+@if(auth()->user()->can('manajemen-panen.read') && auth()->user()->can('manajemen-panen.create') && auth()->user()->can('receiving.create') && auth()->user()->can('receiving.confirm'))<a href="{{ route('manajemen-panen.index') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Penerimaan Panen</a>@endif
+@if(auth()->user()->can('production.create') && auth()->user()->can('production.confirm'))<a href="{{ route('produksi.create') }}" class="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-900">Catat Proses Harian</a>@endif
+</div></div>
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+<a href="{{ route('manajemen-gudang.stage','incoming') }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-sm text-gray-500">Sisa Bahan Penerimaan</p><p class="mt-3 text-2xl font-semibold">{{ number_format($sacks,0,',','.') }} karung</p>@if($remainingWeight !== null)<p class="mt-2 text-sm">{{ number_format($remainingWeight,2,',','.') }} Kg alokasi</p>@endif</a>
+<a href="{{ route('produksi.index') }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-sm text-gray-500">Bahan Diambil untuk Proses</p><p class="mt-3 text-2xl font-semibold">{{ number_format($processedSacks,0,',','.') }} karung</p><p class="mt-2 text-sm">Total pengambilan tercatat</p></a>
+<a href="{{ route('produksi.index',['status'=>'packed']) }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-sm text-gray-500">Hasil Packing Masuk</p><p class="mt-3 text-2xl font-semibold">{{ number_format($packedWeight,2,',','.') }} Kg</p><p class="mt-2 text-sm">{{ number_format($packedPackages,0,',','.') }} kemasan kumulatif</p></a>
+<a href="{{ route('manajemen-gudang.stage','finished') }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-sm text-gray-500">Stok Siap Jual Tersedia</p><p class="mt-3 text-2xl font-semibold">{{ number_format($finishedWeight,2,',','.') }} Kg</p><p class="mt-2 text-sm">{{ number_format($finishedPackages,0,',','.') }} kemasan tersisa</p></a>
+</div>
+<section><h3 class="mb-4 text-lg font-semibold">Alur Stok Fisik</h3><div class="grid gap-4 sm:grid-cols-3">
+@foreach($stages as $key=>$label)<a href="{{ $key === 'process' ? route('produksi.index') : route('manajemen-gudang.stage',$key) }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-xs text-gray-500">TAHAP {{ $loop->iteration }}</p><h4 class="mt-2 font-semibold">{{ $label }}</h4><p class="mt-3 text-sm">{{ number_format($stageCounts[$key],0,',','.') }} {{ $key === 'process' ? 'catatan proses' : 'batch tersedia' }}</p></a>@endforeach
+</div></section>
+<section class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h3 class="text-lg font-semibold">Jumlah Barang per Area</h3>
+<p class="mt-2 text-sm text-gray-500">Area angka untuk bahan penerimaan, area huruf untuk bahan siap jual. Kg alokasi bahan mengikuti stok asal; Kg siap jual berasal dari timbang hasil packing.</p>
+@foreach(['receiving'=>'Bahan Penerimaan','finished'=>'Bahan Siap Jual'] as $usage=>$heading)
+<h4 class="mb-3 mt-6 font-semibold">{{ $heading }}</h4><div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+@forelse($areas->where('usage',$usage) as $area)
+<a href="{{ route('manajemen-gudang.area',$area) }}" class="rounded-xl border p-4 dark:border-gray-700"><div class="flex justify-between gap-2"><h5 class="font-semibold">{{ $areaLabels[$area->id] }}</h5>@if(!$area->is_active)<span class="text-xs text-gray-500">Nonaktif</span>@endif</div>
+@if($usage === 'receiving')
+<p class="mt-3 text-xl font-semibold">{{ number_format($area->remaining_sacks ?? 0,0,',','.') }} karung</p>
+@if($remainingWeight !== null)<p class="mt-2 text-sm">{{ number_format($area->remaining_weight ?? 0,2,',','.') }} Kg alokasi tersisa</p>@endif
+<p class="mt-3 text-xs text-gray-500">Diterima: {{ number_format($area->received_weight ?? 0,2,',','.') }} Kg / {{ $area->batch_count }} batch</p>
+@else
+<p class="mt-3 text-xl font-semibold">{{ number_format($area->finished_weight ?? 0,2,',','.') }} Kg</p><p class="mt-2 text-sm">{{ number_format($area->finished_packages ?? 0,0,',','.') }} kemasan tersedia</p>
+@endif
+</a>@empty<p class="text-sm text-gray-500">Belum ada area.</p>@endforelse
+</div>@endforeach</section>
+@if($drafts > 0)<a href="{{ route('penerimaan-barang.index') }}" class="block text-sm text-brand-600">{{ $drafts }} draft penerimaan belum menambah stok.</a>@endif
+@if($stageCounts['wip'] > 0 || ($productionReady && $stageCounts['press'] > 0))<a href="{{ route('manajemen-gudang.stage','wip') }}" class="block text-sm text-brand-600">{{ $stageCounts['wip'] }} proses lama menunggu packing.</a>@endif
+</div>
 @endsection

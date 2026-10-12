@@ -136,6 +136,12 @@ class OperationalAccountingService
         $shipped = min((float) $sale->total_weight_kg, (float) $sale->stockMovements()->sum('weight_kg'));
         $receivable = (int) round($sale->total_sale_value * 100 * $shipped / $sale->total_weight_kg);
         $invoice = $sale->invoice;
+        if ($invoice && $sale->sale_group_number) {
+            $receivable = $invoice->saleItems()->sum(function ($item) {
+                $shippedWeight = min((float) $item->total_weight_kg, (float) $item->stockMovements()->sum('weight_kg'));
+                return (int) round($item->total_sale_value * 100 * $shippedWeight / $item->total_weight_kg);
+            });
+        }
         if ($invoice) {
             foreach ($invoice->payments()->orderBy('payment_date')->orderBy('id')->lockForUpdate()->get() as $payment) {
                 $amount = (int) $payment->amount * 100;

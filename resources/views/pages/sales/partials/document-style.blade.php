@@ -8,6 +8,8 @@
     .doc-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 6mm; min-height: 32mm; padding-bottom: 4mm; border-bottom: 1.2mm solid var(--green); }
     .invoice .doc-header { min-height: 39mm; }
     .brand { display: flex; gap: 4mm; align-items: flex-start; width: 61%; }
+    .delivery-note .brand, .invoice .brand { flex-direction: column; gap: 2mm; }
+    .delivery-note .items { margin-top: 4mm; }
     .logo { width: 32mm; height: auto; object-fit: contain; flex: none; margin-top: 1mm; }
     .company { flex: 1; min-width: 0; overflow-wrap: anywhere; }
     .company-name { margin: 0 0 1mm; font-size: 20px; font-weight: 800; line-height: 1.15; text-transform: uppercase; }

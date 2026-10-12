@@ -70,7 +70,7 @@ it('creates, lists, edits, prints and deletes invoices with calculated totals', 
     $invoice = Invoice::firstOrFail();
     $this->getJson(route('invoice.data'))->assertOk()->assertJsonPath('data.0.total_amount', 26000000)
         ->assertJsonPath('data.0.term_days', 30)->assertJsonPath('data.0.days_until_due', 23);
-    $this->get(route('invoice.index'))->assertOk()->assertSee('Tambah Invoice')->assertSee('Status mengikuti pembayaran');
+    $this->get(route('invoice.index'))->assertOk()->assertSee('Tambah Invoice')->assertSee(route('invoice.create'));
     $this->get(route('invoice.print', $invoice))->assertOk()->assertSee('images/branding/albagro.png')
         ->assertSee('INV-2026-0098')->assertSee('PO-2026-001')->assertSee('PT Maju Jaya')->assertSee('Rp26.000.000,00')
         ->assertSee('29/10/2026')->assertSee('23 hari lagi')->assertSee('window.print()');
@@ -114,7 +114,7 @@ it('preserves invoice details after deleting a referenced delivery note and esca
         'customer_purchase_order_id' => $this->po->id, 'number' => 'SJ-001', 'delivery_date' => '2026-09-29', 'recipient_name' => 'PT Maju Jaya',
         'destination_address' => 'Makassar', 'origin' => 'Sidoarjo', 'item_name' => 'Gracilaria Kering', 'quantity_kg' => 2000,
     ]);
-    $this->get(route('invoice.index'))->assertOk()->assertSee('SJ-001');
+    $this->get(route('invoice.create'))->assertOk()->assertSee('SJ-001');
     $this->postJson(route('invoice.store'), array_merge($this->payload, [
         'delivery_note_id' => $note->id, 'notes' => '<script>alert(1)</script>',
     ]))->assertOk();
@@ -239,4 +239,28 @@ it('automatically numbers new invoices and prints the configured company and pay
     $this->postJson(route('invoice.store'), $payload)->assertOk();
     expect(Invoice::latest('id')->first()->number)->toBe('ALB/2026/0050')
         ->and($invoice->refresh()->number)->toBe('INV/0001/09/2026');
+});
+
+it('groups sale products into one invoice with all items and the combined amount', function () {
+    (require database_path('migrations/2026_10_12_000001_add_cart_fields_to_sales_transactions.php'))->up();
+    $sale = SalesTransaction::findOrFail($this->payload['sales_transaction_id']);
+    $sale->update(['sale_group_number' => 'PJL-GROUP-001', 'item_name' => 'Cottonii']);
+    $second = $sale->replicate();
+    $second->fill(['invoice_number' => 'PJL-TEST-002', 'item_name' => 'Spinosum',
+        'total_weight_kg' => 100, 'price_per_kg' => 10000, 'total_sale_value' => 900000]);
+    $second->save();
+    $page = $this->get(route('invoice.create'))->assertOk()->assertSee('Barang yang Ditagihkan');
+    expect($page->viewData('sales'))->toHaveCount(1);
+    expect($page->viewData('sales')->first()['items'])->toHaveCount(2);
+    $this->postJson(route('invoice.store'), $this->payload)->assertOk();
+    $invoice = Invoice::firstOrFail();
+    expect($invoice->total_amount)->toBe(26900000.0)
+        ->and($invoice->document_items)->toHaveCount(2)
+        ->and($invoice->deduction_amount)->toBe(100000.0);
+    $this->get(route('invoice.edit', $invoice))->assertOk();
+    $this->get(route('invoice.print', $invoice))->assertOk()->assertSee('Cottonii')->assertSee('Spinosum');
+    $this->postJson(route('invoice.store'), array_merge($this->payload, ['number' => 'INV-DUPLICATE', 'sales_transaction_id' => $second->id]))
+        ->assertUnprocessable()->assertJsonValidationErrors('sales_transaction_id');
+    $this->postJson(route('invoice.pay', $invoice), ['invoice_id' => $invoice->id, 'payment_date' => '2026-10-06', 'amount' => 26900000])->assertOk();
+    expect($sale->fresh()->paid_amount)->toBe(26000000)->and($second->fresh()->paid_amount)->toBe(900000);
 });

@@ -1,6 +1,20 @@
 <div class="space-y-5 rounded-xl bg-white p-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
     @if($errors->any())<ul class="rounded-lg bg-red-50 p-4 text-red-700">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>@endif
     <h2 class="text-xl font-semibold">{{ $run->number }}</h2>
+    @if($run->warehouse_only && $run->status === 'packed')
+    <div class="grid gap-4 rounded-lg border p-4 text-sm sm:grid-cols-2">
+        <div><h3 class="font-semibold">Diambil dari penerimaan</h3>
+            @foreach($run->inputs->groupBy(fn($input) => $input->batch->line->warehouse_area_id) as $areaId => $inputs)
+                <p class="mt-2">{{ $areaLabels[$areaId] ?? $inputs->first()->batch->line->area->name }}: {{ $inputs->sum('sack_count') }} karung / {{ number_format($inputs->sum('reference_weight_kg'),2,',','.') }} Kg alokasi</p>
+            @endforeach
+        </div>
+        <div><h3 class="font-semibold">Masuk bahan siap jual</h3>
+            @foreach($run->outputs->groupBy('warehouse_area_id') as $areaId => $outputs)
+                <p class="mt-2">{{ $areaLabels[$areaId] ?? $outputs->first()->area->name }}: {{ number_format($outputs->sum('weight_kg'),2,',','.') }} Kg / {{ $outputs->sum('package_count') }} kemasan</p>
+            @endforeach
+        </div>
+    </div>
+    @endif
     <div class="flex gap-4 text-sm"><a href="{{ route('produksi.index') }}" class="text-brand-600">Kembali ke Riwayat Proses</a>@if($run->status==='processing')@can('production.create')<a href="{{ route('produksi.edit',$run) }}" class="text-brand-600">Edit Proses</a>@endcan @endif</div>
     @if($run->notes)<p class="text-sm">Catatan: {{ $run->notes }}</p>@endif
     <p class="text-sm">Status: <strong>{{ ['processing'=>'Proses aktif','wip'=>'WIP — menunggu press/timbang/packing','packed'=>'Selesai packing'][$run->status] }}</strong>. PIC: {{ $run->pic }}. Pekerjaan: {{ $run->work_type }}.</p>

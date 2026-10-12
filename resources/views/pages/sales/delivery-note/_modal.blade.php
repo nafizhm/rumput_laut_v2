@@ -25,6 +25,12 @@
                 <x-input label="Alamat Tujuan" name="destination_address" type="text" x-model="form.data.destination_address" alpine-error="form.getError('destination_address')" required />
             </x-form-section>
             <x-form-section title="Detail Barang" description="Informasi barang, berat, dan kemasan yang dikirim.">
+                <label x-show="needsBatch" class="sm:col-span-2 text-sm">Stok Siap Jual
+                    <select x-model="form.data.finished_batch_id" :required="needsBatch" @change="selectBatch" class="mt-1.5 h-11 w-full rounded-lg border border-gray-300 bg-white px-3 dark:border-gray-700 dark:bg-gray-900">
+                        <option value="">Pilih area / batch untuk pengiriman</option>
+                        <template x-for="batch in availableBatches" :key="batch.id"><option :value="batch.id" x-text="batch.label"></option></template>
+                    </select><span class="text-xs text-error-500" x-text="form.getError('finished_batch_id')"></span>
+                </label>
                 <x-input label="Deskripsi Barang" name="item_name" type="text" x-model="form.data.item_name" alpine-error="form.getError('item_name')" required />
                 <x-input label="Jumlah (Kg)" name="quantity_kg" type="number" x-model="form.data.quantity_kg" alpine-error="form.getError('quantity_kg')" required min="0.01" max="999999999.99" step="0.01" />
                 <div x-show="!legacyMode"><x-input label="Jumlah Karung Keluar" name="sack_count" type="number" min="0" step="1" x-model="form.data.sack_count" alpine-error="form.getError('sack_count')" /></div>
@@ -83,6 +89,11 @@
             return {
                 orders: @js($orders),
                 sales: @js($sales),
+                batches: @js($batches),
+                get selectedSale() { return this.sales.find(sale => sale.value == this.form.data.sales_transaction_id); },
+                get needsBatch() { return !this.legacyMode && !!this.selectedSale?.select_batch; },
+                get availableBatches() { return this.batches.filter(batch => !this.selectedSale?.quality_grade_id || batch.quality_grade_id == this.selectedSale.quality_grade_id); },
+                selectBatch() { const batch = this.batches.find(batch => batch.id == this.form.data.finished_batch_id); if (batch) this.form.data.origin = batch.area_name; },
                 legacyMode: false,
                 editMode: false,
                 editId: null,
@@ -90,6 +101,7 @@
 
                 form: useForm({
                     sales_transaction_id: '',
+                    finished_batch_id: '',
                     vehicle_plate: '', vehicle_type: '', driver_name: '', condition: '',
                     origin_address: '', sender_contact: '', recipient_contact: '',
                     gross_weight_kg: '', tare_weight_kg: '', moisture_percent: '',
@@ -133,6 +145,7 @@
                     this.form.clearErrors();
                     this.form.data = {
                         sales_transaction_id: item.sales_transaction_id ?? '',
+                        finished_batch_id: item.finished_batch_id ?? '',
                         vehicle_plate: item.vehicle_plate ?? '', vehicle_type: item.vehicle_type ?? '',
                         driver_name: item.driver_name ?? '', condition: item.condition ?? '',
                         origin_address: item.origin_address ?? '', sender_contact: item.sender_contact ?? '',
@@ -173,6 +186,7 @@
                 },
 
                 selectSale() {
+                    this.form.data.finished_batch_id = '';
                     const sale = this.sales.find(sale => String(sale.value) === String(this.form.data.sales_transaction_id));
                     if (sale) ['recipient_name', 'destination_address', 'item_name', 'quantity_kg', 'sack_count', 'origin'].forEach(key => this.form.data[key] = sale[key] ?? '');
                     this.form.data.customer_purchase_order_id = sale?.customer_purchase_order_id || '';

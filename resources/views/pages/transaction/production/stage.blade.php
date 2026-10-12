@@ -1,5 +1,5 @@
 @if($stage==='process')
-    @can('production.create')<a href="{{ route('produksi.create') }}" class="inline-block rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Mulai Proses Harian</a>@endcan
+    @if(auth()->user()->can('production.create') && auth()->user()->can('production.confirm'))<a href="{{ route('produksi.create') }}" class="inline-block rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Catat Proses Harian</a>@endif
 @endif
 @if($stage==='finished')
     <x-info-help><p class="text-sm text-gray-500">Stok aktual setelah press, timbang dan packing. Pengeluaran penjualan memilih batch dan area ready ini.</p></x-info-help>

@@ -5,6 +5,7 @@ namespace App\Services\Sales;
 use App\Models\CustomerPurchaseOrder;
 use App\Models\DeliveryNote;
 use App\Models\Inventory;
+use App\Models\FinishedBatch;
 use App\Models\SalesTransaction;
 use App\Models\StockMovement;
 use App\Models\User;
@@ -19,7 +20,42 @@ class DeliveryNoteService
 {
     public function getAll()
     {
-        return DeliveryNote::with('sale')->orderByDesc('delivery_date')->orderByDesc('id')->get();
+        $query = DeliveryNote::with('sale');
+        if (\Illuminate\Support\Facades\Schema::hasTable('delivery_note_items')) $query->with('items');
+        return $query->orderByDesc('delivery_date')->orderByDesc('id')->get();
+    }
+
+    public function saveItems(array $data, ?DeliveryNote $note = null): DeliveryNote
+    {
+        return DB::transaction(function () use ($data, $note) {
+            if ($note) { $note = DeliveryNote::lockForUpdate()->findOrFail($note->id); $this->assertEditable($note); }
+            $anchor = SalesTransaction::lockForUpdate()->findOrFail($data['sales_transaction_id']);
+            if ($note && $note->sales_transaction_id !== $anchor->id) throw ValidationException::withMessages(['sales_transaction_id'=>'Nota penjualan terkait tidak dapat diganti.']);
+            $rows = $data['items']; unset($data['items']);
+            $prepared = [];
+            foreach ($rows as $index => $row) {
+                $sale = SalesTransaction::lockForUpdate()->findOrFail($row['sales_transaction_id']);
+                if ($sale->id !== $anchor->id && (!$anchor->sale_group_number || $sale->sale_group_number !== $anchor->sale_group_number)) {
+                    throw ValidationException::withMessages(['items.'.$index=>'Barang harus berasal dari nota penjualan yang dipilih.']);
+                }
+                $used = StockMovement::where('sales_transaction_id',$sale->id)->whereNotNull('delivery_note_id')->sum('weight_kg');
+                $usedSacks = StockMovement::where('sales_transaction_id',$sale->id)->whereNotNull('delivery_note_id')->sum('sack_count');
+                if ((float)$row['quantity_kg'] > (float)$sale->total_weight_kg - $used || (int)$row['sack_count'] > (int)$sale->sold_sacks - $usedSacks) throw ValidationException::withMessages(['items.'.$index=>'Jumlah melebihi sisa penjualan yang belum dikirim.']);
+                try { $line = $this->prepare($row + array_diff_key($data, ['sales_transaction_id'=>true])); }
+                catch (ValidationException $e) { throw ValidationException::withMessages(['items.'.$index=>collect($e->errors())->flatten()->implode(' ')]); }
+                $prepared[] = array_intersect_key($line, array_flip(['sales_transaction_id','finished_batch_id','quantity_kg','sack_count'])) + ['item_name'=>$row['item_name']];
+            }
+            foreach (collect($prepared)->filter(fn($row)=>!empty($row['finished_batch_id']))->groupBy('finished_batch_id') as $id=>$lines) {
+                $batch = FinishedBatch::lockForUpdate()->findOrFail($id);
+                if ($lines->sum('quantity_kg') > $batch->remaining_weight_kg || $lines->sum('sack_count') > $batch->remaining_packages) throw ValidationException::withMessages(['items'=>'Total pengiriman dari batch yang sama melebihi stok.']);
+            }
+            $data['customer_purchase_order_id'] = $anchor->customer_purchase_order_id;
+            $data['item_name'] = mb_substr(implode(', ',array_column($prepared,'item_name')),0,255);
+            $data['quantity_kg'] = array_sum(array_column($prepared,'quantity_kg')); $data['sack_count'] = array_sum(array_column($prepared,'sack_count'));
+            if (!$note) { $note = new DeliveryNote; if(empty($data['number'])) $data['number'] = app(DocumentNumberService::class)->next('delivery_note',$data['delivery_date']); $note->status='draft'; }
+            $note->fill($data)->save(); $note->items()->delete(); $note->items()->createMany($prepared);
+            return $note;
+        });
     }
 
     public function store(array $data): DeliveryNote
@@ -75,6 +111,21 @@ class DeliveryNoteService
         if (! $sale || $sale->stock_mode !== 'delivery_note') {
             throw ValidationException::withMessages(['sales_transaction_id' => 'Pilih penjualan baru dengan stok keluar melalui Surat Jalan. Transaksi lama/langsung tidak boleh dipotong lagi.']);
         }
+        if ($sale->sale_group_number && !$sale->finished_batch_id) {
+            $batch = FinishedBatch::with(['area', 'run'])->lockForUpdate()->find($data['finished_batch_id'] ?? $note?->finished_batch_id);
+            if (!$batch || !$batch->area?->is_active || $batch->area->usage !== 'finished' || $batch->run?->status !== 'packed'
+                || ($sale->quality_grade_id && (int) $sale->quality_grade_id !== (int) $batch->quality_grade_id)) {
+                throw ValidationException::withMessages(['finished_batch_id' => 'Pilih batch siap jual yang aktif dan sesuai barang pesanan.']);
+            }
+            if ((float) $data['quantity_kg'] > (float) $batch->remaining_weight_kg || (int) ($data['sack_count'] ?? 0) < 1
+                || (int) $data['sack_count'] > (int) $batch->remaining_packages) {
+                throw ValidationException::withMessages(['quantity_kg' => 'Stok batch siap jual belum cukup untuk jumlah pengiriman ini.']);
+            }
+            $data['finished_batch_id'] = $batch->id;
+            $data['origin'] = $batch->area->name;
+        } else {
+            unset($data['finished_batch_id']);
+        }
         if ($note && (int) $sale->id !== (int) $note->sales_transaction_id) {
             throw ValidationException::withMessages(['sales_transaction_id' => 'Penjualan terkait tidak dapat diganti.']);
         }
@@ -109,12 +160,22 @@ class DeliveryNoteService
         return $data;
     }
 
-    public function dispatch(DeliveryNote $note, string $date, User $user): DeliveryNote
+    public function dispatch(DeliveryNote $note, string $date, User $user, bool $lineOnly = false): DeliveryNote
     {
-        return DB::transaction(function () use ($note, $date, $user) {
-            $note = DeliveryNote::lockForUpdate()->findOrFail($note->id);
-            if ($note->status !== 'draft' || $note->shipped_at || StockMovement::where('delivery_note_id', $note->id)->exists()) {
+        return DB::transaction(function () use ($note, $date, $user, $lineOnly) {
+            if (!$lineOnly) $note = DeliveryNote::lockForUpdate()->findOrFail($note->id);
+            if ($note->status !== 'draft' || $note->shipped_at || (!$lineOnly && StockMovement::where('delivery_note_id', $note->id)->exists())) {
                 throw ValidationException::withMessages(['surat_jalan' => 'Hanya Draft baru yang dapat dikonfirmasi. Dokumen sudah dikirim atau merupakan data lama.']);
+            }
+            if (!$lineOnly && \Illuminate\Support\Facades\Schema::hasTable('delivery_note_items') && $note->items()->exists()) {
+                foreach ($note->items()->orderBy('sales_transaction_id')->get() as $item) {
+                    $line = clone $note;
+                    $line->sales_transaction_id=$item->sales_transaction_id; $line->finished_batch_id=$item->finished_batch_id;
+                    $line->quantity_kg=$item->quantity_kg; $line->sack_count=$item->sack_count;
+                    $this->dispatch($line,$date,$user,true);
+                }
+                $note->status='shipped'; $note->shipped_date=$date; $note->shipped_at=now(); $note->shipped_by=$user->id; $note->shipped_by_name=$user->name; $note->save();
+                return $note;
             }
             $sale = SalesTransaction::lockForUpdate()->findOrFail($note->sales_transaction_id);
             if ($sale->invoice?->customer_purchase_order_id) {
@@ -140,10 +201,18 @@ class DeliveryNoteService
                 || (int) $movements->sum('sack_count') + $note->sack_count > (int) $sale->sold_sacks) {
                 throw ValidationException::withMessages(['quantity_kg' => 'Total pengiriman akan melebihi jumlah penjualan.']);
             }
-            $inventory = Inventory::lockForUpdate()->findOrFail($sale->inventory_id);
+            $selectedBatch = $note->finished_batch_id ? FinishedBatch::lockForUpdate()->findOrFail($note->finished_batch_id) : null;
+            $inventory = Inventory::lockForUpdate()->findOrFail($selectedBatch?->inventory_id ?? $sale->inventory_id);
             $allocation = [];
             $allocations = [];
-            if ($sale->quality_grade_id) {
+            if ($selectedBatch) {
+                if ($sale->quality_grade_id && (int) $selectedBatch->quality_grade_id !== (int) $sale->quality_grade_id) {
+                    throw ValidationException::withMessages(['finished_batch_id' => 'Batch harus sesuai barang pada penjualan.']);
+                }
+                $allocation = app(ProductionService::class)->consumeFinished($selectedBatch->id, (int) $inventory->id, (float) $note->quantity_kg, (int) $note->sack_count, $date);
+            } elseif ($sale->sale_group_number && !$sale->finished_batch_id) {
+                throw ValidationException::withMessages(['finished_batch_id' => 'Pilih stok siap jual pada Surat Jalan sebelum konfirmasi kirim.']);
+            } elseif ($sale->quality_grade_id) {
                 $allocations = app(ProductionService::class)->allocateGrade($inventory->id, $sale->quality_grade_id, (float) $note->quantity_kg, (int) $note->sack_count, $date);
             } elseif ($inventory->stock_stage === 'finished') {
                 if (! $sale->finished_batch_id) {
@@ -174,7 +243,7 @@ class DeliveryNoteService
             $note->shipped_at = now();
             $note->shipped_by = $user->id;
             $note->shipped_by_name = $user->name;
-            $note->save();
+            if (!$lineOnly) $note->save();
 
             return $note;
         });

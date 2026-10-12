@@ -19,7 +19,8 @@ class ProductionController extends Controller
 
         return view('pages.transaction.production.index', [
             'status' => $filters['status'] ?? '',
-            'runs' => ProductionRun::with('area')
+            'areaLabels' => $this->areaLabels(),
+            'runs' => ProductionRun::with(['area', 'inputs.batch.line.area', 'outputs.area'])
                 ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
                 ->latest('id')->paginate(20)->withQueryString(),
         ]);
@@ -45,16 +46,36 @@ class ProductionController extends Controller
 
     public function create()
     {
+        abort_unless(auth()->user()->can('production.confirm'), 403);
         return view('pages.transaction.production.create', [
             'batches' => MaterialBatch::with(['line.receipt.farmer', 'line.grade', 'line.area'])
                 ->where('remaining_sacks', '>', 0)->where('status', 'available')
                 ->whereHas('line.receipt', fn ($query) => $query->where('status', 'confirmed'))->get(),
-            'areas' => WarehouseArea::where('usage', 'processing')->where('is_active', true)->get(),
+            'areas' => WarehouseArea::where('usage', 'receiving')->where('is_active', true)
+                ->whereHas('inventory', fn ($q) => $q->where('stock_stage', 'material'))->orderBy('id')->get(),
+            'finishedAreas' => WarehouseArea::where('usage', 'finished')->where('is_active', true)
+                ->whereHas('inventory', fn ($q) => $q->where('stock_stage', 'finished'))->orderBy('id')->get(),
+            'areaLabels' => $this->areaLabels(),
         ]);
     }
 
     public function store(Request $request)
     {
+        if ($request->has('sources')) {
+            abort_unless($request->user()->can('production.confirm'), 403);
+            $data = $request->validate([
+                'date' => 'required|date_format:Y-m-d|before_or_equal:today', 'notes' => 'nullable|string|max:2000',
+                'sources' => 'required|array|min:1|max:50',
+                'sources.*.warehouse_area_id' => 'required|integer|distinct|exists:warehouse_areas,id',
+                'sources.*.sack_count' => 'required|integer|min:1|max:1000000',
+                'outputs' => 'required|array|min:1|max:50',
+                'outputs.*.warehouse_area_id' => 'required|integer|exists:warehouse_areas,id',
+                'outputs.*.weight_kg' => 'required|numeric|min:0.01|max:999999999.99|decimal:0,2',
+                'outputs.*.package_count' => 'required|integer|min:1|max:1000000',
+            ]);
+            $this->service->recordDaily($data, $request->user());
+            return redirect()->route('produksi.index')->with('success', 'Proses harian disimpan. Stok bahan berkurang dan hasil packing masuk stok siap jual.');
+        }
         $data = $request->validate(['started_date' => 'required|date_format:Y-m-d', 'warehouse_area_id' => 'required|integer|exists:warehouse_areas,id',
             'pic' => 'required|string|max:255', 'work_type' => 'required|string|max:255', 'notes' => 'nullable|string|max:2000',
             'inputs' => 'required|array|min:1|max:50',
@@ -66,7 +87,8 @@ class ProductionController extends Controller
 
     public function show(Request $request, ProductionRun $produksi)
     {
-        return view($request->header('X-Warehouse-Detail') === 'modal' ? 'pages.transaction.production._detail' : 'pages.transaction.production.show', ['run' => $produksi->load(['inputs.batch.line.receipt.farmer', 'outputs.grade', 'outputs.area', 'journals']),
+        return view($request->header('X-Warehouse-Detail') === 'modal' ? 'pages.transaction.production._detail' : 'pages.transaction.production.show', ['run' => $produksi->load(['inputs.batch.line.receipt.farmer', 'inputs.batch.line.area', 'outputs.grade', 'outputs.area', 'journals']),
+            'areaLabels' => $this->areaLabels(),
             'areas' => WarehouseArea::query()->where('usage', 'finished')->where('is_active', true)->get(),
         ]);
     }
@@ -88,5 +110,19 @@ class ProductionController extends Controller
         $this->service->pack($produksi, $data);
 
         return back()->with('success', 'Hasil packing dikonfirmasi. Batch barang jadi dan stok siap jual dicatat.');
+    }
+
+    private function areaLabels(): array
+    {
+        $labels = [];
+        foreach (['receiving', 'finished'] as $usage) {
+            foreach (WarehouseArea::where('usage', $usage)->orderBy('id')->get() as $index => $area) {
+                $number = $index + 1;
+                $letter = '';
+                for ($n = $number; $n > 0; $n = intdiv($n - 1, 26)) $letter = chr(65 + ($n - 1) % 26).$letter;
+                $labels[$area->id] = 'Area '.($usage === 'receiving' ? $number : $letter);
+            }
+        }
+        return $labels;
     }
 }

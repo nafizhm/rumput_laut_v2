@@ -35,8 +35,9 @@
             <colgroup><col style="width:6%"><col style="width:39%"><col style="width:15%"><col style="width:19%"><col style="width:21%"></colgroup>
             <thead><tr><th>NO</th><th>DESKRIPSI BARANG</th><th>NETTO (KG)</th><th>HARGA / KG (RP)</th><th>JUMLAH (RP)</th></tr></thead>
             <tbody>
-                <tr><td class="center">1</td><td>{{ $invoice->item_name }}</td><td class="right">{{ number_format((float) $invoice->quantity_kg, 2, ',', '.') }}</td><td class="right">Rp{{ number_format((float) $invoice->price_per_kg, 2, ',', '.') }}</td><td class="right">Rp{{ number_format((float) $invoice->quantity_kg * (float) $invoice->price_per_kg, 2, ',', '.') }}</td></tr>
-                @for($row = 2; $row <= 6; $row++)<tr class="blank"><td class="center">{{ $row }}</td><td></td><td></td><td></td><td></td></tr>@endfor
+                @foreach($invoice->document_items as $item)
+                <tr><td class="center">{{ $loop->iteration }}</td><td>{{ $item['item_name'] }}</td><td class="right">{{ number_format((float) $item['quantity_kg'], 2, ',', '.') }}</td><td class="right">Rp{{ number_format((float) $item['price_per_kg'], 2, ',', '.') }}</td><td class="right">Rp{{ number_format((float) $item['subtotal'], 2, ',', '.') }}</td></tr>
+                @endforeach
             </tbody>
         </table>
         <div class="payment-summary">
@@ -46,7 +47,7 @@
                 <div class="field"><span class="label">Atas Nama</span><div class="value">{{ $profile->bank_account_name }}</div></div>
             </section>
             <table class="totals">
-                <tr><td>Subtotal</td><td class="right">Rp{{ number_format((float) $invoice->quantity_kg * (float) $invoice->price_per_kg, 2, ',', '.') }}</td></tr>
+                <tr><td>Subtotal</td><td class="right">Rp{{ number_format(collect($invoice->document_items)->sum('subtotal'), 2, ',', '.') }}</td></tr>
                 <tr><td>Potongan penjualan</td><td class="right">Rp{{ number_format($invoice->deduction_amount, 2, ',', '.') }}</td></tr>
                 <tr><td>PPN (jika ada)</td><td class="right">—</td></tr>
                 <tr class="grand"><td>TOTAL TAGIHAN</td><td class="right">Rp{{ number_format($invoice->total_amount, 2, ',', '.') }}</td></tr>
@@ -57,7 +58,7 @@
             @if($invoice->payment_terms)<p>{{ $invoice->payment_terms }}</p>@endif
             @if($invoice->notes)<p>{{ $invoice->notes }}</p>@endif
             <p>{{ $invoice->payment_status_label }}@if($invoice->payment_status !== 'paid') · {{ $invoice->due_label }}@endif · Termin {{ $invoice->term_days }} hari.</p>
-            @if($invoice->sales_transaction_id)<p>No. Penjualan: {{ $invoice->sale->invoice_number }}</p>@endif
+            @if($invoice->sales_transaction_id)<p>No. Penjualan: {{ $invoice->sale->sale_reference }}</p>@endif
         </div>
         <div class="invoice-footer">
             <p>Mohon cantumkan nomor invoice saat pembayaran. Selisih timbang dan kadar air mengikuti berita acara penerimaan pabrik.</p>

@@ -142,7 +142,7 @@ class CustomerPurchaseOrderService
                 throw ValidationException::withMessages(["items.$index.id" => 'Baris barang bukan milik PO ini.']);
             }
             $grade = ! empty($row['quality_grade_id']) ? QualityGrade::findOrFail($row['quality_grade_id']) : null;
-            $name = isset($data['items']) ? ($item && ! $item->quality_grade_id ? $item->item_name : 'Rumput Laut') : $row['item_name'];
+            $name = isset($data['items']) ? ($row['item_name'] ?? $item?->item_name ?? 'Rumput Laut') : $row['item_name'];
             if ($item && $item->salesTransactions()->exists()) {
                 if ((int) $item->quality_grade_id !== (int) ($row['quality_grade_id'] ?? 0)
                     || (float) $item->price_per_kg !== (float) $row['price_per_kg'] || $item->item_name !== $name) {

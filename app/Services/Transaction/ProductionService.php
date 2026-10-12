@@ -17,6 +17,41 @@ use Illuminate\Validation\ValidationException;
 
 class ProductionService
 {
+    public function recordDaily(array $data, User $user): ProductionRun
+    {
+        return DB::transaction(function () use ($data, $user) {
+            $inputs = [];
+            foreach (collect($data['sources'])->sortBy('warehouse_area_id') as $source) {
+                $area = WarehouseArea::lockForUpdate()->findOrFail($source['warehouse_area_id']);
+                if (!$area->is_active || $area->usage !== 'receiving') {
+                    $this->fail('sources', 'Pilih area penerimaan yang aktif.');
+                }
+                $remaining = (int) $source['sack_count'];
+                $batches = MaterialBatch::where('status', 'available')->where('remaining_sacks', '>', 0)
+                    ->whereHas('line', fn ($q) => $q->where('warehouse_area_id', $area->id))
+                    ->whereHas('line.receipt', fn ($q) => $q->where('status', 'confirmed')->whereDate('received_date', '<=', $data['date']))
+                    ->orderBy(\App\Models\GoodsReceipt::select('received_date')
+                        ->join('goods_receipt_lines', 'goods_receipt_lines.goods_receipt_id', '=', 'goods_receipts.id')
+                        ->whereColumn('goods_receipt_lines.id', 'material_batches.goods_receipt_line_id')->limit(1))
+                    ->orderBy('id')->lockForUpdate()->get();
+                foreach ($batches as $batch) {
+                    $taken = min($remaining, (int) $batch->remaining_sacks);
+                    if ($taken > 0) $inputs[] = ['material_batch_id' => $batch->id, 'sack_count' => $taken];
+                    $remaining -= $taken;
+                    if (!$remaining) break;
+                }
+                if ($remaining > 0) $this->fail('sources', 'Karung tersedia di area asal tidak mencukupi pada tanggal ini.');
+            }
+            $run = $this->start([
+                'started_date' => $data['date'], 'warehouse_area_id' => $data['sources'][0]['warehouse_area_id'],
+                'pic' => $user->name, 'work_type' => 'Proses harian dan packing', 'notes' => $data['notes'] ?? null,
+                'inputs' => $inputs, 'warehouse_only' => true, 'daily_record' => true,
+            ], $user);
+            $this->complete($run, $data['date']);
+            return $this->pack($run, ['packed_date' => $data['date'], 'outputs' => $data['outputs']]);
+        });
+    }
+
     public function updateDetails(ProductionRun $run, array $data): ProductionRun
     {
         return DB::transaction(function () use ($run, $data) {
@@ -39,7 +74,7 @@ class ProductionService
             $warehouseOnly = (bool) ($data['warehouse_only'] ?? false);
             $this->date($data['started_date']);
             $area = WarehouseArea::lockForUpdate()->findOrFail($data['warehouse_area_id']);
-            if (! $area->is_active || $area->usage !== 'processing') {
+            if (! $area->is_active || $area->usage !== (($data['daily_record'] ?? false) ? 'receiving' : 'processing')) {
                 $this->fail('warehouse_area_id', 'Pilih area proses aktif.');
             }
             $inputs = collect($data['inputs'])->sortBy('material_batch_id')->values();

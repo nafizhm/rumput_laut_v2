@@ -58,7 +58,7 @@ class BusinessFlowAuditTest extends TestCase
         $this->getJson(route('dashboard.stats', ['start_date' => '2026-09-01', 'end_date' => '2026-09-30']))
             ->assertOk()->assertJsonPath('production.count', 0);
         $this->get(route('manajemen-gudang.index'))->assertOk()->assertViewHas('stageCounts',
-            fn ($counts) => $counts['process'] === 0 && $counts['wip'] === 1 && $counts['press'] === 1);
+            fn ($counts) => $counts['process'] === 1 && $counts['wip'] === 1 && $counts['press'] === 1);
     }
 
     public function test_backfill_recovers_missing_loan_without_changing_debt_or_duplicating_journals(): void
@@ -696,13 +696,13 @@ class BusinessFlowAuditTest extends TestCase
 
     public function test_production_forms_stage_pages_permissions_and_confirmation(): void
     {
-        foreach (['production.read', 'production.create', 'production.confirm', 'receiving.read', 'journal.read', 'journal.post'] as $permission) {
+        foreach (['production.read', 'production.create', 'production.confirm', 'receiving.read', 'journal.read', 'journal.post', 'manajemen-penjualan.create'] as $permission) {
             $p = Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
             $this->user->givePermissionTo($p);
         }
         $this->withoutVite();
         $batch = $this->sourceBatch();
-        $this->get(route('produksi.create'))->assertOk()->assertSee($batch->code);
+        $this->get(route('produksi.create'))->assertOk()->assertSee('Area asal')->assertSee('Area tujuan');
         $payload = ['started_date' => '2026-10-03', 'warehouse_area_id' => WarehouseArea::where('usage', 'processing')->firstOrFail()->id, 'pic' => 'PIC', 'work_type' => 'Jemur', 'processing_cost' => 0, 'inputs' => [['material_batch_id' => $batch->id, 'sack_count' => 4]]];
         $this->postJson(route('produksi.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('confirm');
         $this->post(route('produksi.store'), $payload + ['confirm' => 1])->assertRedirect();
@@ -717,7 +717,9 @@ class BusinessFlowAuditTest extends TestCase
         foreach (['process', 'wip', 'press', 'finished'] as $stage) {
             $this->get(route('manajemen-gudang.stage', $stage))->assertOk();
         }
-        $this->get(route('manajemen-penjualan.index'))->assertOk()->assertSee('Area Ready / Batch Siap Jual')
+        $this->get(route('manajemen-penjualan.create'))->assertOk()->assertSee('Daftar Barang')
+            ->assertViewHas('finishedBatches', fn ($options) => $options->pluck('id')->contains(FinishedBatch::firstOrFail()->id));
+        $this->get(route('manajemen-penjualan.index'))->assertOk()->assertSee('Tambah Penjualan')
             ->assertViewHas('inventories', fn ($options) => $options->isNotEmpty()
                 && $options->every(fn ($option) => $option['stock_stage'] === 'finished'))
             ->assertViewHas('finishedBatches', fn ($options) => $options->pluck('id')->contains(FinishedBatch::firstOrFail()->id));
@@ -875,7 +877,7 @@ class BusinessFlowAuditTest extends TestCase
         $this->assertFalse((bool) $batch->is_costed);
         $this->assertNull($harvest->priced_at);
         $journals = JournalEntry::count();
-        $this->get(route('produksi.create'))->assertOk()->assertSee($batch->code)->assertDontSee('Biaya proses dibayar tunai');
+        $this->get(route('produksi.create'))->assertOk()->assertSee('Area asal')->assertSee('Area tujuan')->assertDontSee('Biaya proses dibayar tunai');
         $processPayload = ['started_date'=>'2026-10-03','warehouse_area_id'=>WarehouseArea::where('usage','processing')->firstOrFail()->id,'pic'=>'Petugas','work_type'=>'Jemur',
             'warehouse_only'=>false,'processing_cost'=>999999,'inputs'=>[['material_batch_id'=>$batch->id,'sack_count'=>4]],'confirm'=>1];
         $this->post(route('produksi.store'),$processPayload)->assertRedirect()->assertSessionHasNoErrors();

@@ -38,34 +38,27 @@
             <div class="field"><span class="label">Jenis Kendaraan</span><div class="value">{{ $note->vehicle_type }}</div></div>
             <div class="field"><span class="label">Nama Sopir</span><div class="value">{{ $note->driver_name }}</div></div>
         </div>
-        <div class="categories">
-            <span class="label">Jenis</span>
-            @php($knownType = false)
-            @foreach(['Cottonii', 'Spinosum', 'Gracilaria'] as $species)
-                @php($checked = str_contains(mb_strtolower($note->item_name), mb_strtolower($species)))
-                @php($knownType = $knownType || $checked)
-                <span class="check"><span class="box">{{ $checked ? '✓' : '' }}</span>{{ $species }}</span>
-            @endforeach
-            <span class="check"><span class="box">{{ !$knownType ? '✓' : '' }}</span>Lainnya</span>
-            <div class="condition"><span class="label">Kondisi</span>
-                @foreach(['Kering', 'Basah'] as $condition)<span class="check"><span class="box">{{ $note->condition === $condition ? '✓' : '' }}</span>{{ $condition }}</span>@endforeach
-            </div>
-        </div>
         <table class="items">
-            <colgroup><col style="width:6%"><col style="width:20%"><col style="width:9%"><col style="width:18%"><col style="width:11%"><col style="width:10%"><col style="width:13%"><col style="width:13%"></colgroup>
-            <thead><tr><th>NO</th><th>JENIS RUMPUT LAUT</th><th>KONDISI</th><th>JML KARUNG / BAL</th><th>BRUTO (KG)</th><th>TARA (KG)</th><th>NETTO (KG)</th><th>KADAR AIR (%)</th></tr></thead>
+            <colgroup><col style="width:6%"><col style="width:28%"><col style="width:12%"><col style="width:22%"><col style="width:16%"><col style="width:16%"></colgroup>
+            <thead><tr><th>NO</th><th>JENIS RUMPUT LAUT</th><th>KONDISI</th><th>JML KARUNG / BAL</th><th>BRUTO (KG)</th><th>NETTO (KG)</th></tr></thead>
             <tbody>
+                @if($note->relationLoaded('items') && $note->items->isNotEmpty())
+                @foreach($note->items as $item)
+                <tr><td class="center">{{ $loop->iteration }}</td><td>{{ $item->item_name }}</td><td class="center">{{ $note->condition }}</td><td class="center">{{ $item->sack_count }} kemasan</td><td></td><td class="right">{{ number_format($item->quantity_kg,2,',','.') }} kg</td></tr>
+                @endforeach
+                @else
                 <tr>
                     <td class="center">1</td><td>{{ $note->item_name }}</td><td class="center">{{ $note->condition }}</td>
                     <td class="center">{{ $note->packaging ?: ($note->sack_count ? $note->sack_count.' karung' : '') }}</td>
                     <td class="right">{{ $note->gross_weight_kg !== null ? number_format((float) $note->gross_weight_kg, 2, ',', '.') : '' }}</td>
-                    <td class="right">{{ $note->tare_weight_kg !== null ? number_format((float) $note->tare_weight_kg, 2, ',', '.') : '' }}</td>
+                    
                     <td class="right">{{ number_format((float) $note->quantity_kg, 2, ',', '.') }} kg</td>
-                    <td class="right">{{ $note->moisture_percent !== null ? number_format((float) $note->moisture_percent, 2, ',', '.') : '' }}</td>
+                    
                 </tr>
-                @for($row = 2; $row <= 6; $row++)<tr class="blank"><td class="center">{{ $row }}</td>@for($column = 0; $column < 7; $column++)<td></td>@endfor</tr>@endfor
+                @for($row = 2; $row <= 6; $row++)<tr class="blank"><td class="center">{{ $row }}</td>@for($column = 0; $column < 5; $column++)<td></td>@endfor</tr>@endfor
+                @endif
             </tbody>
-            <tfoot><tr><td colspan="3" class="right">TOTAL</td><td class="center">{{ $note->packaging ?: ($note->sack_count ? $note->sack_count.' karung' : '') }}</td><td class="right">{{ $note->gross_weight_kg !== null ? number_format((float) $note->gross_weight_kg, 2, ',', '.') : '' }}</td><td class="right">{{ $note->tare_weight_kg !== null ? number_format((float) $note->tare_weight_kg, 2, ',', '.') : '' }}</td><td class="right">{{ number_format((float) $note->quantity_kg, 2, ',', '.') }}</td><td></td></tr></tfoot>
+            <tfoot><tr><td colspan="3" class="right">TOTAL</td><td class="center">{{ $note->packaging ?: ($note->sack_count ? $note->sack_count.' karung' : '') }}</td><td class="right">{{ $note->gross_weight_kg !== null ? number_format((float) $note->gross_weight_kg, 2, ',', '.') : '' }}</td><td class="right">{{ number_format((float) $note->quantity_kg, 2, ',', '.') }}</td></tr></tfoot>
         </table>
         <div class="notes">
             <div class="label">CATATAN (KONDISI BARANG, NOMOR SEGEL, SELISIH TIMBANG, DLL.)</div>

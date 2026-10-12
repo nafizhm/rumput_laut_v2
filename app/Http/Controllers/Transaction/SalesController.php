@@ -14,6 +14,8 @@ use App\Services\Transaction\SalesService;
 use App\Traits\JsonResponser;
 use Exception;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Request;
 
 class SalesController extends Controller
 {
@@ -23,27 +25,32 @@ class SalesController extends Controller
         protected SalesService $service
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
+        $request->validate(['view' => 'nullable|in:products']);
+        if ($request->input('view') === 'products') {
+            $columns = [
+                ['key' => 'sale_reference', 'label' => 'No. Nota'],
+                ['key' => 'sale_date', 'label' => 'Tanggal', 'render' => 'date', 'sortable' => true],
+                ['key' => 'factory.name', 'label' => 'Konsumen'],
+                ['key' => 'document_item_name', 'label' => 'Produk'],
+                ['key' => 'total_weight_kg', 'label' => 'Berat (Kg)', 'render' => 'weight', 'align' => 'right'],
+                ['key' => 'sold_sacks', 'label' => 'Kemasan', 'align' => 'right'],
+                ['key' => 'price_per_kg', 'label' => 'Harga / Kg', 'render' => 'price', 'align' => 'right'],
+                ['key' => 'total_sale_value', 'label' => 'Nilai Bersih', 'render' => 'total', 'align' => 'right'],
+            ];
+            return view('pages.transaction.sales.products', ['columns' => $columns, 'data' => $this->service->getAllSales()]);
+        }
         $columns = [
-            ['key' => 'invoice_number', 'label' => 'No. Penjualan', 'sortable' => true],
-            ['key' => 'purchase_order.po_number', 'label' => 'Referensi PO', 'render' => 'purchase_order'],
+            ['key' => 'sale_reference', 'label' => 'No. Penjualan', 'sortable' => true],
             ['key' => 'sale_date', 'label' => 'Tanggal', 'render' => 'date', 'sortable' => true],
-            ['key' => 'factory.name', 'label' => 'Pabrik'],
-            ['key' => 'inventory.item_name', 'label' => 'Gudang'],
-            ['key' => 'grade.name', 'label' => 'Grade'],
-            ['key' => 'stock_mode', 'label' => 'Pengeluaran Stok', 'render' => 'stock_mode'],
-            ['key' => 'total_weight_kg', 'label' => 'Berat (Kg)', 'render' => 'weight', 'sortable' => true, 'align' => 'right'],
-            ['key' => 'price_per_kg', 'label' => 'Harga / Kg', 'render' => 'currency', 'align' => 'right'],
+            ['key' => 'factory.name', 'label' => 'Konsumen'],
             ['key' => 'total_sale_value', 'label' => 'Total Nilai', 'render' => 'total_sale_value', 'sortable' => true, 'align' => 'right'],
             ['key' => 'payment_status', 'label' => 'Status', 'render' => 'payment_status', 'align' => 'center'],
-            ['key' => 'paid_amount', 'label' => 'Sudah Dibayar', 'render' => 'paid_amount', 'align' => 'right'],
-            ['key' => 'remaining_amount', 'label' => 'Sisa Tagihan', 'render' => 'remaining_amount', 'align' => 'right'],
-            ['key' => 'payment_date', 'label' => 'Tanggal Bayar', 'render' => 'payment_date'],
-            ['key' => 'action', 'label' => 'Aksi', 'render' => 'action', 'width' => '220px'],
+            ['key' => 'action', 'label' => 'Aksi', 'render' => 'action', 'width' => '160px'],
         ];
 
-        $data = $this->service->getAllSales();
+        $data = $this->service->getSaleNotes();
         $factories = Factory::orderBy('name')->get()->map(fn ($f) => ['value' => $f->id, 'label' => $f->name]);
         $finishedBatches = $this->finishedBatchOptions();
         $inventories = Inventory::where('stock_stage', 'finished')
@@ -76,6 +83,16 @@ class SalesController extends Controller
             ])->filter(fn ($po) => $po['remaining_kg'] > 0)->values();
     }
 
+    public function create()
+    {
+        abort_unless(auth()->user()->can('manajemen-penjualan.create'), 403);
+        return view('pages.transaction.sales.create', [
+            'factories' => Factory::orderBy('name')->get(['id', 'name']),
+            'purchaseOrders' => $this->purchaseOrderOptions(),
+            'finishedBatches' => $this->finishedBatchOptions(),
+        ]);
+    }
+
     public function purchaseOrders()
     {
         return $this->successResponse('PO tersedia untuk penjualan', $this->purchaseOrderOptions());
@@ -97,9 +114,10 @@ class SalesController extends Controller
         return $this->successResponse('Batch barang jadi tersedia', $this->finishedBatchOptions());
     }
 
-    public function data()
+    public function data(Request $request)
     {
-        $data = $this->service->getAllSales();
+        $request->validate(['view' => 'nullable|in:products']);
+        $data = $request->input('view') === 'products' ? $this->service->getAllSales() : $this->service->getSaleNotes();
 
         return $this->successResponse('Data penjualan berhasil diambil', $data);
     }
@@ -107,9 +125,18 @@ class SalesController extends Controller
     public function store(StoreSaleRequest $request)
     {
         try {
+            if ($request->has('items')) {
+                abort_unless($request->user()->can('manajemen-penjualan.create'), 403);
+                $sales = $this->service->createCart($request->validated());
+                return $this->successResponse('Penjualan berhasil dicatat', [
+                    'number' => $sales[0]->sale_group_number, 'item_count' => count($sales),
+                ]);
+            }
             $this->service->createSale($request->validated());
 
             return $this->successResponse('Penjualan berhasil dicatat');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

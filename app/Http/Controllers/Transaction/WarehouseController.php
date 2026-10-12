@@ -76,8 +76,10 @@ class WarehouseController extends Controller
     public function transfer(TransferStockRequest $request)
     {
         try {
-            $this->service->transfer($request->validated());
+            app(\App\Services\Transaction\AreaStockTransferService::class)->transfer($request->validated());
             return $this->successResponse('Transfer stok berhasil dicatat');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -86,11 +88,23 @@ class WarehouseController extends Controller
     public function adjustment(AdjustmentRequest $request)
     {
         try {
-            $this->service->adjustment($request->validated());
+            app(\App\Services\Transaction\AreaStockAdjustmentService::class)->save($request->validated());
             return $this->successResponse('Penyesuaian stok berhasil dicatat');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
+    }
+
+    public function transferData()
+    {
+        return $this->successResponse('Data area berhasil diambil', app(\App\Services\Transaction\AreaStockTransferService::class)->options());
+    }
+
+    public function adjustmentData()
+    {
+        return $this->successResponse('Data area berhasil diambil', app(\App\Services\Transaction\AreaStockAdjustmentService::class)->areas());
     }
 
     public function stockData()

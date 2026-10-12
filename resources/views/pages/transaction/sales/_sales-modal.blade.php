@@ -1,133 +1,36 @@
 <div x-data="salesFormComponent()">
-    <x-modal name="sales-modal" maxWidth="max-w-[720px]">
-        <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">Tambah Penjualan</h4>
-
-        <form @submit.prevent="submit" class="max-h-[70vh] overflow-y-auto pr-1">
-            <div class="space-y-4">
-                <div>
-                    <label for="sale-source" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Jenis Penjualan</label>
-                    <select id="sale-source" x-model="form.data.sale_source" @change="changeSource()" class="h-11 w-full rounded-lg border border-gray-300 px-4 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
-                        <option value="direct">Penjualan langsung (tanpa PO)</option>
-                        <option value="po">Penjualan melalui PO konsumen</option>
-                    </select>
-                </div>
-                <div x-show="form.data.sale_source === 'po'" x-cloak>
-                    <label for="sale-po" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">PO Konsumen</label>
-                    <select id="sale-po" x-model="form.data.customer_purchase_order_id" @change="selectPurchaseOrder()" :required="form.data.sale_source === 'po'" class="h-11 w-full rounded-lg border border-gray-300 px-4 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
-                        <option value="">Pilih PO konsumen</option>
-                        <template x-for="order in purchaseOrders" :key="order.id"><option :value="order.id" x-text="order.label + ' / Sisa ' + formatWeight(order.remaining_kg)"></option></template>
-                    </select>
-                    <p x-show="form.getError('customer_purchase_order_id')" x-text="form.getError('customer_purchase_order_id')" class="mt-1 text-xs text-error-500"></p>
-                    <x-info-help><p class="mt-1 text-xs text-gray-500">PO yang sudah dipenuhi tidak ditampilkan. PO lama perlu dilengkapi pabriknya terlebih dahulu.</p></x-info-help>
-                    <label for="sale-po-item" class="mt-3 mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Barang yang Dipenuhi</label>
-                    <select id="sale-po-item" x-model="form.data.customer_purchase_order_item_id" @change="selectPurchaseOrderItem()" :required="form.data.sale_source === 'po'" class="h-11 w-full rounded-lg border border-gray-300 px-4 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
-                        <option value="">Pilih barang dari PO</option>
-                        <template x-for="item in (selectedOrder?.items || [])" :key="item.id"><option :value="item.id" x-text="item.description + ' / Sisa ' + formatWeight(item.remaining_kg)"></option></template>
-                    </select>
-                    <p class="mt-1 text-xs text-error-500" x-text="form.getError('customer_purchase_order_item_id')"></p>
-                    <p x-show="selectedOrderItem" class="mt-2 text-sm text-gray-700 dark:text-gray-300" x-text="selectedOrderItem ? 'Barang pesanan: ' + selectedOrderItem.description + ' · Sisa pesanan: ' + formatWeight(selectedOrderItem.remaining_kg) : ''"></p>
-                </div>
-                <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Mekanisme Pengeluaran Stok</label>
-                    <select x-model="form.data.stock_mode" class="h-11 w-full rounded-lg border border-gray-300 px-4 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
-                        <option value="immediate">Langsung — barang diserahkan saat penjualan</option>
-                        <option value="delivery_note">Melalui Surat Jalan — stok keluar saat Konfirmasi Dikirim</option>
-                    </select>
-                    <x-info-help label="Keterangan pengeluaran stok"><p x-text="form.data.stock_mode === 'delivery_note' ? 'Penjualan ini belum memotong atau memesan stok. Siapkan Surat Jalan dan konfirmasi setelah barang keluar.' : 'Stok langsung berkurang saat penjualan disimpan. Jangan pilih ini untuk pengiriman melalui Surat Jalan.'"></p></x-info-help>
-                </div>
-                <div x-show="form.data.sale_source === 'direct'">
-                <x-select label="Pabrik" name="factory_id" :options="$factories"
-                    x-on:change="$dispatch('update-sales-field', { field: 'factory_id', value: $event.detail })"
-                    alpine-error="form.getError('factory_id')" required />
-                </div>
-                <div x-show="form.data.sale_source === 'po'" x-cloak>
-                    <x-input label="Konsumen dari PO" name="po_customer" x-bind:value="selectedOrder ? selectedOrder.label : ''" readonly />
-                </div>
-
-                <div>
-                    <label class="block text-sm text-gray-700 dark:text-gray-300">Area Ready / Batch Siap Jual
-                        <select x-model="stockKey" @change="selectGrade()" required class="mt-2 w-full rounded-lg border bg-white p-3 dark:bg-gray-900">
-                            <option value="">Pilih area ready / batch</option>
-                            <template x-for="stock in gradeStocks.filter(s => !selectedOrderItem?.quality_grade_id || s.gradeId == selectedOrderItem.quality_grade_id)" :key="stock.key">
-                                <option :value="stock.key" x-text="stock.label + ' / ' + formatWeight(stock.weight) + ' / ' + stock.packages + ' kemasan'"></option>
-                            </template>
-                        </select>
-                    </label>
-                    <p x-show="form.getError('quality_grade_id')" x-text="form.getError('quality_grade_id')" class="text-xs text-red-600"></p>
-                    <p x-show="form.getError('sold_sacks')" x-text="form.getError('sold_sacks')" class="text-xs text-red-600"></p>
-                    <p x-show="!gradeStocks.length" class="text-sm text-gray-500">Belum ada barang jadi siap jual. Selesaikan timbang dan packing terlebih dahulu.</p>
-                    <x-info-help>Pilih batch dari area barang ready sesuai lokasi penyimpanan fisik. Untuk Surat Jalan, stok diambil saat Konfirmasi Dikirim.</x-info-help>
-                </div>
-                <x-input label="Tanggal Penjualan" name="sale_date" type="date" x-model="form.data.sale_date"
-                    alpine-error="form.getError('sale_date')" required />
-
-                <div class="grid grid-cols-2 gap-4">
-                    <x-input label="Berat Terjual (Kg)" name="sold_weight_kg" x-model="form.data.sold_weight_kg" :isNumeric="true" :numericDecimals="2"
-                        alpine-error="form.getError('sold_weight_kg')" required />
-                    <x-input label="Jumlah Kemasan Jadi" name="sold_sacks" type="number" min="1" x-model="form.data.sold_sacks"
-                        alpine-error="form.getError('sold_sacks')" required />
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <x-input label="Harga / Kg" name="price_per_kg" x-model="form.data.price_per_kg" :isCurrency="true"
-                        :currencyDecimals="2" x-bind:readonly="form.data.sale_source === 'po'" alpine-error="form.getError('price_per_kg')" required />
-                    <x-input label="Bonus / Karung (Kg)" name="deduction_weight_kg" x-model="form.data.deduction_weight_kg" :isNumeric="true" :numericDecimals="2"
-                        alpine-error="form.getError('deduction_weight_kg')" required />
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <x-select label="Jenis Potongan" name="deduction_type" :options="[
-                        ['label' => 'Tidak Ada', 'value' => 'none'],
-                        ['label' => 'Persentase', 'value' => 'percentage'],
-                        ['label' => 'Nominal', 'value' => 'nominal'],
-                        ['label' => 'Berat (Kg)', 'value' => 'weight'],
-                    ]"
-                        x-on:change="$dispatch('update-sales-field', { field: 'deduction_type', value: $event.detail })"
-                        alpine-error="form.getError('deduction_type')" required />
-
-                    <div x-show="form.data.deduction_type === 'nominal'">
-                        <x-input label="Nilai Potongan" name="deduction_value_nominal"
-                            x-model="form.data.deduction_value"
-                            :isCurrency="true"
-                            alpine-error="form.getError('deduction_value')" />
-                    </div>
-                    <div x-show="form.data.deduction_type === 'percentage' || form.data.deduction_type === 'weight'">
-                        <x-input label="Nilai Potongan" name="deduction_value_numeric"
-                            x-model="form.data.deduction_value"
-                            :isNumeric="true"
-                            :numericDecimals="2"
-                            alpine-error="form.getError('deduction_value')" />
-                    </div>
-                </div>
-
-                <div class="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/70">
-                    <h5 class="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Ringkasan Pembayaran</h5>
-                    <div class="space-y-3 text-sm">
-                        <div class="flex items-center justify-between">
-                            <span class="text-gray-500 dark:text-gray-400">Nilai Kotor</span>
-                            <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(grossSaleValue)"></span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-gray-500 dark:text-gray-400">Potongan Penjualan</span>
-                            <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(totalDeductionAmount)"></span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-gray-500 dark:text-gray-400">Total Nilai Jual</span>
-                            <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(totalSaleValue)"></span>
-                        </div>
-                    </div>
-                </div>
+    <x-modal name="sale-detail-modal" maxWidth="max-w-4xl">
+        <div class="max-h-[75vh] space-y-5 overflow-y-auto pr-1 text-gray-800 dark:text-gray-200">
+            <div class="flex flex-wrap justify-between gap-3"><div><h3 class="text-xl font-semibold" x-text="detailItem?.sale_reference"></h3><p class="mt-1 text-sm text-gray-500" x-text="detailItem ? formatDisplayDate(detailItem.sale_date) + ' / ' + detailItem.factory?.name : ''"></p></div><span class="text-sm" x-text="detailItem?.payment_status_label"></span></div>
+            <p x-show="detailItem?.purchase_order" class="text-sm" x-text="'Referensi PO: ' + (detailItem?.purchase_order?.po_number || '')"></p>
+            <section class="space-y-3"><h4 class="font-semibold">Barang dalam Nota</h4>
+                <template x-for="row in (detailItem?.items || [])" :key="row.id"><div class="rounded-lg border p-3 dark:border-gray-700">
+                    <div class="flex flex-wrap justify-between gap-2"><strong class="text-sm" x-text="row.document_item_name"></strong><strong class="text-sm tabular-nums" x-text="formatCurrency(row.total_sale_value)"></strong></div>
+                    <div class="mt-2 grid gap-2 text-sm text-gray-500 sm:grid-cols-3"><span x-text="formatWeight(row.total_weight_kg) + ' / ' + (row.sold_sacks || 0) + ' kemasan'"></span><span x-text="'Harga / Kg: ' + formatCurrency(row.price_per_kg)"></span><span x-text="'Bonus / kemasan: ' + formatWeight(row.deduction_weight_kg || 0)"></span></div>
+                    <p class="mt-2 text-xs text-gray-500" x-text="'Pembayaran: ' + row.payment_status_label"></p>
+                    <a x-show="row.invoice" href="{{ route('invoice.index') }}" class="mt-2 block text-sm text-brand-600" x-text="'Invoice: ' + (row.invoice?.number || '')"></a>
+                    <a x-show="row.payment_proof_url" :href="row.payment_proof_url" target="_blank" rel="noopener" class="mt-2 block text-sm text-brand-600">Bukti pembayaran</a>
+                    <p x-show="row.payment_date" class="mt-2 text-xs text-gray-500" x-text="row.payment_date ? 'Tanggal bayar: ' + formatDisplayDate(row.payment_date) : ''"></p>
+                    <p x-show="row.payment_notes" class="mt-2 text-xs text-gray-500" x-text="row.payment_notes"></p>
+                </div></template>
+            </section>
+            <div class="space-y-3 rounded-lg bg-gray-50 p-4 text-sm dark:bg-gray-800">
+                <div class="flex justify-between"><span>Nilai barang</span><span class="tabular-nums" x-text="formatCurrency(detailGross)"></span></div>
+                <div class="flex justify-between"><span>Total bonus &amp; potongan</span><span class="tabular-nums" x-text="formatCurrency(detailGross - (detailItem?.total_sale_value || 0))"></span></div>
+                <div class="flex justify-between font-semibold"><span>Total nota</span><span class="tabular-nums" x-text="formatCurrency(detailItem?.total_sale_value || 0)"></span></div>
+                <div class="flex justify-between"><span>Sudah dibayar</span><span class="tabular-nums" x-text="formatCurrency(detailItem?.paid_amount || 0)"></span></div>
+                <div class="flex justify-between font-semibold"><span>Sisa tagihan</span><span class="tabular-nums" x-text="formatCurrency(detailItem?.remaining_amount || 0)"></span></div>
             </div>
-
-            <div class="mt-6 flex justify-end gap-3">
-                <button type="button" @click="$dispatch('close-modal', 'sales-modal')" class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Batal</button>
-                <button type="submit" :disabled="form.processing" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">
-                    <span x-show="!form.processing">Simpan</span>
-                    <span x-show="form.processing">Menyimpan...</span>
-                </button>
+            <p x-show="detailItem?.has_invoice" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-700">Nota ini menggunakan invoice. Pelunasan dilakukan melalui menu Invoice.</p>
+            <div class="flex flex-wrap justify-end gap-3">
+                <button type="button" x-show="detailItem?.can_delete" @click="$dispatch('close-modal', 'sale-detail-modal'); $dispatch('delete-sale', detailItem.id)" class="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600">Hapus Nota</button>
+                <button type="button" @click="$dispatch('close-modal', 'sale-detail-modal')" class="rounded-lg border px-4 py-2 text-sm">Tutup</button>
+                <a x-show="detailItem?.has_invoice" href="{{ route('invoice.index') }}" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white">Buka Invoice</a>
+                <button type="button" x-show="detailItem?.can_pay" @click="$dispatch('close-modal', 'sale-detail-modal'); openPaymentModal(detailItem)" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white">Lunasi Nota</button>
             </div>
-        </form>
+        </div>
     </x-modal>
+
 
     <x-delete-modal name="delete-sale-modal"
         message="Apakah anda yakin ingin menghapus penjualan ini? Stok akan dikembalikan dan bukti bayar akan dihapus. Aksi ini tidak dapat dibatalkan."
@@ -141,11 +44,11 @@
                 <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/70">
                     <div class="flex items-center justify-between text-sm">
                         <span class="text-gray-500 dark:text-gray-400">No. Penjualan</span>
-                        <span class="font-semibold text-gray-900 dark:text-white/90" x-text="paymentItem?.invoice_number || '-'"></span>
+                        <span class="font-semibold text-gray-900 dark:text-white/90" x-text="paymentItem?.sale_reference || '-'"></span>
                     </div>
                     <div class="mt-2 flex items-center justify-between text-sm">
-                        <span class="text-gray-500 dark:text-gray-400">Total Penjualan</span>
-                        <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(paymentItem?.total_sale_value || 0)"></span>
+                        <span class="text-gray-500 dark:text-gray-400">Sisa Tagihan Nota</span>
+                        <span class="text-right tabular-nums font-semibold text-gray-900 dark:text-white/90" x-text="formatCurrency(paymentItem?.remaining_amount || 0)"></span>
                     </div>
                 </div>
 
@@ -181,242 +84,35 @@
 <script>
 function salesFormComponent() {
     return {
-        inventories: @json($inventories),
-        purchaseOrders: @json($purchaseOrders),
-        finishedBatches: @json($finishedBatches),
-        stockKey: '',
-        paymentItem: null,
-        deleteId: null,
-
-        form: useForm({
-            sale_source: 'direct',
-            customer_purchase_order_id: '',
-            customer_purchase_order_item_id: '',
-            stock_mode: 'immediate',
-            factory_id: '',
-            inventory_id: '',
-            quality_grade_id: '',
-            finished_batch_id: '',
-            sale_date: window.getLocalDateInputValue(),
-            sold_weight_kg: 0,
-            price_per_kg: 0,
-            sold_sacks: 0,
-            deduction_type: 'none',
-            deduction_value: 0,
-            deduction_weight_kg: 1,
-        }),
-
-        paymentForm: useForm({
-            payment_date: window.getLocalDateInputValue(),
-            paid_amount: 0,
-            payment_notes: '',
-            payment_proof: null,
-        }),
-
-        get grossSaleValue() {
-            return (parseFloat(this.form.data.sold_weight_kg) || 0) * (parseFloat(this.form.data.price_per_kg) || 0);
-        },
-
-        get weightDeductionAmount() {
-            const sacks = parseInt(this.form.data.sold_sacks) || 0;
-            const extra = parseFloat(this.form.data.deduction_weight_kg) || 0;
-            const price = parseFloat(this.form.data.price_per_kg) || 0;
-            return sacks * extra * price;
-        },
-
-        get typeDeductionAmount() {
-            const price = parseFloat(this.form.data.price_per_kg) || 0;
-            const weightDeductionAmount = this.weightDeductionAmount;
-            const valueAfterWeight = Math.max(0, this.grossSaleValue - weightDeductionAmount);
-            const deductionValue = parseFloat(this.form.data.deduction_value) || 0;
-
-            if (this.form.data.deduction_type === 'percentage') {
-                return valueAfterWeight * (deductionValue / 100);
-            }
-            if (this.form.data.deduction_type === 'nominal') {
-                return deductionValue;
-            }
-            if (this.form.data.deduction_type === 'weight') {
-                return deductionValue * price;
-            }
-            return 0;
-        },
-
-        get totalDeductionAmount() {
-            return this.weightDeductionAmount + this.typeDeductionAmount;
-        },
-
-        get totalSaleValue() {
-            return Math.max(0, this.grossSaleValue - this.totalDeductionAmount);
-        },
-
-        get gradeStocks() {
-            return this.finishedBatches.map(batch => ({
-                key: String(batch.id), batchId: batch.id,
-                inventoryId: batch.inventory_id, gradeId: batch.quality_grade_id,
-                label: batch.label, weight: Number(batch.weight_kg), packages: Number(batch.packages),
-            }));
-        },
-        selectGrade() {
-            const stock = this.gradeStocks.find(s => s.key === this.stockKey);
-            this.form.data.inventory_id = stock?.inventoryId || '';
-            this.form.data.finished_batch_id = stock?.batchId || '';
-            this.form.data.quality_grade_id = '';
-        },
-        get selectedInventory() {
-            return this.inventories.find(i => i.value == this.form.data.inventory_id);
-        },
-
-        get selectedOrder() {
-            return this.purchaseOrders.find(order => order.id == this.form.data.customer_purchase_order_id);
-        },
-
-        get selectedOrderItem() {
-            return this.selectedOrder?.items.find(item => item.id == this.form.data.customer_purchase_order_item_id);
-        },
-
-        changeSource() {
-            this.form.data.customer_purchase_order_id = '';
-            this.form.data.customer_purchase_order_item_id = '';
-            this.form.data.finished_batch_id = ''; this.form.data.quality_grade_id = ''; this.stockKey = ''; this.form.data.inventory_id = '';
-            this.form.data.factory_id = '';
-            this.form.data.sold_weight_kg = 0;
-            this.form.data.price_per_kg = 0;
-            this.form.data.deduction_weight_kg = this.form.data.sale_source === 'po' ? 0 : 1;
-            this.form.clearErrors();
-            window.dispatchEvent(new CustomEvent('set-selected-factory_id', { detail: null }));
-        },
-
-        selectPurchaseOrder() {
-            const order = this.selectedOrder;
-            this.form.data.factory_id = order?.factory_id || '';
-            this.form.data.customer_purchase_order_item_id = order?.items.length === 1 ? order.items[0].id : '';
-            this.selectPurchaseOrderItem();
-            this.form.clearErrors();
-        },
-
-        selectPurchaseOrderItem() {
-            const item = this.selectedOrderItem;
-            this.form.data.price_per_kg = item?.price_per_kg || 0;
-            this.form.data.sold_weight_kg = item?.remaining_kg || 0;
-            this.form.data.finished_batch_id = ''; this.form.data.quality_grade_id = ''; this.stockKey = ''; this.form.data.inventory_id = '';
-            this.form.clearErrors();
-        },
-
-        async refreshPurchaseOrders() {
-            try {
-                const response = await fetch('{{ route('manajemen-penjualan.purchase-orders') }}', { headers: { Accept: 'application/json' } });
-                const result = await response.json();
-                if (result.success) this.purchaseOrders = result.data;
-            } catch (error) { console.error('Gagal refresh PO:', error); }
-        },
-
+        form: useForm({}), paymentItem: null, detailItem: null, deleteId: null,
+        get detailGross() { return (this.detailItem?.items || []).reduce((sum, row) => sum + Number(row.total_weight_kg) * Number(row.price_per_kg), 0); },
+        paymentForm: useForm({payment_date: window.getLocalDateInputValue(), paid_amount: 0, payment_notes: '', payment_proof: null}),
         init() {
-            window.addEventListener('create-entity', () => {
-                this.refreshPurchaseOrders();
-                this.form.reset();
-                this.stockKey = '';
-                this.refreshInventories();
-                this.form.clearErrors();
-                this.form.data.sale_date = window.getLocalDateInputValue();
-                this.form.data.deduction_weight_kg = 1;
-                window.dispatchEvent(new CustomEvent('set-selected-factory_id', { detail: null }));
-                window.dispatchEvent(new CustomEvent('set-selected-inventory_id', { detail: null }));
-                window.dispatchEvent(new CustomEvent('set-selected-deduction_type', { detail: null }));
-                this.$dispatch('open-modal', 'sales-modal');
-            });
-
-            window.addEventListener('update-sales-field', (e) => {
-                if (e.detail.field === 'factory_id' && this.form.data.sale_source === 'po') return;
-                this.form.data[e.detail.field] = e.detail.value;
-            });
-            window.addEventListener('open-pay-sale', (e) => this.openPaymentModal(e.detail));
-            window.addEventListener('delete-sale', (e) => this.deleteItem(e.detail));
+            window.addEventListener('view-sale-note', event => { this.detailItem = event.detail; this.$dispatch('open-modal', 'sale-detail-modal'); });
+            window.addEventListener('open-pay-sale', event => this.openPaymentModal(event.detail));
+            window.addEventListener('delete-sale', event => { this.deleteId = event.detail; this.$dispatch('open-modal', 'delete-sale-modal'); });
         },
-
-        deleteItem(id) {
-            this.deleteId = id;
-            this.$dispatch('open-modal', 'delete-sale-modal');
-        },
-
         async deleteConfirmed() {
             await this.form.submit('delete', `{{ url('manajemen-penjualan') }}/${this.deleteId}`, {
-                onSuccess: (res) => {
-                    toast.success('Berhasil', res.data.message);
-                    refreshDataTable('salesTable');
-                    this.$dispatch('close-modal', 'delete-sale-modal');
-                    this.refreshInventories();
-                },
-                onError: (err) => {
-                    toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan saat menghapus data');
-                }
+                onSuccess: response => { toast.success('Berhasil', response.data.message); refreshDataTable('salesTable'); this.$dispatch('close-modal', 'delete-sale-modal'); },
+                onError: error => toast.error('Gagal', error.response?.data?.message || 'Penjualan belum dapat dihapus.')
             });
         },
-
         openPaymentModal(item) {
-            this.paymentItem = item;
-            this.paymentForm.reset();
-            this.paymentForm.clearErrors();
-            this.paymentForm.data.payment_date = window.getLocalDateInputValue();
-            this.paymentForm.data.paid_amount = item.total_sale_value || 0;
-            this.paymentForm.data.payment_proof = null;
-            if (this.$refs.paymentProofInput) {
-                this.$refs.paymentProofInput.value = '';
-            }
+            if (!item.can_pay || item.has_invoice) return;
+            this.paymentItem = item; this.paymentForm.reset(); this.paymentForm.clearErrors();
+            this.paymentForm.data.payment_date = window.getLocalDateInputValue(); this.paymentForm.data.paid_amount = item.remaining_amount || 0;
+            if (this.$refs.paymentProofInput) this.$refs.paymentProofInput.value = '';
             this.$dispatch('open-modal', 'pay-sale-modal');
         },
-
-        async refreshInventories() {
-            this.refreshPurchaseOrders();
-            try {
-                const res = await fetch('/warehouse-stock');
-                const result = await res.json();
-                if (result.success && result.data) {
-                    const batchResult = await fetch('{{ route('manajemen-penjualan.batches') }}').then(r => r.json());
-                    this.finishedBatches = batchResult.data || [];
-                    this.inventories = result.data.filter(item => item.stock_stage === 'finished' && this.finishedBatches.some(batch => batch.inventory_id == item.value));
-                }
-            } catch (e) {
-                console.error('Gagal refresh stok:', e);
-            }
-        },
-
-        async submit() {
-            await this.form.submit('post', '{{ route("manajemen-penjualan.store") }}', {
-                onSuccess: (res) => {
-                    toast.success('Berhasil', res.data.message);
-                    refreshDataTable('salesTable');
-                    this.$dispatch('close-modal', 'sales-modal');
-                    this.refreshInventories();
-                },
-                onError: (err) => {
-                    toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan sistem');
-                }
-            });
-        },
-
         async submitPayment() {
             await this.paymentForm.submit('post', `{{ url('manajemen-penjualan') }}/${this.paymentItem.id}/pay`, {
-                transform: (data) => {
-                    const formData = new FormData();
-                    Object.entries(data).forEach(([key, value]) => {
-                        if (value !== null && value !== undefined) {
-                            formData.append(key, value);
-                        }
-                    });
-                    return formData;
-                },
-                onSuccess: (res) => {
-                    toast.success('Berhasil', res.data.message);
-                    refreshDataTable('salesTable');
-                    this.$dispatch('close-modal', 'pay-sale-modal');
-                },
-                onError: (err) => {
-                    toast.error('Gagal', err.response?.data?.message || 'Terjadi kesalahan sistem');
-                }
+                transform: data => { const body = new FormData(); Object.entries(data).forEach(([key,value]) => { if (value !== null && value !== undefined) body.append(key,value); }); return body; },
+                onSuccess: response => { toast.success('Berhasil', response.data.message); refreshDataTable('salesTable'); this.$dispatch('close-modal', 'pay-sale-modal'); },
+                onError: error => toast.error('Gagal', error.response?.data?.message || 'Pembayaran belum dapat disimpan.')
             });
         }
-    }
+    };
 }
 </script>
 @endpush

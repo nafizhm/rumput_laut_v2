@@ -25,6 +25,7 @@ class SaveCustomerPurchaseOrderRequest extends FormRequest
             'price_per_kg' => ['required_without:items', 'numeric', 'decimal:0,2', 'min:0', 'max:999999999.99'],
             'items' => ['sometimes', 'array', 'min:1', 'max:50'],
             'items.*.id' => ['nullable', 'integer', 'distinct'],
+            'items.*.item_name' => ['sometimes', 'required', 'string', 'max:255'],
             'items.*.quality_grade_id' => ['nullable', 'integer', 'distinct', Rule::exists('quality_grades', 'id')->where('is_active', true)],
             'items.*.quantity_kg' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:999999999.99'],
             'items.*.price_per_kg' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:999999999.99'],

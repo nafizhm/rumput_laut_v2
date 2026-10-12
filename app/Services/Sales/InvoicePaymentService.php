@@ -111,12 +111,16 @@ class InvoicePaymentService
         if (! $invoice->sales_transaction_id) {
             return;
         }
-        $sale = SalesTransaction::lockForUpdate()->findOrFail($invoice->sales_transaction_id);
-        $sale->update([
-            'paid_amount' => (int) $invoice->paid_amount,
-            // Existing sale schema supports unpaid/paid; amount exposes partial payments.
-            'payment_status' => $invoice->payment_status === 'paid' ? 'paid' : 'unpaid',
-            'payment_date' => $invoice->payments()->max('payment_date'),
-        ]);
+        $remaining = (int) $invoice->paid_amount;
+        foreach ($invoice->saleItems() as $item) {
+            $sale = SalesTransaction::lockForUpdate()->findOrFail($item->id);
+            $amount = min($remaining, (int) $sale->total_sale_value);
+            $remaining -= $amount;
+            $sale->update([
+                'paid_amount' => $amount,
+                'payment_status' => $amount >= (int) $sale->total_sale_value ? 'paid' : 'unpaid',
+                'payment_date' => $amount > 0 ? $invoice->payments()->max('payment_date') : null,
+            ]);
+        }
     }
 }

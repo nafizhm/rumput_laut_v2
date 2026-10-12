@@ -19,6 +19,8 @@ class SalesTransaction extends Model
     use HasOperationalJournals;
 
     protected $fillable = [
+        'sale_group_number',
+        'item_name',
         'customer_purchase_order_id',
         'customer_purchase_order_item_id',
         'finished_batch_id',
@@ -48,6 +50,8 @@ class SalesTransaction extends Model
     ];
 
     protected $appends = [
+        'document_item_name',
+        'sale_reference',
         'payment_proof_url',
         'payment_status_label',
         'remaining_amount',
@@ -70,7 +74,12 @@ class SalesTransaction extends Model
 
     public function getDocumentItemNameAttribute(): string
     {
-        return $this->purchaseOrderItem?->description ?? $this->grade?->name ?? $this->inventory->item_name;
+        return $this->item_name ?: ($this->purchaseOrderItem?->description ?? $this->grade?->name ?? $this->inventory?->item_name ?? 'Rumput Laut');
+    }
+
+    public function getSaleReferenceAttribute(): string
+    {
+        return $this->sale_group_number ?: $this->invoice_number;
     }
 
     public function grade(): BelongsTo

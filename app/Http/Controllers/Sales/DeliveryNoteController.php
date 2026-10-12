@@ -7,6 +7,8 @@ use App\Http\Requests\Sales\SaveDeliveryNoteRequest;
 use App\Models\CustomerPurchaseOrder;
 use App\Models\DeliveryNote;
 use App\Models\SalesTransaction;
+use App\Models\FinishedBatch;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\Request;
 use App\Services\Sales\DeliveryNoteService;
 use App\Traits\JsonResponser;
@@ -20,11 +22,9 @@ class DeliveryNoteController extends Controller
     public function index()
     {
         $columns = [
-            ['key' => 'number', 'label' => 'No. Surat Jalan', 'sortable' => true],
-            ['key' => 'sale.invoice_number', 'label' => 'Penjualan'],
+            ['key' => 'number', 'label' => 'Surat Jalan', 'sortable' => true, 'render' => 'document', 'width' => '240px'],
             ['key' => 'status', 'label' => 'Status', 'render' => 'status'],
             ['key' => 'shipped_date', 'label' => 'Tanggal Kirim Aktual', 'render' => 'shipped_date'],
-            ['key' => 'delivery_date', 'label' => 'Tanggal', 'sortable' => true, 'render' => 'date'],
             ['key' => 'recipient_name', 'label' => 'Penerima', 'sortable' => true],
             ['key' => 'item_name', 'label' => 'Barang', 'sortable' => true],
             ['key' => 'quantity_kg', 'label' => 'Jumlah (Kg)', 'render' => 'weight', 'align' => 'right'],
@@ -40,13 +40,21 @@ class DeliveryNoteController extends Controller
             'item_name' => $order->item_name, 'quantity_kg' => $order->quantity_kg,
         ]);
         $sales = SalesTransaction::with(['factory', 'inventory'])->where('stock_mode', 'delivery_note')->orderByDesc('sale_date')->get()->map(fn ($sale) => [
-            'value' => $sale->id, 'label' => $sale->invoice_number.' - '.$sale->factory->name,
+            'value' => $sale->id, 'label' => $sale->sale_reference.' - '.$sale->factory->name.' - '.$sale->document_item_name,
             'recipient_name' => $sale->factory->name, 'destination_address' => $sale->factory->address ?? '',
             'item_name' => $sale->document_item_name, 'origin' => $sale->inventory->item_name,
             'quantity_kg' => $sale->total_weight_kg, 'sack_count' => $sale->sold_sacks ?? 0,
             'customer_purchase_order_id' => $sale->customer_purchase_order_id,
+            'select_batch' => (bool) ($sale->sale_group_number && !$sale->finished_batch_id),
+            'quality_grade_id' => $sale->quality_grade_id,
         ]);
-        return view('pages.sales.delivery-note.index', compact('data', 'columns', 'orders', 'sales'));
+        $batches = Schema::hasTable('finished_batches') ? FinishedBatch::with('area')->where('remaining_weight_kg', '>', 0)->where('remaining_packages', '>', 0)
+            ->whereHas('run', fn ($q) => $q->where('status', 'packed'))
+            ->whereHas('area', fn ($q) => $q->where('is_active', true)->where('usage', 'finished'))->get()->map(fn ($b) => [
+                'id' => $b->id, 'quality_grade_id' => $b->quality_grade_id, 'area_name' => $b->area->name,
+                'label' => $b->area->name.' / '.$b->code.' / '.$b->remaining_weight_kg.' Kg / '.$b->remaining_packages.' kemasan',
+            ]) : collect();
+        return view('pages.sales.delivery-note.index', compact('data', 'columns', 'orders', 'sales', 'batches'));
     }
 
     public function data()
@@ -54,15 +62,38 @@ class DeliveryNoteController extends Controller
         return $this->successResponse('Data surat jalan berhasil diambil', $this->service->getAll());
     }
 
+    public function create() { return view('pages.sales.delivery-note.form', $this->formData()); }
+    public function edit(DeliveryNote $surat_jalan) {
+        abort_unless($surat_jalan->status === 'draft',403,'Hanya draft yang dapat diedit.');
+        return view('pages.sales.delivery-note.form', $this->formData($surat_jalan));
+    }
+    private function formData(?DeliveryNote $note=null): array {
+        $sales = SalesTransaction::with(['factory','inventory','stockMovements','purchaseOrderItem','grade'])->where('stock_mode','delivery_note')->orderByDesc('sale_date')->get();
+        $sales = $sales->groupBy(fn($s)=>$s->sale_group_number ?: 'sale:'.$s->id)->map(function($rows) {
+            $first=$rows->sortBy('id')->first();
+            return ['id'=>$first->id,'label'=>$first->sale_reference.' / '.$first->factory->name,
+                'recipient_name'=>$first->factory->name,'destination_address'=>$first->factory->address ?? '',
+                'items'=>$rows->map(fn($s)=>['sales_transaction_id'=>$s->id,'item_name'=>$s->document_item_name,
+                    'quantity_kg'=>max(0,(float)$s->total_weight_kg-$s->stockMovements->sum('weight_kg')),
+                    'sack_count'=>max(0,(int)$s->sold_sacks-$s->stockMovements->sum('sack_count')),
+                    'finished_batch_id'=>$s->finished_batch_id, 'select_batch'=>(bool)($s->sale_group_number && !$s->finished_batch_id), 'quality_grade_id'=>$s->quality_grade_id])->values()];
+        })->values();
+        $batches = Schema::hasTable('finished_batches') ? FinishedBatch::with('area')->where('remaining_weight_kg','>',0)->where('remaining_packages','>',0)->whereHas('run',fn($q)=>$q->where('status','packed'))->whereHas('area',fn($q)=>$q->where('is_active',true)->where('usage','finished'))->get()->map(fn($b)=>['id'=>$b->id,'quality_grade_id'=>$b->quality_grade_id,'label'=>$b->area->name.' / '.$b->code.' / '.$b->remaining_weight_kg.' Kg / '.$b->remaining_packages.' kemasan']) : collect();
+        if ($note) $note->load('items');
+        return compact('sales','batches','note');
+    }
+
     public function store(SaveDeliveryNoteRequest $request)
     {
-        $this->service->store($request->validated());
+        if ($request->has('items')) $this->service->saveItems($request->validated());
+        else $this->service->store($request->validated());
         return $this->successResponse('Surat jalan berhasil ditambahkan');
     }
 
     public function update(SaveDeliveryNoteRequest $request, DeliveryNote $surat_jalan)
     {
-        $this->service->update($surat_jalan, $request->validated());
+        if ($request->has('items')) $this->service->saveItems($request->validated(), $surat_jalan);
+        else $this->service->update($surat_jalan, $request->validated());
         return $this->successResponse('Surat jalan berhasil diperbarui');
     }
 
@@ -74,6 +105,7 @@ class DeliveryNoteController extends Controller
 
     public function print(DeliveryNote $surat_jalan)
     {
+        if (Schema::hasTable('delivery_note_items')) $surat_jalan->load('items');
         return view('pages.sales.delivery-note.print', ['note' => $surat_jalan, 'profile' => \App\Models\CompanyProfile::current()]);
     }
 

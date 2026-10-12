@@ -77,19 +77,25 @@ class InvoiceService
             return $data;
         }
         $sale = SalesTransaction::with(['factory', 'inventory'])->lockForUpdate()->findOrFail($saleId);
-        if (Invoice::where('sales_transaction_id', $sale->id)->when($invoice, fn ($q) => $q->where('id', '!=', $invoice->id))->exists()) {
+        $items = SalesTransaction::with(['factory', 'inventory'])
+            ->when($sale->sale_group_number, fn ($query) => $query->where('sale_group_number', $sale->sale_group_number), fn ($query) => $query->whereKey($sale->id))
+            ->orderBy('id')->lockForUpdate()->get();
+        if ($items->contains(fn ($item) => $item->factory_id !== $sale->factory_id || $item->customer_purchase_order_id !== $sale->customer_purchase_order_id)) {
+            throw ValidationException::withMessages(['sales_transaction_id' => 'Seluruh barang penjualan harus memiliki konsumen dan PO yang sama.']);
+        }
+        if (Invoice::whereIn('sales_transaction_id', $items->pluck('id'))->when($invoice, fn ($q) => $q->where('id', '!=', $invoice->id))->exists()) {
             throw ValidationException::withMessages(['sales_transaction_id' => 'Penjualan ini sudah memiliki invoice.']);
         }
-        if (! $invoice?->sales_transaction_id && ($sale->payment_status === 'paid' || (int) $sale->paid_amount > 0 || (int) $invoice?->paid_amount > 0 || $invoice?->payment_status === 'paid' || $invoice?->payments()->exists())) {
+        if (! $invoice?->sales_transaction_id && ($items->contains(fn ($item) => $item->payment_status === 'paid' || (int) $item->paid_amount > 0) || (int) $invoice?->paid_amount > 0 || $invoice?->payment_status === 'paid' || $invoice?->payments()->exists())) {
             throw ValidationException::withMessages(['sales_transaction_id' => 'Transaksi yang sudah dibayar memerlukan rekonsiliasi sebelum dihubungkan.']);
         }
         if ($invoice && ! $invoice->sales_transaction_id && (
-            (int) round($invoice->total_amount) !== (int) $sale->total_sale_value
+            (int) round($invoice->total_amount) !== (int) $items->sum('total_sale_value')
             || mb_strtolower(trim($invoice->customer_name)) !== mb_strtolower(trim($sale->factory->name))
         )) {
             throw ValidationException::withMessages(['sales_transaction_id' => 'Konsumen dan total invoice lama harus sesuai dengan penjualan sebelum dihubungkan.']);
         }
-        if (strtotime($data['invoice_date']) < strtotime($sale->sale_date->format('Y-m-d'))) {
+        if ($items->contains(fn ($item) => strtotime($data['invoice_date']) < strtotime($item->sale_date->format('Y-m-d')))) {
             throw ValidationException::withMessages(['invoice_date' => 'Tanggal invoice tidak boleh sebelum tanggal penjualan.']);
         }
         $po = CustomerPurchaseOrder::findOrFail($data['customer_purchase_order_id']);
@@ -108,10 +114,10 @@ class InvoiceService
         }
         $data['sales_transaction_id'] = $sale->id;
         $data['customer_name'] = $sale->factory->name;
-        $data['item_name'] = $sale->document_item_name;
-        $data['quantity_kg'] = $sale->total_weight_kg;
-        $data['price_per_kg'] = $sale->price_per_kg;
-        $data['sale_total_amount'] = $sale->total_sale_value;
+        $data['item_name'] = $items->count() > 1 ? 'Penjualan '.$sale->sale_reference : $sale->document_item_name;
+        $data['quantity_kg'] = $items->sum('total_weight_kg');
+        $data['price_per_kg'] = round($items->sum(fn ($item) => (float) $item->total_weight_kg * (float) $item->price_per_kg) / (float) $data['quantity_kg'], 2);
+        $data['sale_total_amount'] = $items->sum('total_sale_value');
         $data['payment_status'] = $invoice?->payment_status ?? 'unpaid';
         $data['paid_amount'] = (int) $invoice?->paid_amount;
 
@@ -122,8 +128,15 @@ class InvoiceService
     {
         $po = CustomerPurchaseOrder::findOrFail($data['customer_purchase_order_id']);
         $query = DeliveryNote::where('customer_purchase_order_id', $po->id);
+        $sale = !empty($data['sales_transaction_id']) ? SalesTransaction::findOrFail($data['sales_transaction_id']) : null;
+        $saleIds = $sale ? SalesTransaction::when($sale->sale_group_number,
+            fn ($query) => $query->where('sale_group_number', $sale->sale_group_number),
+            fn ($query) => $query->whereKey($sale->id))->pluck('id') : collect();
         if (! empty($data['sales_transaction_id']) && SalesTransaction::find($data['sales_transaction_id'])?->stock_mode === 'delivery_note') {
-            $query->where('sales_transaction_id', $data['sales_transaction_id'])->where('status', 'shipped');
+            $query->where(function($q) use($saleIds) {
+                $q->whereIn('sales_transaction_id',$saleIds);
+                if (\Illuminate\Support\Facades\Schema::hasTable('delivery_note_items')) $q->orWhereHas('items',fn($item)=>$item->whereIn('sales_transaction_id',$saleIds));
+            })->where('status', 'shipped');
         } elseif (! empty($data['sales_transaction_id'])) {
             // Preserve unlinked historical documents; never take another sale's shipment.
             $query->where(fn ($q) => $q->where('sales_transaction_id', $data['sales_transaction_id'])
