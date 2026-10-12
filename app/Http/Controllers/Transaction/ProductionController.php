@@ -21,6 +21,7 @@ class ProductionController extends Controller
             'status' => $filters['status'] ?? '',
             'areaLabels' => $this->areaLabels(),
             'runs' => ProductionRun::with(['area', 'inputs.batch.line.area', 'outputs.area'])
+                ->where('work_type', '!=', 'Stok Awal')
                 ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
                 ->latest('id')->paginate(20)->withQueryString(),
         ]);

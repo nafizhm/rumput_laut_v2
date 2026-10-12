@@ -73,6 +73,71 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
+function prepareOpeningStockSchema(): void
+{
+    foreach (['2026_10_07_000012_create_accounting_journals.php', '2026_10_07_000015_connect_production_and_operational_accounting.php',
+        '2026_10_10_000010_enable_independent_warehouse_processing.php', '2026_10_11_000002_use_warehouse_locations.php',
+        '2026_10_12_000004_allow_legacy_area_transfers.php', '2026_10_12_000005_create_opening_stock_entries.php'] as $migration) {
+        (require database_path('migrations/'.$migration))->up();
+    }
+    (new \Database\Seeders\WarehouseLocationSeeder)->run();
+}
+
+it('records opening receiving stock without a purchase and prevents repeated submission', function () {
+    prepareOpeningStockSchema();
+    $payload = ['token' => (string) \Illuminate\Support\Str::uuid(), 'stock_date' => '2026-10-06',
+        'warehouse_area_id' => $this->area->id, 'quality_grade_id' => $this->grade->id, 'weight_kg' => 250.75, 'package_count' => 5];
+    $this->get(route('stok-awal.index'))->assertOk()->assertSee('Gudang Penerimaan')->assertSee('Gudang Ready');
+    $this->post(route('stok-awal.store'), $payload)->assertRedirect(route('stok-awal.index'))->assertSessionHasNoErrors();
+    $batch = MaterialBatch::firstOrFail();
+    expect((float) $batch->remaining_weight_kg)->toBe(250.75)
+        ->and($batch->line->receipt->status)->toBe('confirmed')
+        ->and($batch->line->receipt->farmer_id)->toBeNull()
+        ->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(250.75)
+        ->and((int) $this->inventory->current_sack_count)->toBe(5)
+        ->and(StockMovement::count())->toBe(1)
+        ->and(\Illuminate\Support\Facades\DB::table('journal_entries')->count())->toBe(0);
+    $this->post(route('stok-awal.store'), $payload)->assertSessionHasErrors('token');
+    expect(MaterialBatch::count())->toBe(1);
+    $this->get(route('manajemen-gudang.index'))->assertOk();
+});
+
+it('makes opening ready stock available to sales FIFO without counting it as daily production', function () {
+    prepareOpeningStockSchema();
+    $area = WarehouseArea::where('usage', 'finished')->firstOrFail();
+    $payload = ['token' => (string) \Illuminate\Support\Str::uuid(), 'stock_date' => '2026-10-06',
+        'warehouse_area_id' => $area->id, 'quality_grade_id' => $this->grade->id, 'weight_kg' => 100, 'package_count' => 4];
+    $this->post(route('stok-awal.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $batch = \App\Models\FinishedBatch::firstOrFail();
+    $this->get(route('manajemen-penjualan.batches'))->assertOk()->assertJsonFragment(['id' => $batch->id]);
+    $dashboard = $this->get(route('manajemen-gudang.index'))->assertOk();
+    expect((float) $dashboard->viewData('finishedWeight'))->toBe(100.0)
+        ->and((float) $dashboard->viewData('packedWeight'))->toBe(0.0)
+        ->and($dashboard->viewData('stageCounts')['process'])->toBe(0);
+    $allocations = app(\App\Services\Transaction\ProductionService::class)->allocateGrade($area->inventory_id, $this->grade->id, 25, 1, '2026-10-07');
+    expect($allocations[0]['finished_batch_id'])->toBe($batch->id)
+        ->and((float) $batch->refresh()->remaining_weight_kg)->toBe(75.0)
+        ->and((int) $batch->remaining_packages)->toBe(3);
+});
+
+it('rejects future dates and inactive areas for opening stock without changing stock', function () {
+    prepareOpeningStockSchema();
+    $payload = ['token' => (string) \Illuminate\Support\Str::uuid(), 'stock_date' => '2026-10-08',
+        'warehouse_area_id' => $this->area->id, 'quality_grade_id' => $this->grade->id, 'weight_kg' => 100, 'package_count' => 4];
+    $this->post(route('stok-awal.store'), $payload)->assertSessionHasErrors('stock_date');
+    $payload['stock_date'] = '2026-10-07';
+    $this->area->update(['is_active' => false]);
+    $this->post(route('stok-awal.store'), $payload)->assertSessionHasErrors('warehouse_area_id');
+    expect(MaterialBatch::count())->toBe(0)->and(StockMovement::count())->toBe(0);
+});
+
+it('restricts opening stock input to users with its permission', function () {
+    prepareOpeningStockSchema();
+    $user = User::create(['name' => 'Viewer', 'email' => 'opening-viewer@example.test', 'password' => 'password']);
+    $this->actingAs($user)->get(route('stok-awal.index'))->assertForbidden();
+    $this->post(route('stok-awal.store'), [])->assertForbidden();
+});
+
 it('records daily area transfers atomically and allocates oldest received stock first', function () {
     foreach (['2026_10_07_000012_create_accounting_journals.php', '2026_10_07_000015_connect_production_and_operational_accounting.php', '2026_10_10_000010_enable_independent_warehouse_processing.php', '2026_10_11_000002_use_warehouse_locations.php'] as $migration) {
         (require database_path('migrations/'.$migration))->up();

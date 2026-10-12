@@ -97,6 +97,8 @@ Route::middleware('auth')->group(function () {
     Route::get('transaction-data', [TransactionController::class, 'data'])->name('transaction-data');
 
     // Warehouse
+    Route::get('stok-awal', [\App\Http\Controllers\Transaction\OpeningStockController::class, 'index'])->name('stok-awal.index')->middleware('can:opening-stock.read');
+    Route::post('stok-awal', [\App\Http\Controllers\Transaction\OpeningStockController::class, 'store'])->name('stok-awal.store')->middleware('can:opening-stock.create');
     Route::get('produksi', [ProductionController::class, 'index'])->name('produksi.index')->middleware('can:production.read');
     Route::get('produksi/create', [ProductionController::class, 'create'])->name('produksi.create')->middleware('can:production.create');
     Route::get('produksi/{produksi}/edit', [ProductionController::class, 'edit'])->name('produksi.edit')->middleware('can:production.create');

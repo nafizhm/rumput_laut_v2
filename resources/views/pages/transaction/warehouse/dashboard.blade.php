@@ -6,6 +6,7 @@
 <div class="flex flex-wrap items-center justify-between gap-3">
 <div><h2 class="text-xl font-semibold">Penerimaan sampai Siap Jual</h2><p class="mt-2 text-sm text-gray-500">Pantau sisa bahan, pengambilan proses harian, dan hasil packing.</p></div>
 <div class="flex flex-wrap gap-3">
+@can('opening-stock.read')<a href="{{ route('stok-awal.index') }}" class="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-900">Stok Awal</a>@endcan
 @if(auth()->user()->can('manajemen-panen.read') && auth()->user()->can('manajemen-panen.create') && auth()->user()->can('receiving.create') && auth()->user()->can('receiving.confirm'))<a href="{{ route('manajemen-panen.index') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Penerimaan Panen</a>@endif
 @if(auth()->user()->can('production.create') && auth()->user()->can('production.confirm'))<a href="{{ route('produksi.create') }}" class="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-900">Catat Proses Harian</a>@endif
 </div></div>

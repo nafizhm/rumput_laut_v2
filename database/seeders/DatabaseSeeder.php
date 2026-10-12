@@ -26,6 +26,7 @@ class DatabaseSeeder extends Seeder
             HarvestFinanceSeeder::class,
             WarehouseActionMenuSeeder::class,
             WarehouseLocationSeeder::class,
+            OpeningStockMenuSeeder::class,
         ]);
     }
 }
