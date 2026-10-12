@@ -69,6 +69,26 @@ it('creates, lists, edits, prints and deletes a delivery note', function () {
     $this->get(route('surat-jalan.print', $note))->assertNotFound();
 });
 
+it('saves edited shipment notes and displays them on the printed document', function () {
+    \Illuminate\Support\Facades\Schema::create('finished_batches', fn (\Illuminate\Database\Schema\Blueprint $table) => $table->id());
+    \Illuminate\Support\Facades\Schema::table('sales_transactions', fn (\Illuminate\Database\Schema\Blueprint $table) => $table->unsignedInteger('sold_sacks')->nullable());
+    \Illuminate\Support\Facades\Schema::table('stock_movements', fn (\Illuminate\Database\Schema\Blueprint $table) => $table->unique(['delivery_note_id', 'id'], 'stock_movements_delivery_batch_unique'));
+    (require database_path('migrations/2026_10_12_000003_create_delivery_note_items.php'))->up();
+    $this->postJson(route('surat-jalan.store'), $this->payload)->assertOk();
+    $note = DeliveryNote::sole();
+    $note->sale->update(['sold_sacks' => 40]);
+    $payload = $this->payload;
+    $payload['notes'] = "Catatan pengiriman baru\nPeriksa jumlah kemasan.";
+    $payload['sender_name'] = 'Pengirim Manual';
+    $payload['origin_address'] = 'Alamat Pengirim Manual';
+    $payload['sender_contact'] = '081234567890';
+    $payload['items'] = [['sales_transaction_id' => $note->sales_transaction_id, 'item_name' => 'Gracilaria Kering', 'quantity_kg' => 2000, 'sack_count' => 40]];
+    $this->putJson(route('surat-jalan.update', $note), $payload)->assertOk();
+    expect($note->fresh()->notes)->toBe($payload['notes']);
+    $this->get(route('surat-jalan.print', $note))->assertOk()->assertSee('Catatan pengiriman baru')->assertSee('Periksa jumlah kemasan.')
+        ->assertSee('Catatan :')->assertSee('Pengirim Manual')->assertSee('Alamat Pengirim Manual')->assertSee('081234567890');
+});
+
 it('validates numbers, quantities and PO references', function () {
     $this->postJson(route('surat-jalan.store'), $this->payload)->assertOk();
     $this->postJson(route('surat-jalan.store'), array_merge($this->payload, [

@@ -20,8 +20,21 @@
             <td class="whitespace-nowrap p-3">Rp {{ number_format($harvest->cash_payout,0,',','.') }}</td>
             <td class="whitespace-nowrap p-3">Rp {{ number_format($harvest->debt_deduction,0,',','.') }}</td>
             <td class="whitespace-nowrap p-3">{{ $harvest->separate_payment && !$harvest->priced_at ? '-' : 'Rp '.number_format($harvest->outstanding_payable,0,',','.') }}</td>
-            <td class="p-3"><span @class(['rounded-lg px-2 py-1 text-xs', 'bg-green-100 text-green-800'=>$harvest->priced_at && $harvest->outstanding_payable===0, 'bg-amber-100 text-amber-800'=>!$harvest->priced_at || $harvest->outstanding_payable>0])>{{ $harvest->payment_status }}</span></td>
-            <td class="p-3"><a class="text-brand-500" href="{{ route('harvest-finance.show',$harvest) }}">{{ $harvest->separate_payment ? 'Proses / Lihat' : 'Lihat Riwayat' }}</a></td>
+            @php
+                $statusClass = match ($harvest->payment_status) {
+                    'Menunggu Penetapan Harga' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+                    'Belum Terbayar' => 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200',
+                    'Terbayar Sebagian' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
+                    'Sudah Terbayar' => 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200',
+                    default => 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+                };
+            @endphp
+            <td class="p-3"><span class="inline-flex whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-medium {{ $statusClass }}">{{ $harvest->payment_status }}</span></td>
+            <td class="p-3"><a @class([
+                'inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+                'bg-blue-600 hover:bg-blue-700 focus-visible:outline-blue-600' => $harvest->separate_payment,
+                'bg-violet-600 hover:bg-violet-700 focus-visible:outline-violet-600' => !$harvest->separate_payment,
+            ]) href="{{ route('harvest-finance.show',$harvest) }}">{{ $harvest->separate_payment ? 'Proses / Lihat' : 'Lihat Riwayat' }}</a></td>
         </tr>@empty<tr><td colspan="9" class="p-5 text-center text-gray-500">Belum ada panen untuk status ini.</td></tr>@endforelse</tbody>
     </table></div>
     {{ $harvests->links() }}

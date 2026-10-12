@@ -44,22 +44,26 @@
             </div>
         </x-slot:document>
         <x-slot:weight><span x-text="formatWeight(item.quantity_kg)"></span></x-slot:weight>
-        <x-slot:status><span x-text="item.status === 'shipped' ? 'Dikirim' : (item.status === 'draft' ? 'Draft — belum dikirim' : 'Data Lama')" class="text-sm font-semibold"></span></x-slot:status>
-        <x-slot:shipped_date><span x-text="item.shipped_date ? formatDisplayDate(item.shipped_date) : '-'"></span></x-slot:shipped_date>
+        <x-slot:status>
+            <div class="flex flex-col gap-1">
+                <span x-text="item.status === 'shipped' ? 'Dikirim' : (item.status === 'draft' ? 'Draft — belum dikirim' : 'Data Lama')" class="text-sm font-semibold"></span>
+                <span x-show="item.shipped_date" x-text="item.shipped_date ? formatDisplayDate(item.shipped_date) : ''" class="text-xs text-gray-500 dark:text-gray-400"></span>
+            </div>
+        </x-slot:status>
         <x-slot:action>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 @can('surat-jalan.update')
-                    <button type="button" x-show="item.status === 'draft'" @click="$dispatch('confirm-shipment', item)" class="rounded-lg bg-green-600 px-4 py-2 text-sm text-white">Konfirmasi Dikirim</button>
+                    <button type="button" x-show="item.status === 'draft'" @click="$dispatch('confirm-shipment', item)" class="whitespace-nowrap rounded-md bg-green-600 px-2 py-1 text-xs text-white">Konfirmasi Dikirim</button>
                 @endcan
                 <a :href="`{{ url('surat-jalan') }}/${item.id}/cetak`" target="_blank" rel="noopener"
-                    class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">Cetak</a>
+                    class="whitespace-nowrap rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">Cetak</a>
                 
 @can('surat-jalan.update')
 <button 
                     type="button" 
                     x-show="item.status !== 'shipped'"
                     @click="item.status === 'draft' ? window.location.href = `{{ url('surat-jalan') }}/${item.id}/edit` : $dispatch('edit-entity', item)"
-                    class="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md bg-brand-500 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-600"
                 >
                     Edit
                 </button>
@@ -70,9 +74,10 @@
 @can('surat-jalan.delete')
 <button 
                     type="button" 
-                    x-show="item.status !== 'shipped'"
+                    :disabled="item.status === 'shipped' || !!item.shipped_at"
+                    :title="item.status === 'shipped' || item.shipped_at ? 'Surat jalan sudah dikirim dan tidak dapat dihapus.' : 'Hapus surat jalan'"
                     @click="$dispatch('delete-entity', item.id)" 
-                    class="flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-600"
+                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md bg-rose-500 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-rose-600 disabled:cursor-not-allowed disabled:bg-gray-400 disabled:opacity-60"
                 >
                     Hapus
                 </button>

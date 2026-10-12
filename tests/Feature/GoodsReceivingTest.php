@@ -384,22 +384,26 @@ it('opens a finished area containing migrated stock without a production record'
     Schema::create('production_runs', function (Blueprint $table) {
         $table->id();
         $table->string('number');
+        $table->string('status')->default('packed');
+        $table->date('packed_date')->nullable();
         $table->timestamps();
     });
     Schema::create('finished_batches', function (Blueprint $table) {
         $table->id();
         $table->string('code');
         $table->unsignedBigInteger('production_run_id')->nullable();
+        $table->unsignedBigInteger('inventory_id')->nullable();
         $table->unsignedBigInteger('warehouse_area_id');
         $table->unsignedBigInteger('quality_grade_id')->nullable();
         $table->decimal('remaining_weight_kg', 12, 2);
         $table->unsignedInteger('remaining_packages');
+        $table->unsignedBigInteger('remaining_cost_cents')->default(0);
         $table->timestamps();
     });
     $ready = Inventory::create(['item_name' => 'Barang Jadi', 'stock_stage' => 'finished']);
     $area = WarehouseArea::create(['code' => 'BJ-A', 'name' => 'Area A', 'inventory_id' => $ready->id, 'usage' => 'finished', 'is_active' => true]);
     \App\Models\FinishedBatch::create(['code' => 'LEGACY-GUDANG-KERING-23-24', 'production_run_id' => null,
-        'warehouse_area_id' => $area->id, 'quality_grade_id' => null, 'remaining_weight_kg' => 42159.5, 'remaining_packages' => 1872]);
+        'inventory_id' => $ready->id, 'warehouse_area_id' => $area->id, 'quality_grade_id' => null, 'remaining_weight_kg' => 42159.5, 'remaining_packages' => 1872]);
     $run = \App\Models\ProductionRun::forceCreate(['number' => 'PRD-TEST']);
     \App\Models\FinishedBatch::create(['code' => 'BAT-PRODUCTION', 'production_run_id' => $run->id,
         'warehouse_area_id' => $area->id, 'quality_grade_id' => null, 'remaining_weight_kg' => 100, 'remaining_packages' => 2]);
@@ -409,6 +413,42 @@ it('opens a finished area containing migrated stock without a production record'
     $this->get(route('manajemen-gudang.stage', 'finished'))->assertOk()
         ->assertSee('LEGACY-GUDANG-KERING-23-24')->assertSee('42.159,50')
         ->assertSee(route('produksi.show', $run), false);
+    $this->grantModuleAccess($this->user, ['surat-jalan']);
+    $this->get(route('surat-jalan.create'))->assertOk()
+        ->assertViewHas('batches', fn ($batches) => $batches->contains(fn ($batch) => str_contains($batch['label'], 'LEGACY-GUDANG-KERING-23-24')));
+    $run->update(['status' => 'processing']);
+    expect(\App\Models\FinishedBatch::readyForSale()->pluck('code')->all())->toBe(['LEGACY-GUDANG-KERING-23-24']);
+    Schema::table('stock_movements', fn (Blueprint $table) => $table->unsignedBigInteger('finished_batch_id')->nullable());
+    $legacy = \App\Models\FinishedBatch::where('code', 'LEGACY-GUDANG-KERING-23-24')->sole();
+    $allocation = app(\App\Services\Transaction\ProductionService::class)->consumeFinished($legacy->id, $ready->id, 5000, 100, '2026-10-07');
+    expect($allocation['finished_batch_id'])->toBe($legacy->id);
+    expect((float) $legacy->fresh()->remaining_weight_kg)->toBe(37159.5);
+    expect((int) $legacy->fresh()->remaining_packages)->toBe(1772);
+    Schema::create('delivery_note_items', function (Blueprint $table) {
+        $table->id();
+        $table->unsignedBigInteger('delivery_note_id');
+        $table->unsignedBigInteger('sales_transaction_id');
+        $table->unsignedBigInteger('finished_batch_id')->nullable();
+        $table->string('item_name');
+        $table->decimal('quantity_kg', 12, 2);
+        $table->unsignedInteger('sack_count');
+        $table->timestamps();
+    });
+    $factory = Factory::create(['name' => 'Customer Edit']);
+    $sale = \App\Models\SalesTransaction::create(['factory_id' => $factory->id, 'inventory_id' => $ready->id,
+        'invoice_number' => 'PJL-EDIT', 'sale_date' => '2026-10-07', 'stock_mode' => 'delivery_note',
+        'total_weight_kg' => 5000, 'price_per_kg' => 1000, 'total_sale_value' => 5000000]);
+    $note = \App\Models\DeliveryNote::create(['number' => 'SJ-EDIT', 'delivery_date' => '2026-10-07',
+        'sales_transaction_id' => $sale->id, 'recipient_name' => 'Customer Edit', 'destination_address' => 'Gudang',
+        'origin' => 'Area A', 'item_name' => 'Rumput Laut', 'quantity_kg' => 5000]);
+    $note->items()->create(['sales_transaction_id' => $sale->id, 'finished_batch_id' => $legacy->id,
+        'item_name' => 'Rumput Laut', 'quantity_kg' => 5000, 'sack_count' => 100]);
+    $note->forceFill(['status' => 'draft'])->save();
+    $legacy->update(['remaining_weight_kg' => 0, 'remaining_packages' => 0]);
+    $this->get(route('surat-jalan.edit', $note))->assertOk()
+        ->assertViewHas('batches', fn ($batches) => $batches->contains('id', $legacy->id))
+        ->assertViewHas('note', fn ($saved) => $saved->items->sole()->finished_batch_id === $legacy->id)
+        ->assertSee(':selected="String(batch.id) === String(row.finished_batch_id)"', false);
 });
 
 it('preserves seed edits and requires permission and explicit confirmation', function () {

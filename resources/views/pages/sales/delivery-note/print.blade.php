@@ -9,7 +9,9 @@
 <body>
     <div class="toolbar">
         <a href="{{ route('surat-jalan.index') }}">Kembali</a>
-        <span>{{ $note->status === 'shipped' ? 'DIKIRIM' : ($note->status === 'draft' ? 'DRAFT — BELUM DIKIRIM' : 'DATA LAMA') }}</span>
+        @if($note->status !== 'draft')
+            <span>{{ $note->status === 'shipped' ? 'DIKIRIM' : 'DATA LAMA' }}</span>
+        @endif
         <button type="button" onclick="window.print()">Cetak / Simpan PDF</button>
     </div>
     <main class="sheet delivery-note">
@@ -17,14 +19,13 @@
             'documentTitle' => 'SURAT JALAN', 'documentNumber' => $note->number,
             'documentDate' => $note->delivery_date, 'showTax' => false,
         ])
-        @if($note->status === 'draft')<p class="document-status">DRAFT — BELUM DIKIRIM</p>@endif
         @if($note->shipped_date)<p class="document-status">Dikirim {{ $note->shipped_date->format('d/m/Y') }} · Dikonfirmasi oleh {{ $note->shipped_by_name }}</p>@endif
         <div class="columns">
             <section>
                 <h2>PENGIRIM</h2>
-                <div class="field"><span class="label">Nama / Gudang</span><div class="value">{{ $note->origin ?: $profile->company_name }}</div></div>
-                <div class="field"><span class="label">Alamat Asal</span><div class="value">{{ $note->origin_address ?: $profile->address }}</div></div>
-                <div class="field"><span class="label">Telp / PIC</span><div class="value">{{ $note->sender_contact ?: $profile->phone }}</div></div>
+                <div class="field"><span class="label">Nama Pengirim</span><div class="value">{{ $note->sender_name ?: '-' }}</div></div>
+                <div class="field"><span class="label">Alamat</span><div class="value">{{ $note->origin_address ?: '-' }}</div></div>
+                <div class="field"><span class="label">No. Telp</span><div class="value">{{ $note->sender_contact ?: '-' }}</div></div>
             </section>
             <section>
                 <h2>PENERIMA (PABRIK)</h2>
@@ -61,7 +62,7 @@
             <tfoot><tr><td colspan="3" class="right">TOTAL</td><td class="center">{{ $note->packaging ?: ($note->sack_count ? $note->sack_count.' karung' : '') }}</td><td class="right">{{ $note->gross_weight_kg !== null ? number_format((float) $note->gross_weight_kg, 2, ',', '.') : '' }}</td><td class="right">{{ number_format((float) $note->quantity_kg, 2, ',', '.') }}</td></tr></tfoot>
         </table>
         <div class="notes">
-            <div class="label">CATATAN (KONDISI BARANG, NOMOR SEGEL, SELISIH TIMBANG, DLL.)</div>
+            <div class="label">Catatan :</div>
             @if($note->remarks)<p>{{ $note->remarks }}</p>@endif
             @if($note->notes)<p>{{ $note->notes }}</p>@endif
         </div>

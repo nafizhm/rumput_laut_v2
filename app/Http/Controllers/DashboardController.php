@@ -6,6 +6,7 @@ use App\Models\AccountingSetting;
 use App\Models\Farmer;
 use App\Models\HarvestTransaction;
 use App\Models\Inventory;
+use App\Models\Invoice;
 use App\Models\JournalLine;
 use App\Models\Loan;
 use App\Models\ProductionRun;
@@ -56,19 +57,21 @@ class DashboardController extends Controller
         $farmerDebt = Farmer::sum('current_debt');
         $warehouseStock = Inventory::sum('current_stock_kg');
 
-        $recentInvoices = SalesTransaction::with('factory')
-            ->orderBy('sale_date', 'desc')
+        $recentInvoices = Invoice::with('sale.inventory')
+            ->orderBy('invoice_date', 'desc')
             ->orderBy('id', 'desc')
             ->limit(5)
             ->get()
-            ->map(function ($sale) {
+            ->map(function ($invoice) {
                 return [
-                    'invoice_number' => $sale->invoice_number,
-                    'sale_date' => $sale->sale_date->format('d M Y'),
-                    'factory_name' => $sale->factory->name,
-                    'total_sale_value' => $sale->total_sale_value,
-                    'status' => $sale->payment_status_label,
-                    'payment_status' => $sale->payment_status,
+                    'id' => $invoice->id,
+                    'invoice_number' => $invoice->number,
+                    'invoice_date' => $invoice->invoice_date->format('d M Y'),
+                    'customer_name' => $invoice->customer_name,
+                    'total_amount' => $invoice->total_amount,
+                    'status' => $invoice->payment_status_label,
+                    'payment_status' => $invoice->payment_status,
+                    'url' => route('invoice.print', $invoice),
                 ];
             });
 

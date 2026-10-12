@@ -112,8 +112,8 @@ class DeliveryNoteService
             throw ValidationException::withMessages(['sales_transaction_id' => 'Pilih penjualan baru dengan stok keluar melalui Surat Jalan. Transaksi lama/langsung tidak boleh dipotong lagi.']);
         }
         if ($sale->sale_group_number && !$sale->finished_batch_id) {
-            $batch = FinishedBatch::with(['area', 'run'])->lockForUpdate()->find($data['finished_batch_id'] ?? $note?->finished_batch_id);
-            if (!$batch || !$batch->area?->is_active || $batch->area->usage !== 'finished' || $batch->run?->status !== 'packed'
+            $batch = FinishedBatch::with(['area', 'run'])->readyForSale()->lockForUpdate()->find($data['finished_batch_id'] ?? $note?->finished_batch_id);
+            if (!$batch
                 || ($sale->quality_grade_id && (int) $sale->quality_grade_id !== (int) $batch->quality_grade_id)) {
                 throw ValidationException::withMessages(['finished_batch_id' => 'Pilih batch siap jual yang aktif dan sesuai barang pesanan.']);
             }

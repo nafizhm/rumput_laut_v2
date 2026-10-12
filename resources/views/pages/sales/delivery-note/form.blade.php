@@ -17,14 +17,16 @@
 <label class="text-sm">Deskripsi barang<input x-model="row.item_name" maxlength="255" required class="{{ $input }}"></label>
 <label class="text-sm">Berat kirim (Kg)<input type="number" x-model="row.quantity_kg" min="0.01" max="999999999.99" step="0.01" required class="{{ $input }}"></label>
 <label class="text-sm">Jumlah kemasan<input type="number" x-model="row.sack_count" min="1" max="1000000" step="1" required class="{{ $input }}"></label>
-<label x-show="sourceItem(row)?.select_batch" class="text-sm">Stok siap jual<select x-model="row.finished_batch_id" :required="sourceItem(row)?.select_batch" class="{{ $input }}"><option value="">Pilih area / batch</option><template x-for="batch in availableBatches(row)" :key="batch.id"><option :value="batch.id" x-text="batch.label"></option></template></select></label>
+<label x-show="sourceItem(row)?.select_batch" class="text-sm">Stok siap jual<select x-model="row.finished_batch_id" :required="sourceItem(row)?.select_batch" class="{{ $input }}"><option value="">Pilih area / batch</option><template x-for="batch in availableBatches(row)" :key="batch.id"><option :value="batch.id" :selected="String(batch.id) === String(row.finished_batch_id)" x-text="batch.label"></option></template></select></label>
 </div><div class="mt-3 flex justify-between gap-3"><p class="text-xs text-gray-500" x-text="'Sisa penjualan: ' + formatWeight(sourceItem(row)?.quantity_kg || 0)"></p><button type="button" @click="form.data.items.splice(index,1)" class="text-sm text-red-600">Hapus dari pengiriman</button></div>
 <p class="mt-2 text-xs text-error-500" x-text="rowError(index)"></p></div></template></div>
 <p class="mt-3 text-sm text-error-500" x-text="form.getError('items')"></p></section>
 <section class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h3 class="mb-4 font-semibold">Rincian Pengiriman</h3><div class="grid gap-4 sm:grid-cols-2">
 <label class="text-sm">Asal barang<input x-model="form.data.origin" maxlength="255" required class="{{ $input }}"></label>
 <label class="text-sm">Kemasan<input x-model="form.data.packaging" maxlength="255" placeholder="Contoh: Karung" class="{{ $input }}"></label>
-<label class="text-sm">Dikirim oleh<input x-model="form.data.sender_name" maxlength="255" class="{{ $input }}"></label>
+<label class="text-sm">Nama pengirim<input x-model="form.data.sender_name" maxlength="255" class="{{ $input }}"></label>
+<label class="text-sm">Alamat pengirim<textarea x-model="form.data.origin_address" maxlength="2000" rows="2" class="{{ $input }}"></textarea></label>
+<label class="text-sm">No. telepon pengirim<input type="tel" x-model="form.data.sender_contact" maxlength="255" class="{{ $input }}"></label>
 <label class="text-sm">Diterima oleh<input x-model="form.data.receiver_name" maxlength="255" class="{{ $input }}"></label>
 <label class="text-sm">Nomor kendaraan<input x-model="form.data.vehicle_plate" maxlength="30" class="{{ $input }}"></label>
 <label class="text-sm">Nama sopir<input x-model="form.data.driver_name" maxlength="255" class="{{ $input }}"></label>
@@ -38,12 +40,12 @@
 <script>
 function shipmentPage() { return {
 sales: @js($sales), batches: @js($batches), saved: @js($note), editMode: @js((bool)$note), serverError: '',
-form: useForm({sales_transaction_id:'', delivery_date:window.getLocalDateInputValue(), recipient_name:'',destination_address:'',origin:'Gudang Siap Jual',packaging:'',sender_name:'',receiver_name:'',vehicle_plate:'',driver_name:'',notes:'',items:[]}),
+form: useForm({number:'',sales_transaction_id:'', delivery_date:window.getLocalDateInputValue(), recipient_name:'',destination_address:'',origin:'Gudang Siap Jual',packaging:'',sender_name:'',origin_address:'',sender_contact:'',receiver_name:'',vehicle_plate:'',driver_name:'',notes:'',items:[]}),
 init() { if (this.saved) { Object.keys(this.form.data).forEach(key=>{ if(key!=='items' && this.saved[key]!=null) this.form.data[key]=this.saved[key]; }); this.form.data.items=this.saved.items?.length ? this.saved.items.map(row=>this.cleanRow(row)) : [this.cleanRow(this.saved)]; } },
-cleanRow(row) { return {sales_transaction_id:row.sales_transaction_id,item_name:row.item_name,quantity_kg:row.quantity_kg,sack_count:row.sack_count,finished_batch_id:row.finished_batch_id || null}; },
+cleanRow(row) { return {sales_transaction_id:row.sales_transaction_id,item_name:row.item_name,quantity_kg:row.quantity_kg,sack_count:row.sack_count,finished_batch_id:row.finished_batch_id == null ? '' : String(row.finished_batch_id)}; },
 get selectedSale() { return this.sales.find(sale=>sale.id==this.form.data.sales_transaction_id); },
 sourceItem(row) { return this.selectedSale?.items.find(item=>item.sales_transaction_id==row.sales_transaction_id); },
-availableBatches(row) { const grade=this.sourceItem(row)?.quality_grade_id; return this.batches.filter(batch=>!grade || batch.quality_grade_id==grade); },
+availableBatches(row) { const grade=this.sourceItem(row)?.quality_grade_id; return this.batches.filter(batch=>String(batch.id)===String(row.finished_batch_id) || !grade || batch.quality_grade_id==grade); },
 selectSale() { const sale=this.selectedSale; this.form.data.recipient_name=sale?.recipient_name || '';this.form.data.destination_address=sale?.destination_address || ''; this.form.data.items=(sale?.items || []).filter(item=>item.quantity_kg>0 && item.sack_count>0).map(item=>this.cleanRow(item)); this.form.clearErrors(); },
 get totalWeight() { return this.form.data.items.reduce((sum,row)=>sum+Number(row.quantity_kg || 0),0); },
 rowError(index) { return Object.entries(this.form.errors).filter(([key])=>key==='items.'+index || key.startsWith('items.'+index+'.')).map(([,value])=>value).join(' '); },

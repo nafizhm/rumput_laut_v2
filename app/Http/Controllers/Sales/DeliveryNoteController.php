@@ -24,7 +24,6 @@ class DeliveryNoteController extends Controller
         $columns = [
             ['key' => 'number', 'label' => 'Surat Jalan', 'sortable' => true, 'render' => 'document', 'width' => '240px'],
             ['key' => 'status', 'label' => 'Status', 'render' => 'status'],
-            ['key' => 'shipped_date', 'label' => 'Tanggal Kirim Aktual', 'render' => 'shipped_date'],
             ['key' => 'recipient_name', 'label' => 'Penerima', 'sortable' => true],
             ['key' => 'item_name', 'label' => 'Barang', 'sortable' => true],
             ['key' => 'quantity_kg', 'label' => 'Jumlah (Kg)', 'render' => 'weight', 'align' => 'right'],
@@ -48,9 +47,7 @@ class DeliveryNoteController extends Controller
             'select_batch' => (bool) ($sale->sale_group_number && !$sale->finished_batch_id),
             'quality_grade_id' => $sale->quality_grade_id,
         ]);
-        $batches = Schema::hasTable('finished_batches') ? FinishedBatch::with('area')->where('remaining_weight_kg', '>', 0)->where('remaining_packages', '>', 0)
-            ->whereHas('run', fn ($q) => $q->where('status', 'packed'))
-            ->whereHas('area', fn ($q) => $q->where('is_active', true)->where('usage', 'finished'))->get()->map(fn ($b) => [
+        $batches = Schema::hasTable('finished_batches') ? FinishedBatch::with('area')->readyForSale()->get()->map(fn ($b) => [
                 'id' => $b->id, 'quality_grade_id' => $b->quality_grade_id, 'area_name' => $b->area->name,
                 'label' => $b->area->name.' / '.$b->code.' / '.$b->remaining_weight_kg.' Kg / '.$b->remaining_packages.' kemasan',
             ]) : collect();
@@ -78,8 +75,11 @@ class DeliveryNoteController extends Controller
                     'sack_count'=>max(0,(int)$s->sold_sacks-$s->stockMovements->sum('sack_count')),
                     'finished_batch_id'=>$s->finished_batch_id, 'select_batch'=>(bool)($s->sale_group_number && !$s->finished_batch_id), 'quality_grade_id'=>$s->quality_grade_id])->values()];
         })->values();
-        $batches = Schema::hasTable('finished_batches') ? FinishedBatch::with('area')->where('remaining_weight_kg','>',0)->where('remaining_packages','>',0)->whereHas('run',fn($q)=>$q->where('status','packed'))->whereHas('area',fn($q)=>$q->where('is_active',true)->where('usage','finished'))->get()->map(fn($b)=>['id'=>$b->id,'quality_grade_id'=>$b->quality_grade_id,'label'=>$b->area->name.' / '.$b->code.' / '.$b->remaining_weight_kg.' Kg / '.$b->remaining_packages.' kemasan']) : collect();
         if ($note) $note->load('items');
+        $savedBatchIds = $note ? $note->items->pluck('finished_batch_id')->push($note->finished_batch_id)->filter()->unique()->all() : [];
+        $batches = Schema::hasTable('finished_batches') ? FinishedBatch::with('area')
+            ->where(fn ($query) => $query->readyForSale()->orWhereIn('id', $savedBatchIds))
+            ->get()->map(fn($b)=>['id'=>$b->id,'quality_grade_id'=>$b->quality_grade_id,'label'=>($b->area?->name ?? 'Area tidak tersedia').' / '.$b->code.' / '.$b->remaining_weight_kg.' Kg / '.$b->remaining_packages.' kemasan']) : collect();
         return compact('sales','batches','note');
     }
 

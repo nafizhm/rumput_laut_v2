@@ -241,12 +241,15 @@ class ProductionService
     public function consumeFinished(int $batchId, int $inventoryId, float $weight, int $packages, string $date): array
     {
         $batch = FinishedBatch::with(['run', 'area', 'grade'])->lockForUpdate()->findOrFail($batchId);
-        if (! $batch->area->is_active || $batch->area->usage !== 'finished') {
+        if (! $batch->area?->is_active || $batch->area->usage !== 'finished' || ($batch->production_run_id && $batch->run?->status !== 'packed')) {
             $this->fail('finished_batch_id', 'Area barang ready nonaktif atau tidak sesuai.');
         }
         $kg = (int) round($weight * 100);
         $remaining = (int) round($batch->remaining_weight_kg * 100);
-        $this->date($date, $batch->run->packed_date->format('Y-m-d'));
+        $availableDate = $batch->run?->packed_date?->format('Y-m-d')
+            ?? StockMovement::where('finished_batch_id', $batch->id)->where('direction', 'in')->min('movement_date')
+            ?? $batch->created_at->format('Y-m-d');
+        $this->date($date, $availableDate);
         if ($batch->inventory_id !== $inventoryId || $kg <= 0 || $kg > $remaining || $packages < 1 || $packages > $batch->remaining_packages) {
             $this->fail('finished_batch_id', 'Stok berat atau kemasan batch jadi tidak mencukupi.');
         }

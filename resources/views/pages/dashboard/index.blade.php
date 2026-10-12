@@ -160,7 +160,7 @@
                                             Tanggal</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                            Pabrik</th>
+                                            Konsumen</th>
                                         <th
                                             class="px-6 py-4 text-left text-sm font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
                                             Jumlah</th>
@@ -173,14 +173,15 @@
                                     <!-- Example rows (keep as needed) -->
                                     <template x-for="invoice in stats.recentInvoices" :key="invoice.invoice_number">
                                         <tr>
+                                            <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400">
+                                                <a :href="invoice.url" class="text-brand-600" x-text="invoice.invoice_number"></a>
+                                            </td>
                                             <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400"
-                                                x-text="invoice.invoice_number"></td>
+                                                x-text="invoice.invoice_date"></td>
                                             <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400"
-                                                x-text="invoice.sale_date"></td>
-                                            <td class="px-6 py-4 text-left text-sm whitespace-nowrap text-gray-700 dark:text-gray-400"
-                                                x-text="invoice.factory_name"></td>
+                                                x-text="invoice.customer_name"></td>
                                             <td class="text-right tabular-nums px-6 py-4  text-sm whitespace-nowrap text-gray-700 dark:text-gray-400"
-                                                x-text="formatCurrency(invoice.total_sale_value)"></td>
+                                                x-text="formatCurrency(invoice.total_amount)"></td>
                                             <td class="px-6 py-4 text-left">
                                                 <span
                                                     :class="invoice.payment_status === 'paid' ?

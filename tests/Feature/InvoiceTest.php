@@ -13,6 +13,23 @@ use Database\Seeders\DeliveryNoteMenuSeeder;
 use Database\Seeders\InvoiceMenuSeeder;
 use Illuminate\Support\Carbon;
 
+it('uses actual invoices rather than sales for the latest invoice dashboard list', function () {
+    foreach (['2026_04_26_062518_create_loans_table.php', '2026_04_26_111858_create_expense_categories_table.php', '2026_04_26_111907_create_expenses_table.php', '2026_07_13_142525_create_incomes_table.php', '2026_07_14_000002_create_transactions_table.php'] as $migration) {
+        (require database_path('migrations/'.$migration))->up();
+    }
+    $invoice = Invoice::create(array_merge($this->payload, ['number' => 'INV-DASHBOARD', 'invoice_date' => '2026-10-05',
+        'customer_name' => 'Invoice Customer', 'quantity_kg' => 10, 'price_per_kg' => 2000, 'payment_status' => 'partial']));
+    $response = app(\App\Http\Controllers\DashboardController::class)->stats(\Illuminate\Http\Request::create('/dashboard/stats'));
+    $recent = $response->getData(true)['recentInvoices'];
+    expect($recent)->toHaveCount(1);
+    expect($recent[0]['invoice_number'])->toBe('INV-DASHBOARD');
+    expect($recent[0]['invoice_date'])->toBe('05 Oct 2026');
+    expect($recent[0]['customer_name'])->toBe('Invoice Customer');
+    expect((float) $recent[0]['total_amount'])->toBe(20000.0);
+    expect($recent[0]['payment_status'])->toBe('partial');
+    expect($recent[0]['url'])->toBe(route('invoice.print', $invoice));
+});
+
 beforeEach(function () {
     foreach ([
         '0001_01_01_000000_create_users_table.php',
