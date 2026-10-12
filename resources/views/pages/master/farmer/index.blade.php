@@ -10,7 +10,9 @@
     <x-data-table id="farmerTable" :rows="$data" :columns="$columns" :url="route('farmer-data')">
         
         <x-slot:headerAction>
-            <button type="button" @click="$dispatch('create-farmer')"
+            
+@can('manajemen-petani.create')
+<button type="button" @click="$dispatch('create-farmer')"
                 class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto hover:bg-gray-50 dark:hover:bg-white/3 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -20,6 +22,8 @@
                 </svg>
                 Tambah Data
             </button>
+@endcan
+
         </x-slot:headerAction>
 
         <x-slot:currency>
@@ -33,14 +37,22 @@
                     class="flex items-center w-full justify-center gap-2 py-2 px-4 text-sm font-medium text-gray-700 bg-gray-100 transition-colors rounded-lg hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700">
                     Detail
                 </button>
-                <button type="button" @click="$dispatch('edit-farmer', item)"
+                
+@can('manajemen-petani.update')
+<button type="button" @click="$dispatch('edit-farmer', item)"
                     class="flex items-center w-full justify-center gap-2 py-2 px-4 text-sm font-medium text-white transition-colors rounded-lg bg-brand-500 hover:bg-brand-600">
                     Edit
                 </button>
-                <button type="button" @click="$dispatch('delete-farmer', item.id)"
+@endcan
+
+                
+@can('manajemen-petani.delete')
+<button type="button" @click="$dispatch('delete-farmer', item.id)"
                     class="flex items-center w-full justify-center gap-2 py-2 px-4 text-sm font-medium text-white transition-colors rounded-lg bg-rose-500 hover:bg-rose-600">
                     Delete
                 </button>
+@endcan
+
             </div>
         </x-slot:action>
     </x-data-table>

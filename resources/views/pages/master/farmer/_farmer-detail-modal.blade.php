@@ -59,10 +59,14 @@
 
             <!-- Footer (Fixed) -->
             <div class="px-6 lg:px-10 pb-6 lg:pb-10 pt-0 mt-4 flex justify-end gap-3">
-                <button type="button" @click="openPaymentModal()"
+                
+@can('manajemen-petani.update')
+<button type="button" @click="openPaymentModal()"
                     class="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition-colors">
                     Bayar Hutang
                 </button>
+@endcan
+
                 <button type="button" @click="$dispatch('close-modal', 'farmer-detail-modal')"
                     class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">
                     Tutup

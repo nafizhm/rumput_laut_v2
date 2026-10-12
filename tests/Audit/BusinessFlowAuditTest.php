@@ -196,6 +196,8 @@ class BusinessFlowAuditTest extends TestCase
         });
         $this->user = User::create(['name' => 'Audit', 'email' => 'audit@example.test', 'password' => 'password']);
         $this->actingAs($this->user);
+        $this->grantModuleAccess($this->user, ['dashboard', 'cash-flow', 'manajemen-pinjaman', 'manajemen-gudang',
+            'manajemen-penjualan', 'surat-jalan', 'invoice', 'manajemen-pemasukan-pengeluaran']);
         $this->farmer = Farmer::create(['name' => 'Petani Audit', 'current_debt' => 0]);
         $this->factory = Factory::create(['name' => 'Pabrik Audit', 'address' => 'Alamat Audit']);
         $this->material = Inventory::create(['item_name' => 'Bahan Masuk', 'current_stock_kg' => 0, 'current_sack_count' => 0]);
@@ -660,7 +662,7 @@ class BusinessFlowAuditTest extends TestCase
 
     public function test_production_history_and_edit_preserve_stock_and_reject_completed_runs(): void
     {
-        foreach (['production.read', 'production.create', 'receiving.read'] as $permission) {
+        foreach (['production.read', 'production.create', 'production.update', 'receiving.read'] as $permission) {
             $this->user->givePermissionTo(Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']));
         }
         $this->withoutVite();
@@ -690,7 +692,7 @@ class BusinessFlowAuditTest extends TestCase
         $this->putJson(route('produksi.update', $run), ['pic' => 'Ditolak', 'work_type' => 'Jemur'])
             ->assertUnprocessable()->assertJsonValidationErrors('production');
         $this->assertSame('PIC Baru', $run->fresh()->pic);
-        $this->user->revokePermissionTo('production.create');
+        $this->user->revokePermissionTo('production.update');
         $this->putJson(route('produksi.update', $run), ['pic' => 'Ditolak', 'work_type' => 'Jemur'])->assertForbidden();
     }
 

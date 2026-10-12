@@ -33,6 +33,7 @@ beforeEach(function () {
     \App\Models\Menu::create(['name' => 'Keuangan', 'is_active' => true]);
     $this->seed(Database\Seeders\ChartOfAccountSeeder::class);
     $this->actingAs(User::create(['name' => 'COA Tester', 'email' => 'cash-coa@example.test', 'password' => 'password']));
+    $this->grantModuleAccess(auth()->user(), ['manajemen-pemasukan-pengeluaran']);
     $this->withoutVite();
     AccountingSetting::whereKey(1)->update(['start_date' => '2026-10-01']);
     $this->bank = ChartOfAccount::where('code', '11103')->firstOrFail();

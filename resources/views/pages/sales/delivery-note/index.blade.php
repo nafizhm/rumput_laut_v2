@@ -21,7 +21,9 @@
         :url="route('surat-jalan.data')" 
     >
         <x-slot:headerAction>
-            <a
+            
+@can('surat-jalan.create')
+<a
                 href="{{ route('surat-jalan.create') }}"
                 class="flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3"
             >
@@ -30,6 +32,8 @@
                 </svg>
                 Tambah Surat Jalan
             </a>
+@endcan
+
         </x-slot:headerAction>
 
         <x-slot:document>
@@ -44,12 +48,14 @@
         <x-slot:shipped_date><span x-text="item.shipped_date ? formatDisplayDate(item.shipped_date) : '-'"></span></x-slot:shipped_date>
         <x-slot:action>
             <div class="flex items-center gap-2">
-                @can('manajemen-penjualan.create')
+                @can('surat-jalan.update')
                     <button type="button" x-show="item.status === 'draft'" @click="$dispatch('confirm-shipment', item)" class="rounded-lg bg-green-600 px-4 py-2 text-sm text-white">Konfirmasi Dikirim</button>
                 @endcan
                 <a :href="`{{ url('surat-jalan') }}/${item.id}/cetak`" target="_blank" rel="noopener"
                     class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">Cetak</a>
-                <button 
+                
+@can('surat-jalan.update')
+<button 
                     type="button" 
                     x-show="item.status !== 'shipped'"
                     @click="item.status === 'draft' ? window.location.href = `{{ url('surat-jalan') }}/${item.id}/edit` : $dispatch('edit-entity', item)"
@@ -57,8 +63,12 @@
                 >
                     Edit
                 </button>
+@endcan
 
-                <button 
+
+                
+@can('surat-jalan.delete')
+<button 
                     type="button" 
                     x-show="item.status !== 'shipped'"
                     @click="$dispatch('delete-entity', item.id)" 
@@ -66,6 +76,8 @@
                 >
                     Hapus
                 </button>
+@endcan
+
             </div>
         </x-slot:action>
     </x-data-table>

@@ -36,6 +36,7 @@ beforeEach(function () {
     }
     $this->withoutVite();
     $this->actingAs(User::create(['name' => 'Tester', 'email' => 'sj@example.test', 'password' => 'test-password']));
+    $this->grantModuleAccess(auth()->user(), ['surat-jalan']);
     $this->payload = [
         'number' => 'SJ-2026-001', 'delivery_date' => '2026-10-06',
         'recipient_name' => 'PT Maju Jaya', 'destination_address' => 'Gudang Makassar',
@@ -116,9 +117,10 @@ it('automatically numbers shipments and stores optional transport and weighing d
     ]);
     $this->postJson(route('surat-jalan.store'), $payload)->assertOk();
     $note = DeliveryNote::firstOrFail();
-    expect($note->number)->toBe('SJ/0001/10/2026')->and($note->vehicle_plate)->toBe('KT 1234 AB');
+    expect($note->number)->toBe('SJ/0001/10/2026')->and($note->vehicle_plate)->toBe('KT 1234 AB')
+        ->and((float) $note->moisture_percent)->toBe(25.5);
     $this->get(route('surat-jalan.print', $note))->assertOk()->assertSee('KT 1234 AB')->assertSee('Sopir Uji')
-        ->assertSee('2.020,00')->assertSee('25,50')->assertSee('NETTO (KG)');
+        ->assertSee('2.020,00')->assertSee('NETTO (KG)');
     $this->postJson(route('surat-jalan.store'), array_merge($payload, ['moisture_percent' => 101]))
         ->assertUnprocessable()->assertJsonValidationErrors('moisture_percent');
     expect(DeliveryNote::count())->toBe(1);

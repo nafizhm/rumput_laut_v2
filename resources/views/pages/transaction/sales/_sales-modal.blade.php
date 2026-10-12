@@ -8,7 +8,9 @@
                     <div class="flex flex-wrap justify-between gap-2"><strong class="text-sm" x-text="row.document_item_name"></strong><strong class="text-sm tabular-nums" x-text="formatCurrency(row.total_sale_value)"></strong></div>
                     <div class="mt-2 grid gap-2 text-sm text-gray-500 sm:grid-cols-3"><span x-text="formatWeight(row.total_weight_kg) + ' / ' + (row.sold_sacks || 0) + ' kemasan'"></span><span x-text="'Harga / Kg: ' + formatCurrency(row.price_per_kg)"></span><span x-text="'Bonus / kemasan: ' + formatWeight(row.deduction_weight_kg || 0)"></span></div>
                     <p class="mt-2 text-xs text-gray-500" x-text="'Pembayaran: ' + row.payment_status_label"></p>
+                    @can('invoice.read')
                     <a x-show="row.invoice" href="{{ route('invoice.index') }}" class="mt-2 block text-sm text-brand-600" x-text="'Invoice: ' + (row.invoice?.number || '')"></a>
+                    @endcan
                     <a x-show="row.payment_proof_url" :href="row.payment_proof_url" target="_blank" rel="noopener" class="mt-2 block text-sm text-brand-600">Bukti pembayaran</a>
                     <p x-show="row.payment_date" class="mt-2 text-xs text-gray-500" x-text="row.payment_date ? 'Tanggal bayar: ' + formatDisplayDate(row.payment_date) : ''"></p>
                     <p x-show="row.payment_notes" class="mt-2 text-xs text-gray-500" x-text="row.payment_notes"></p>
@@ -23,10 +25,20 @@
             </div>
             <p x-show="detailItem?.has_invoice" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-700">Nota ini menggunakan invoice. Pelunasan dilakukan melalui menu Invoice.</p>
             <div class="flex flex-wrap justify-end gap-3">
-                <button type="button" x-show="detailItem?.can_delete" @click="$dispatch('close-modal', 'sale-detail-modal'); $dispatch('delete-sale', detailItem.id)" class="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600">Hapus Nota</button>
+                
+@can('manajemen-penjualan.delete')
+<button type="button" x-show="detailItem?.can_delete" @click="$dispatch('close-modal', 'sale-detail-modal'); $dispatch('delete-sale', detailItem.id)" class="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600">Hapus Nota</button>
+@endcan
+
                 <button type="button" @click="$dispatch('close-modal', 'sale-detail-modal')" class="rounded-lg border px-4 py-2 text-sm">Tutup</button>
+                @can('invoice.read')
                 <a x-show="detailItem?.has_invoice" href="{{ route('invoice.index') }}" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white">Buka Invoice</a>
-                <button type="button" x-show="detailItem?.can_pay" @click="$dispatch('close-modal', 'sale-detail-modal'); openPaymentModal(detailItem)" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white">Lunasi Nota</button>
+                @endcan
+                
+@can('manajemen-penjualan.update')
+<button type="button" x-show="detailItem?.can_pay" @click="$dispatch('close-modal', 'sale-detail-modal'); openPaymentModal(detailItem)" class="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white">Lunasi Nota</button>
+@endcan
+
             </div>
         </div>
     </x-modal>

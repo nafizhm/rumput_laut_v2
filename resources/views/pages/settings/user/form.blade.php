@@ -29,29 +29,46 @@
                 <input name="password_confirmation" type="password" autocomplete="new-password" minlength="8" @required(!$user->exists) class="mt-2 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 dark:border-gray-700" />
             </label>
         </x-form-section>
-        <x-form-section title="Role" description="Hak akses dari role berlaku otomatis. Role yang tersedia sesuai hak akses Anda.">
+        <x-form-section title="Role" description="Pilih jenis pengguna. Hak akses menu mengikuti centang di bawah; superadmin mengikuti seluruh akses role.">
             @forelse($roles as $role)
                 <label class="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
                     <input type="checkbox" name="roles[]" value="{{ $role->id }}" class="mt-1 rounded" @checked(in_array($role->id, old('roles', $errors->any() ? [] : $user->roles->pluck('id')->all()))) />
-                    <span><strong>{{ $role->name }}</strong><span class="mt-1 block text-xs text-gray-500">{{ $role->permissions->pluck('name')->join(', ') ?: 'Belum memiliki hak akses' }}</span></span>
+                    <span>{{ $role->name }}</span>
                 </label>
             @empty
                 <p class="text-sm text-gray-500">Belum ada role yang dapat diberikan.</p>
             @endforelse
         </x-form-section>
-        <x-form-section title="Hak Akses Tambahan" description="Izin ini ditambahkan ke hak akses role. Untuk mencabut izin dari role, ubah pilihan role pengguna.">
-            @foreach($permissions->groupBy(fn($permission) => explode('.', $permission->name)[0]) as $group => $items)
-                <fieldset class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-                    <legend class="px-2 text-sm font-semibold text-gray-700 dark:text-gray-300">{{ $group }}</legend>
-                    @foreach($items as $permission)
-                        <label class="mb-2 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" name="permissions[]" value="{{ $permission->id }}" class="rounded" @checked(in_array($permission->id, old('permissions', $errors->any() ? [] : $user->permissions->pluck('id')->all()))) />
-                            {{ $permission->name }}
-                        </label>
-                    @endforeach
-                </fieldset>
-            @endforeach
-        </x-form-section>
+        <section class="mb-6 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900" x-data="{ enabledParents: @js($enabledParents), visible(parents) { return parents.every(id => this.enabledParents.includes(id)); } }">
+            <input type="hidden" name="menu_hierarchy" value="1">
+            <div class="p-5"><h3 class="font-semibold text-gray-800 dark:text-white">Hak Akses Menu</h3><p class="mt-1 text-sm text-gray-500">Pengguna hanya mendapat akses yang dicentang. Hilangkan centang untuk mencabut akses.</p></div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-gray-700 dark:text-gray-300">
+                    <thead class="border-y bg-gray-50 dark:border-gray-700 dark:bg-gray-800"><tr><th class="px-5 py-3 text-left">Nama Menu</th>@foreach(['read'=>'Lihat', 'create'=>'Tambah', 'update'=>'Edit', 'delete'=>'Hapus'] as $heading)<th class="px-4 py-3 text-center">{{ $heading }}</th>@endforeach</tr></thead>
+                    <tbody>
+                    @forelse($permissionRows as $row)
+                        <tr x-show="visible(@js($row['parents']))" @if($row['parents']) x-cloak @endif @class(['border-b border-gray-100 dark:border-gray-800', 'bg-blue-50 font-semibold text-blue-800 dark:bg-blue-900/30 dark:text-blue-200' => $row['is_parent']])>
+                            <td class="py-3 pr-5" style="padding-left: {{ 20 + $row['level'] * 24 }}px">{{ $row['label'] }}</td>
+                            @foreach(['read'=>'Lihat', 'create'=>'Tambah', 'update'=>'Edit', 'delete'=>'Hapus'] as $action=>$label)
+                                <td class="px-4 py-3 text-center">
+                                    @if(isset($row['parent_key']) && $action === 'read')
+                                        <input type="checkbox" name="enabled_parents[]" value="{{ $row['parent_key'] }}" x-model="enabledParents" :disabled="!visible(@js($row['parents']))" aria-label="{{ $row['label'] }}: Lihat" class="rounded border-gray-300 text-brand-500" @checked(in_array($row['parent_key'], $enabledParents, true)) />
+                                    @elseif(isset($row['cells'][$action]))
+                                        @php($permission = $row['cells'][$action])
+                                        <input type="checkbox" name="permissions[]" value="{{ $permission->id }}" :disabled="!visible(@js($row['parents']))" aria-label="{{ $row['label'] }}: {{ $label }}" class="rounded border-gray-300 text-brand-500" @checked(in_array($permission->id, old('permissions', $errors->any() ? [] : $user->getAllPermissions()->pluck('id')->all()))) />
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                </td>
+                            @endforeach
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="p-5 text-center text-gray-500">Belum ada hak akses yang dapat diberikan.</td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
         <div class="flex justify-end gap-3 pb-6">
             <a href="{{ route('users.index') }}" class="rounded-lg border border-gray-300 px-5 py-3 text-sm text-gray-700 dark:text-gray-300">Batal</a>
             <button type="submit" class="rounded-lg bg-brand-500 px-5 py-3 text-sm text-white">Simpan Pengguna</button>

@@ -24,6 +24,7 @@ beforeEach(function () {
 
     $this->withoutVite();
     $this->actingAs(User::create(['name' => 'Tester', 'email' => 'payment@example.test', 'password' => 'test-password']));
+    $this->grantModuleAccess(auth()->user(), ['invoice']);
     Carbon::setTestNow(Carbon::parse('2026-10-06 00:05:00', 'Asia/Jakarta'));
 
     $this->po = CustomerPurchaseOrder::create([

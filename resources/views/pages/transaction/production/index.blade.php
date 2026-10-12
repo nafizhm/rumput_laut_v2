@@ -6,7 +6,7 @@
 <div class="space-y-5 rounded-xl bg-white p-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="text-xl font-semibold">Riwayat Proses Harian</h2>
-        @if(auth()->user()->can('production.create') && auth()->user()->can('production.confirm'))<a href="{{ route('produksi.create') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Catat Proses Harian</a>@endif
+        @can('production.create')<a href="{{ route('produksi.create') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Catat Proses Harian</a>@endcan
     </div>
     <form method="GET" class="flex flex-wrap items-end gap-3">
         <label class="text-sm">Status<select name="status" class="ml-3 rounded-lg border bg-white p-3 dark:bg-gray-900">
@@ -25,7 +25,7 @@
             <td class="p-3">@if($run->status === 'packed'){{ number_format($run->outputs->sum('weight_kg'),2,',','.') }} Kg<br>{{ $run->outputs->sum('package_count') }} kemasan @else — @endif</td>
             <td class="p-3">{{ ['processing'=>'Proses aktif','wip'=>'WIP','packed'=>'Selesai packing'][$run->status] }}</td>
             <td class="p-3"><div class="flex gap-3"><a href="{{ route('produksi.show',$run) }}" @click.prevent="$dispatch('warehouse-detail', { url: $el.href })" class="text-brand-600">Detail</a>
-                @if($run->status==='processing')@can('production.create')<a href="{{ route('produksi.edit',$run) }}" class="text-brand-600">Edit</a>@endcan @endif
+                @if($run->status==='processing')@can('production.update')<a href="{{ route('produksi.edit',$run) }}" class="text-brand-600">Edit</a>@endcan @endif
             </div></td>
         </tr>@empty<tr><td colspan="8" class="p-6 text-center text-gray-500">Belum ada proses pada pilihan ini.</td></tr>@endforelse</tbody>
     </table></div>

@@ -16,7 +16,7 @@ class WarehouseNavigationSeeder extends Seeder
             Menu::updateOrCreate(['route' => 'manajemen-gudang.index'], [
                 'name' => 'Dashboard Gudang', 'parent_id' => $warehouse->id,
                 'icon' => 'layout-dashboard', 'url' => 'manajemen-gudang', 'order' => 0,
-                'permission' => 'receiving.read', 'is_active' => true,
+                'permission' => 'manajemen-gudang.read', 'is_active' => true,
             ]);
         });
     }

@@ -3,6 +3,7 @@
 namespace App\Services\Sidebar;
 
 use App\Models\Menu;
+use App\Services\Auth\RoutePermissionService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -20,15 +21,11 @@ class SidebarService
             ->get();
 
         return $menus->filter(function ($menu) use ($user) {
-            if ($menu->permission) {
-                return $user->can($menu->permission);
+            if ($menu->children->isNotEmpty()) {
+                return $menu->children->contains(fn ($child) => self::checkMenuPermission($user, $child));
             }
 
-            $accessibleChildren = $menu->children->filter(function ($child) use ($user) {
-                return self::checkMenuPermission($user, $child);
-            });
-
-            return $accessibleChildren->isNotEmpty();
+            return self::checkMenuPermission($user, $menu);
         })->map(function ($menu) use ($user, $currentRoute) {
             $menu->children = $menu->children->filter(function ($child) use ($user) {
                 return self::checkMenuPermission($user, $child);
@@ -52,11 +49,7 @@ class SidebarService
             return false;
         }
 
-        if ($menu->permission) {
-            return $user->can($menu->permission);
-        }
-
-        return true;
+        return $menu->route && RoutePermissionService::canAccess($user, $menu->route);
     }
 
     private static function checkActive($menu, $currentRoute)

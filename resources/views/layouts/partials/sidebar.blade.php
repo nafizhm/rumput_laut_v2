@@ -4,7 +4,7 @@
 
     <div :class="sidebarToggle ? 'justify-center' : 'justify-between'"
         class="sidebar-header flex items-center gap-2 pt-8 pb-7">
-        <a href="index.html" class="flex items-center">
+        <a href="{{ route('access.home') }}" class="flex items-center">
             <span class="logo flex items-center" :class="sidebarToggle ? 'hidden' : ''">
                 <span class="text-2xl font-black tracking-tighter text-gray-900 dark:text-white">
                     RLS<span class="text-brand-500">.</span>

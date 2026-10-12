@@ -15,7 +15,7 @@
         </div>
     </div>
     @endif
-    <div class="flex gap-4 text-sm"><a href="{{ route('produksi.index') }}" class="text-brand-600">Kembali ke Riwayat Proses</a>@if($run->status==='processing')@can('production.create')<a href="{{ route('produksi.edit',$run) }}" class="text-brand-600">Edit Proses</a>@endcan @endif</div>
+    <div class="flex gap-4 text-sm"><a href="{{ route('produksi.index') }}" class="text-brand-600">Kembali ke Riwayat Proses</a>@if($run->status==='processing')@can('production.update')<a href="{{ route('produksi.edit',$run) }}" class="text-brand-600">Edit Proses</a>@endcan @endif</div>
     @if($run->notes)<p class="text-sm">Catatan: {{ $run->notes }}</p>@endif
     <p class="text-sm">Status: <strong>{{ ['processing'=>'Proses aktif','wip'=>'WIP — menunggu press/timbang/packing','packed'=>'Selesai packing'][$run->status] }}</strong>. PIC: {{ $run->pic }}. Pekerjaan: {{ $run->work_type }}.</p>
     <p class="text-sm text-gray-500">Mulai {{ $run->started_date->format('d/m/Y') }}. Bahan {{ $run->input_sacks }} karung.@if(!$run->warehouse_only) Nilai bahan {{ \App\Services\Finance\AccountingMoney::format($run->material_cost_cents) }}, biaya proses {{ \App\Services\Finance\AccountingMoney::format($run->processing_cost_cents) }}.@endif</p>

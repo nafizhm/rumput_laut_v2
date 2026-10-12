@@ -4,13 +4,21 @@
 @section('content')
 <div class="mb-5 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">Satu nota untuk seluruh barang. Buka Detail untuk melihat barang, potongan, dan pembayaran. Nota yang menggunakan invoice dibayar melalui menu Invoice.</div>
 <x-data-table id="salesTable" :rows="$data" :columns="$columns" :url="route('manajemen-penjualan.data')">
-<x-slot:headerAction><div class="flex flex-wrap gap-2">@can('manajemen-penjualan.create')<a href="{{ route('manajemen-penjualan.create') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm font-medium text-white">+ Tambah Penjualan</a>@endcan<a href="{{ route('manajemen-penjualan.index', ['view'=>'products']) }}" class="rounded-lg border px-4 py-3 text-sm font-medium text-brand-600">Lihat per Produk</a></div></x-slot:headerAction>
+<x-slot:headerAction><div class="flex flex-wrap gap-2">@can('manajemen-penjualan.create')
+@can('manajemen-penjualan.create')
+<a href="{{ route('manajemen-penjualan.create') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm font-medium text-white">+ Tambah Penjualan</a>
+@endcan
+@endcan<a href="{{ route('manajemen-penjualan.index', ['view'=>'products']) }}" class="rounded-lg border px-4 py-3 text-sm font-medium text-brand-600">Lihat per Produk</a></div></x-slot:headerAction>
 <x-slot:date><span x-text="formatDisplayDate(item.sale_date)"></span></x-slot:date>
 <x-slot:total_sale_value><span class="tabular-nums" x-text="formatCurrency(item.total_sale_value)"></span></x-slot:total_sale_value>
 <x-slot:payment_status><span class="inline-flex rounded-full px-3 py-1 text-xs font-medium" :class="item.payment_status === 'paid' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'" x-text="item.payment_status_label"></span><span x-show="item.has_invoice" class="mt-1 block text-xs text-gray-500">Melalui Invoice</span></x-slot:payment_status>
 <x-slot:action><div class="flex flex-wrap gap-2">
 <button type="button" @click="$dispatch('view-sale-note', item)" class="rounded-lg border px-3 py-2 text-sm text-brand-600">Detail</button>
+
+@can('manajemen-penjualan.update')
 <button type="button" x-show="item.can_pay" @click="$dispatch('open-pay-sale', item)" class="rounded-lg bg-brand-600 px-3 py-2 text-sm text-white">Pelunasan</button>
+@endcan
+
 </div></x-slot:action>
 </x-data-table>
 @include('pages.transaction.sales._sales-modal')

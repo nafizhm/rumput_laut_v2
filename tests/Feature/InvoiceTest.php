@@ -38,6 +38,7 @@ beforeEach(function () {
     }
     $this->withoutVite();
     $this->actingAs(User::create(['name' => 'Tester', 'email' => 'invoice@example.test', 'password' => 'test-password']));
+    $this->grantModuleAccess(auth()->user(), ['invoice']);
     Carbon::setTestNow(Carbon::parse('2026-10-06 00:05:00', 'Asia/Jakarta'));
     $this->po = CustomerPurchaseOrder::create([
         'po_number' => 'PO-2026-001', 'po_date' => '2026-09-29', 'customer_name' => 'PT Maju Jaya',

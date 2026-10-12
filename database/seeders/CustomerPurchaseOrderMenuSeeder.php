@@ -21,7 +21,7 @@ class CustomerPurchaseOrderMenuSeeder extends Seeder
             $parent->fill(['icon' => 'shopping-cart', 'order' => $order, 'is_active' => true])->save();
             Menu::updateOrCreate(['route' => 'po-konsumen.index'], [
                 'name' => 'PO konsumen', 'url' => 'po-konsumen', 'parent_id' => $parent->id,
-                'order' => 1, 'is_active' => true, 'permission' => null,
+                'order' => 1, 'is_active' => true, 'permission' => 'po-konsumen.read',
             ]);
         });
     }

@@ -58,6 +58,7 @@ beforeEach(function () {
     });
     $this->withoutVite();
     $this->actingAs(User::create(['name' => 'Tester', 'email' => 'direct@example.test', 'password' => 'password']));
+    $this->grantModuleAccess(auth()->user(), ['manajemen-penjualan', 'po-konsumen', 'surat-jalan', 'invoice']);
     Permission::firstOrCreate(['name' => 'manajemen-penjualan.create', 'guard_name' => 'web']);
     auth()->user()->givePermissionTo('manajemen-penjualan.create');
     $this->factory = Factory::create(['name' => 'Pabrik Test']);
@@ -328,7 +329,7 @@ it('links invoices to the existing sale and bills its net value without another 
         ->and(SalesTransaction::count())->toBe(1)
         ->and(StockMovement::count())->toBe(1)
         ->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(900.0);
-    $this->get(route('invoice.index'))->assertOk()->assertSee('Penjualan yang Ditagihkan');
+    $this->get(route('invoice.index'))->assertOk()->assertSee('Penjualan Terkait')->assertSee($sale->invoice_number);
     $this->get(route('invoice.print', $invoice))->assertOk()->assertSee($sale->invoice_number)->assertSee('Rp864.000,00')->assertSee('Rp136.000,00');
     $this->postJson(route('invoice.store'), array_replace($data, ['number' => 'INV-DUPLICATE']))->assertUnprocessable()->assertJsonValidationErrors('sales_transaction_id');
     $this->postJson(route('manajemen-penjualan.pay', $sale), ['payment_date' => '2026-10-08', 'paid_amount' => 864000])->assertUnprocessable();
@@ -474,7 +475,7 @@ it('requires permission, explicit confirmation and valid actual dates before shi
     foreach ([['confirm' => false], ['shipped_date' => '2026-10-06'], ['shipped_date' => '2026-10-08']] as $change) {
         $this->postJson(route('surat-jalan.dispatch', $note), array_replace(['shipped_date' => '2026-10-07', 'confirm' => true], $change))->assertUnprocessable();
     }
-    auth()->user()->revokePermissionTo('manajemen-penjualan.create');
+    auth()->user()->revokePermissionTo('surat-jalan.update');
     $this->postJson(route('surat-jalan.dispatch', $note), ['shipped_date' => '2026-10-07', 'confirm' => true])->assertForbidden();
     expect(StockMovement::count())->toBe(0)->and($note->refresh()->status)->toBe('draft');
 });

@@ -40,7 +40,9 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', \App\Http\Middleware\EnsureRoutePermission::class])->group(function () {
+    Route::get('home', fn () => redirect()->route(\App\Services\Auth\RoutePermissionService::landingRoute(auth()->user())))->name('access.home');
+    Route::view('akses-kosong', 'pages.auth.no-access')->name('access.empty');
     Route::resource('setting/users', \App\Http\Controllers\Setting\UserController::class)
         ->only(['index', 'create', 'store', 'edit', 'update'])
         ->middlewareFor('index', 'can:users.read')
@@ -101,8 +103,8 @@ Route::middleware('auth')->group(function () {
     Route::post('stok-awal', [\App\Http\Controllers\Transaction\OpeningStockController::class, 'store'])->name('stok-awal.store')->middleware('can:opening-stock.create');
     Route::get('produksi', [ProductionController::class, 'index'])->name('produksi.index')->middleware('can:production.read');
     Route::get('produksi/create', [ProductionController::class, 'create'])->name('produksi.create')->middleware('can:production.create');
-    Route::get('produksi/{produksi}/edit', [ProductionController::class, 'edit'])->name('produksi.edit')->middleware('can:production.create');
-    Route::put('produksi/{produksi}', [ProductionController::class, 'update'])->name('produksi.update')->middleware('can:production.create');
+    Route::get('produksi/{produksi}/edit', [ProductionController::class, 'edit'])->name('produksi.edit')->middleware('can:production.update');
+    Route::put('produksi/{produksi}', [ProductionController::class, 'update'])->name('produksi.update')->middleware('can:production.update');
     Route::post('produksi', [ProductionController::class, 'store'])->name('produksi.store')->middleware('can:production.create');
     Route::get('produksi/{produksi}', [ProductionController::class, 'show'])->name('produksi.show')->middleware('can:production.read');
     Route::post('produksi/{produksi}/complete', [ProductionController::class, 'complete'])->name('produksi.complete')->middleware('can:production.confirm');
@@ -114,8 +116,8 @@ Route::middleware('auth')->group(function () {
         ->middlewareFor(['index', 'show'], 'can:receiving.read')->middlewareFor(['create', 'store'], 'can:receiving.create')
         ->middlewareFor(['edit', 'update'], 'can:receiving.update')->middlewareFor(['destroy'], 'can:receiving.delete');
     Route::post('penerimaan-barang/{penerimaan_barang}/confirm', [GoodsReceiptController::class, 'confirm'])->name('penerimaan-barang.confirm')->middleware('can:receiving.confirm');
-    Route::get('manajemen-gudang/tahap/{stage}', [WarehouseDashboardController::class, 'stage'])->name('manajemen-gudang.stage')->middleware('can:receiving.read');
-    Route::get('manajemen-gudang/area/{area}', [WarehouseDashboardController::class, 'area'])->name('manajemen-gudang.area')->middleware('can:receiving.read');
+    Route::get('manajemen-gudang/tahap/{stage}', [WarehouseDashboardController::class, 'stage'])->name('manajemen-gudang.stage');
+    Route::get('manajemen-gudang/area/{area}', [WarehouseDashboardController::class, 'area'])->name('manajemen-gudang.area');
     Route::get('manajemen-gudang/mutasi', [WarehouseController::class, 'movements'])->name('manajemen-gudang.movements');
     Route::get('warehouse-stock', [WarehouseController::class, 'stockData'])->name('manajemen-gudang.stock');
     Route::get('manajemen-gudang', [WarehouseController::class, 'index'])->name('manajemen-gudang.index');
@@ -137,7 +139,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('invoice', InvoiceController::class)->only(['index', 'create', 'edit', 'store', 'update', 'destroy']);
 
     Route::get('surat-jalan-data', [DeliveryNoteController::class, 'data'])->name('surat-jalan.data');
-    Route::post('surat-jalan/{surat_jalan}/dispatch', [DeliveryNoteController::class, 'dispatch'])->name('surat-jalan.dispatch')->middleware('can:manajemen-penjualan.create');
+    Route::post('surat-jalan/{surat_jalan}/dispatch', [DeliveryNoteController::class, 'dispatch'])->name('surat-jalan.dispatch');
     Route::get('surat-jalan/{surat_jalan}/cetak', [DeliveryNoteController::class, 'print'])->name('surat-jalan.print');
     Route::resource('surat-jalan', DeliveryNoteController::class)
         ->parameters(['surat-jalan' => 'surat_jalan'])->only(['index', 'create', 'edit', 'store', 'update', 'destroy']);

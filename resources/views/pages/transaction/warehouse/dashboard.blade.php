@@ -7,8 +7,8 @@
 <div><h2 class="text-xl font-semibold">Penerimaan sampai Siap Jual</h2><p class="mt-2 text-sm text-gray-500">Pantau sisa bahan, pengambilan proses harian, dan hasil packing.</p></div>
 <div class="flex flex-wrap gap-3">
 @can('opening-stock.read')<a href="{{ route('stok-awal.index') }}" class="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-900">Stok Awal</a>@endcan
-@if(auth()->user()->can('manajemen-panen.read') && auth()->user()->can('manajemen-panen.create') && auth()->user()->can('receiving.create') && auth()->user()->can('receiving.confirm'))<a href="{{ route('manajemen-panen.index') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Penerimaan Panen</a>@endif
-@if(auth()->user()->can('production.create') && auth()->user()->can('production.confirm'))<a href="{{ route('produksi.create') }}" class="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-900">Catat Proses Harian</a>@endif
+@if(auth()->user()->can('manajemen-panen.read') && auth()->user()->can('manajemen-panen.create'))<a href="{{ route('manajemen-panen.index') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Penerimaan Panen</a>@endif
+@can('production.create')<a href="{{ route('produksi.create') }}" class="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-900">Catat Proses Harian</a>@endcan
 </div></div>
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 <a href="{{ route('manajemen-gudang.stage','incoming') }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-sm text-gray-500">Sisa Bahan Penerimaan</p><p class="mt-3 text-2xl font-semibold">{{ number_format($sacks,0,',','.') }} karung</p>@if($remainingWeight !== null)<p class="mt-2 text-sm">{{ number_format($remainingWeight,2,',','.') }} Kg alokasi</p>@endif</a>
@@ -34,7 +34,9 @@
 @endif
 </a>@empty<p class="text-sm text-gray-500">Belum ada area.</p>@endforelse
 </div>@endforeach</section>
+@can('receiving.read')
 @if($drafts > 0)<a href="{{ route('penerimaan-barang.index') }}" class="block text-sm text-brand-600">{{ $drafts }} draft penerimaan belum menambah stok.</a>@endif
+@endcan
 @if($stageCounts['wip'] > 0 || ($productionReady && $stageCounts['press'] > 0))<a href="{{ route('manajemen-gudang.stage','wip') }}" class="block text-sm text-brand-600">{{ $stageCounts['wip'] }} proses lama menunggu packing.</a>@endif
 </div>
 @endsection

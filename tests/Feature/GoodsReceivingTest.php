@@ -54,6 +54,7 @@ beforeEach(function () {
     $this->user = User::create(['name' => 'Owner', 'email' => 'receiving@example.test', 'password' => 'password']);
     $this->user->assignRole('owner');
     $this->actingAs($this->user);
+    $this->grantModuleAccess($this->user, ['manajemen-gudang', 'manajemen-petani', 'manajemen-penjualan']);
     $this->withoutVite();
     $this->farmer = Farmer::create(['name' => 'Petani Test', 'current_debt' => 100000]);
     $this->inventory = Inventory::where('stock_stage', 'material')->firstOrFail();
@@ -71,6 +72,43 @@ beforeEach(function () {
 });
 afterEach(function () {
     Carbon::setTestNow();
+});
+
+it('shows and saves integrated harvest receiving with only harvest read and create access', function () {
+    enableHarvestFinance($this);
+    $user = User::create(['name' => 'Gudang Terbatas', 'email' => 'harvest-only@example.test', 'password' => 'password']);
+    foreach (['manajemen-panen.read', 'manajemen-panen.create'] as $name) {
+        $user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate($name, 'web'));
+    }
+    $this->actingAs($user)->get(route('manajemen-panen.index'))->assertOk()->assertSee('Tambah Penerimaan Panen');
+    expect($user->can('receiving.create'))->toBeFalse()->and($user->can('receiving.confirm'))->toBeFalse();
+    $this->postJson(route('manajemen-panen.store'), unifiedHarvestPayload($this))->assertOk();
+    expect(GoodsReceipt::firstOrFail()->status)->toBe('confirmed')->and(MaterialBatch::count())->toBe(1);
+    $user->revokePermissionTo('manajemen-panen.create');
+    $this->get(route('manajemen-panen.index'))->assertOk()->assertDontSee('Tambah Penerimaan Panen');
+    $this->postJson(route('manajemen-panen.store'), unifiedHarvestPayload($this))->assertForbidden();
+    $this->get(route('harvest-finance.index'))->assertForbidden();
+});
+
+it('shows and saves daily production with create access without separate confirmation access', function () {
+    prepareOpeningStockSchema();
+    $area = WarehouseArea::where('usage', 'finished')->where('is_active', true)->firstOrFail();
+    app(\App\Services\Transaction\OpeningStockService::class)->save([
+        'token' => (string) \Illuminate\Support\Str::uuid(), 'stock_date' => '2026-10-06', 'usage' => 'receiving',
+        'items' => [['warehouse_area_id' => $this->area->id, 'weight_kg' => 100, 'package_count' => 4]],
+    ], $this->user);
+    $user = User::create(['name' => 'Proses Terbatas', 'email' => 'production-only@example.test', 'password' => 'password']);
+    foreach (['production.read', 'production.create'] as $name) {
+        $user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate($name, 'web'));
+    }
+    $this->actingAs($user)->get(route('produksi.index'))->assertOk()->assertSee('Catat Proses Harian');
+    $this->get(route('produksi.create'))->assertOk();
+    expect($user->can('production.confirm'))->toBeFalse();
+    $this->post(route('produksi.store'), ['date' => '2026-10-07',
+        'sources' => [['warehouse_area_id' => $this->area->id, 'sack_count' => 2]],
+        'outputs' => [['warehouse_area_id' => $area->id, 'weight_kg' => 40, 'package_count' => 2]],
+    ])->assertRedirect(route('produksi.index'))->assertSessionHasNoErrors();
+    expect((int) MaterialBatch::sum('remaining_sacks'))->toBe(2)->and((float) \App\Models\FinishedBatch::sum('weight_kg'))->toBe(40.0);
 });
 
 function prepareOpeningStockSchema(): void

@@ -47,7 +47,6 @@ class ProductionController extends Controller
 
     public function create()
     {
-        abort_unless(auth()->user()->can('production.confirm'), 403);
         return view('pages.transaction.production.create', [
             'batches' => MaterialBatch::with(['line.receipt.farmer', 'line.grade', 'line.area'])
                 ->where('remaining_sacks', '>', 0)->where('status', 'available')
@@ -63,7 +62,6 @@ class ProductionController extends Controller
     public function store(Request $request)
     {
         if ($request->has('sources')) {
-            abort_unless($request->user()->can('production.confirm'), 403);
             $data = $request->validate([
                 'date' => 'required|date_format:Y-m-d|before_or_equal:today', 'notes' => 'nullable|string|max:2000',
                 'sources' => 'required|array|min:1|max:50',

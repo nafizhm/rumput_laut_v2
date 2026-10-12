@@ -27,6 +27,7 @@ beforeEach(function () {
     }
     $this->withoutVite();
     $this->actingAs(User::create(['name' => 'PO Tester', 'email' => 'po@example.test', 'password' => 'test-password']));
+    $this->grantModuleAccess(auth()->user(), ['po-konsumen']);
     Storage::fake('local');
     $this->factory = Factory::create(['name' => 'Pabrik Uji', 'phone' => '08123456', 'address' => 'Alamat pabrik']);
     $this->payload = [

@@ -16,6 +16,7 @@
         <x-slot:headerAction>
             <div class="flex flex-wrap gap-2">
                 @if ($showActions)
+                    @can('receiving.create')
                     <a href="{{ route('penerimaan-barang.create') }}"
                         class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -23,6 +24,8 @@
                         </svg>
                         Penerimaan Barang
                     </a>
+                    @endcan
+                    @can('manajemen-gudang.update')
                     <button type="button" @click="$dispatch('open-transfer-modal')"
                         class="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-theme-xs transition-colors dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/3">
                         <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -41,6 +44,7 @@
                         </svg>
                         Penyesuaian
                     </button>
+                    @endcan
                 @endif
             </div>
         </x-slot:headerAction>

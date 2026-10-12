@@ -21,7 +21,9 @@
         :url="route('invoice.data')" 
     >
         <x-slot:headerAction>
-            <a 
+            
+@can('invoice.create')
+<a 
                 href="{{ route('invoice.create') }}" 
                 class="flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/3"
             >
@@ -30,6 +32,8 @@
                 </svg>
                 Tambah Invoice
             </a>
+@endcan
+
         </x-slot:headerAction>
 
         <x-slot:document>
@@ -59,24 +63,36 @@
         <x-slot:due><div><span x-text="formatDisplayDate(item.due_date)"></span><p class="text-xs" :class="item.payment_status !== 'paid' && item.days_until_due < 0 ? 'text-rose-600' : 'text-gray-500'" x-text="item.due_label"></p><p class="text-xs text-gray-500" x-text="'Termin ' + item.term_days + ' hari'"></p></div></x-slot:due>
         <x-slot:action>
             <div class="flex flex-wrap items-center gap-1.5">
-                <button type="button" x-show="item.payment_status !== 'paid'" @click="$dispatch('open-invoice-payment', item)" class="rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs text-white">Bayar</button>
+                
+@can('invoice.update')
+<button type="button" x-show="item.payment_status !== 'paid'" @click="$dispatch('open-invoice-payment', item)" class="rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs text-white">Bayar</button>
+@endcan
+
                 <a :href="`{{ url('invoice') }}/${item.id}/cetak`" target="_blank" rel="noopener"
                     class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">Cetak</a>
-                <button 
+                
+@can('invoice.update')
+<button 
                     type="button" 
                     @click="window.location.href = `{{ url('invoice') }}/${item.id}/edit`" 
                     class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-600"
                 >
                     Edit
                 </button>
+@endcan
 
-                <button 
+
+                
+@can('invoice.delete')
+<button 
                     type="button" 
                     @click="$dispatch('delete-entity', item.id)" 
                     class="inline-flex items-center justify-center rounded-lg bg-rose-500 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-rose-600"
                 >
                     Hapus
                 </button>
+@endcan
+
             </div>
         </x-slot:action>
     </x-data-table>

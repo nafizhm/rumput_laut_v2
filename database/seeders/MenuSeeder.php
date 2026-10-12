@@ -196,7 +196,7 @@ class MenuSeeder extends Seeder
             'icon' => null,
             'route' => 'manajemen-gudang.index',
             'url' => 'manajemen-gudang',
-            'permission' => 'receiving.read',
+            'permission' => 'manajemen-gudang.read',
             'parent_id' => $transaksi->id,
             'order' => 0,
             'is_active' => true

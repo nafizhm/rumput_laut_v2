@@ -13,7 +13,7 @@ class StoreHarvestTransactionRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return $this->user()->can('manajemen-panen.create') && $this->user()->can('receiving.create') && $this->user()->can('receiving.confirm');
+        return $this->user()->can('manajemen-panen.create');
     }
     public function rules(): array
     {

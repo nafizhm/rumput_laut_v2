@@ -10,7 +10,7 @@
     <x-info-help><p class="mb-4 rounded-lg bg-white p-4 text-sm text-gray-500 dark:bg-gray-900">Input sekali setelah perhitungan selesai. Panen, penerimaan, stok, dan batch langsung tercatat.</p></x-info-help>
     <x-data-table id="harvestTransactionTable" :rows="$data" :columns="$columns" :url="route('harvest-data')">
         <x-slot:headerAction>
-            @if(auth()->user()->can('manajemen-panen.create') && auth()->user()->can('receiving.create') && auth()->user()->can('receiving.confirm'))
+            @can('manajemen-panen.create')
             <button type="button" @click="$dispatch('create-harvest-transaction')"
                 class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-[11px] text-sm font-medium text-gray-700 shadow-theme-xs dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 sm:w-auto hover:bg-gray-50 dark:hover:bg-white/3 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -21,7 +21,7 @@
                 </svg>
                 Tambah Penerimaan Panen
             </button>
-            @endif
+            @endcan
         </x-slot:headerAction>
 
         <x-slot:longDate>

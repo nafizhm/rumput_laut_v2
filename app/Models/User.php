@@ -11,7 +11,21 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, Notifiable;
+    use HasRoles {
+        hasPermissionViaRole as protected roleHasPermission;
+        getPermissionsViaRoles as protected rolePermissions;
+    }
+
+    protected function hasPermissionViaRole(\Spatie\Permission\Contracts\Permission $permission): bool
+    {
+        return ! $this->uses_custom_permissions && $this->roleHasPermission($permission);
+    }
+
+    public function getPermissionsViaRoles(): \Illuminate\Support\Collection
+    {
+        return $this->uses_custom_permissions ? collect() : $this->rolePermissions();
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -45,6 +59,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'uses_custom_permissions' => 'boolean',
         ];
     }
 }
