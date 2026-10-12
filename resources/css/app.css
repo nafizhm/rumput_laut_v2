@@ -759,6 +759,27 @@ span.flatpickr-weekday,
     display: none !important;
 }
 
+/* Keep tall dialogs inside the screen so their top is always reachable. */
+.app-modal-viewport {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 1.25rem;
+}
+
+.app-modal-panel {
+    flex-shrink: 0;
+    margin-block: auto;
+    max-height: calc(100vh - 2.5rem);
+    max-height: calc(100dvh - 2.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
 .no-transition * {
     transition: none !important;
 }

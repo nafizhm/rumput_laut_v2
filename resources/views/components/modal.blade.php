@@ -1,7 +1,7 @@
 @props(['name', 'title' => null, 'maxWidth' => 'max-w-[584px]'])
 
 <div x-data="{ show: false }" x-cloak x-show="show"
-    @open-modal.window="if ($event.detail === '{{ $name }}') show = true"
+    @open-modal.window="if ($event.detail === '{{ $name }}') { show = true; $nextTick(() => { $refs.panel.scrollTop = 0; }); }"
     @close-modal.window="if ($event.detail === '{{ $name }}') show = false" @keydown.escape.window="show = false"
     x-cloak class="fixed inset-0 z-9999" {{ $attributes }}>
     <div x-show="show" @click="show = false" x-transition:enter="ease-out duration-300"
@@ -11,14 +11,14 @@
     </div>
 
     <div x-show="show"
-        class="fixed inset-0 z-10 overflow-y-auto px-4 py-6 sm:px-0 flex items-center justify-center p-5 pointer-events-none">
-        <div x-transition:enter="ease-out duration-300"
+        @click.self="show = false" class="app-modal-viewport z-10">
+        <div x-ref="panel" x-transition:enter="ease-out duration-300"
             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" x-transition:leave="ease-in duration-200"
             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
             x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-            class="relative w-full {{ $maxWidth }} pointer-events-auto rounded-3xl bg-white p-6 shadow-xl dark:bg-gray-900 lg:p-10">
-            <button @click="show = false"
+            class="app-modal-panel relative w-full {{ $maxWidth }} rounded-3xl bg-white p-6 shadow-xl dark:bg-gray-900 lg:p-10">
+            <button type="button" @click="show = false"
                 class="group absolute right-3 top-3 z-999 flex h-9.5 w-9.5 items-center justify-center rounded-full bg-gray-200 text-gray-500 transition-colors hover:bg-gray-300 hover:text-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 sm:right-6 sm:top-6 sm:h-11 sm:w-11">
                 <svg class="transition-colors fill-current group-hover:text-gray-600 dark:group-hover:text-gray-200"
                     width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
