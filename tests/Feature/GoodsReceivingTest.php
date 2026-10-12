@@ -380,6 +380,37 @@ it('shows clickable warehouse stages and farmer receiving history without guessi
     $this->get(route('area-gudang.edit', $this->area))->assertOk();
 });
 
+it('opens a finished area containing migrated stock without a production record', function () {
+    Schema::create('production_runs', function (Blueprint $table) {
+        $table->id();
+        $table->string('number');
+        $table->timestamps();
+    });
+    Schema::create('finished_batches', function (Blueprint $table) {
+        $table->id();
+        $table->string('code');
+        $table->unsignedBigInteger('production_run_id')->nullable();
+        $table->unsignedBigInteger('warehouse_area_id');
+        $table->unsignedBigInteger('quality_grade_id')->nullable();
+        $table->decimal('remaining_weight_kg', 12, 2);
+        $table->unsignedInteger('remaining_packages');
+        $table->timestamps();
+    });
+    $ready = Inventory::create(['item_name' => 'Barang Jadi', 'stock_stage' => 'finished']);
+    $area = WarehouseArea::create(['code' => 'BJ-A', 'name' => 'Area A', 'inventory_id' => $ready->id, 'usage' => 'finished', 'is_active' => true]);
+    \App\Models\FinishedBatch::create(['code' => 'LEGACY-GUDANG-KERING-23-24', 'production_run_id' => null,
+        'warehouse_area_id' => $area->id, 'quality_grade_id' => null, 'remaining_weight_kg' => 42159.5, 'remaining_packages' => 1872]);
+    $run = \App\Models\ProductionRun::forceCreate(['number' => 'PRD-TEST']);
+    \App\Models\FinishedBatch::create(['code' => 'BAT-PRODUCTION', 'production_run_id' => $run->id,
+        'warehouse_area_id' => $area->id, 'quality_grade_id' => null, 'remaining_weight_kg' => 100, 'remaining_packages' => 2]);
+    $this->get(route('manajemen-gudang.area', $area))->assertOk()
+        ->assertSee('LEGACY-GUDANG-KERING-23-24')->assertSee('42.159,50')->assertSee('1872')
+        ->assertSee(route('produksi.show', $run), false);
+    $this->get(route('manajemen-gudang.stage', 'finished'))->assertOk()
+        ->assertSee('LEGACY-GUDANG-KERING-23-24')->assertSee('42.159,50')
+        ->assertSee(route('produksi.show', $run), false);
+});
+
 it('preserves seed edits and requires permission and explicit confirmation', function () {
     $this->area->update(['name' => 'Area Client']);
     $this->inventory->update(['current_stock_kg' => 123]);

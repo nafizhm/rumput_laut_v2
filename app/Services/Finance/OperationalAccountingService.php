@@ -46,6 +46,12 @@ class OperationalAccountingService
 
     public function loan(Loan $loan): void
     {
+        if ($loan->transfer_from_farmer_id) {
+            $from = \App\Models\Farmer::findOrFail($loan->transfer_from_farmer_id);
+            $this->record($loan, 'loan', $loan->loan_date->format('Y-m-d'), 'Pemindahbukuan piutang '.$from->name.' ke '.$loan->farmer->name.' (tanpa kas)',
+                [['11201', $loan->amount * 100, 0], ['11201', 0, $loan->amount * 100]]);
+            return;
+        }
         $this->record($loan, 'loan', $loan->loan_date->format('Y-m-d'), 'Pinjaman petani '.$loan->farmer->name,
             [['11201', $loan->amount * 100, 0], ['11101', 0, $loan->amount * 100]]);
     }
@@ -78,6 +84,11 @@ class OperationalAccountingService
 
     public function farmerPayment(FarmerPayment $payment): void
     {
+        if ($payment->transfer_to_loan_id) {
+            // The linked loan records both sides of the non-cash transfer.
+            $this->record($payment, 'farmer-payment', $payment->payment_date->format('Y-m-d'), 'Pemindahbukuan piutang; jurnal pada pinjaman #'.$payment->transfer_to_loan_id, []);
+            return;
+        }
         $this->record($payment, 'farmer-payment', $payment->payment_date->format('Y-m-d'), 'Pembayaran utang petani '.$payment->farmer->name,
             [['11101', $payment->amount * 100, 0], ['11201', 0, $payment->amount * 100]]);
     }
@@ -215,7 +226,10 @@ class OperationalAccountingService
             $key = $source->getMorphClass().':'.$source->getKey().':'.$event;
             $snapshot = ['date' => $date, 'description' => $description, 'lines' => $lines];
             $row = DB::table('operational_events')->where('source_key', $key)->lockForUpdate()->first();
-            if ($row && ! $row->cancelled && json_decode($row->snapshot, true) === $snapshot) {
+            $previous = $row ? json_decode($row->snapshot, true) : null;
+            // MySQL JSON storage can reorder object keys; compare values in a stable order.
+            if ($row && ! $row->cancelled && $previous
+                && [$previous['date'], $previous['description'], $previous['lines']] === [$date, $description, $lines]) {
                 return;
             }
             $effectiveDate = $date;
