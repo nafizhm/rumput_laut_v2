@@ -67,6 +67,9 @@
                 />
 
 
+                <div x-show="editMode">
+                    <x-input label="Alasan perubahan" name="change_reason" x-model="form.data.change_reason" alpine-error="form.getError('change_reason')" />
+                </div>
             </div>
 
             <div class="mt-6 flex justify-end gap-3">
@@ -90,11 +93,17 @@
         </form>
     </x-modal>
 
-    <x-delete-modal
-        name="delete-entity-modal"
-        message="Apakah anda yakin ingin menghapus transaksi ini? Data yang dihapus tidak dapat dikembalikan."
-        @confirm-delete-delete-entity-modal.window="deleteConfirmed"
-    />
+    <x-modal name="delete-entity-modal" maxWidth="max-w-[600px]">
+        <h4 class="text-lg font-semibold mb-4">Batalkan transaksi</h4>
+        <p class="mb-4 text-sm">Transaksi dihapus dari daftar aktif. Riwayat dan jurnal pembalik tetap tersimpan.</p>
+        <form @submit.prevent="deleteConfirmed">
+            <x-input label="Alasan pembatalan" name="delete_reason" x-model="deleteReason" :required="true" alpine-error="form.getError('change_reason')" />
+            <div class="flex justify-end gap-3 mt-4">
+                <button type="button" @click="$dispatch('close-modal', 'delete-entity-modal')">Tutup</button>
+                <button type="submit" :disabled="form.processing" class="rounded-lg bg-rose-500 p-3 text-white">Batalkan transaksi</button>
+            </div>
+        </form>
+    </x-modal>
 </div>
 
 <script>
@@ -103,12 +112,14 @@
             editMode: false,
             editId: null,
             deleteId: null,
+            deleteReason: '',
 
             form: useForm({
                 type: 'income',
                 date: window.getLocalDateInputValue(),
                 amount: 0,
                 description: '',
+                change_reason: '',
                 chart_of_account_id: '',
                 cash_account_id: '',
             }),
@@ -148,6 +159,8 @@
                     date: item.date ? item.date.split('T')[0] : '',
                     amount: item.amount,
                     description: item.description || '',
+                    change_reason: '',
+                    notes: item.notes || '',
                     chart_of_account_id: item.chart_of_account_id || '',
                     cash_account_id: item.cash_account_id || '',
                 };
@@ -160,11 +173,14 @@
 
             deleteItem(id) {
                 this.deleteId = id;
+                this.deleteReason = '';
+                this.form.clearErrors();
                 this.$dispatch('open-modal', 'delete-entity-modal');
             },
 
             async deleteConfirmed() {
                 await this.form.submit('delete', `{{ url('manajemen-pemasukan-pengeluaran') }}/${this.deleteId}`, {
+                    transform: () => ({ change_reason: this.deleteReason }),
                     onSuccess: (response) => {
                         toast.success('Berhasil', response.data.message);
                         refreshDataTable('transactionTable');

@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             WarehouseLocationSeeder::class,
             OpeningStockMenuSeeder::class,
             MenuAccessSeeder::class,
+            FinanceNavigationSeeder::class,
         ]);
     }
 }

@@ -8,6 +8,12 @@
                         <h4 class="text-lg font-medium text-gray-800 dark:text-white/90"
                             x-text="'Rincian ' + item.category"></h4>
                         <x-info-help>Daftar transaksi kas untuk periode terpilih.</x-info-help>
+                        <div x-show="item.transactions_formatted" class="mt-3 text-sm space-y-1">
+                            <p>Transaksi: <span x-text="item.transactions_formatted"></span></p>
+                            <p>Koreksi / pembatalan: <span x-text="item.corrections_formatted"></span></p>
+                            <p class="font-semibold">Total bersih: <span x-text="item.amount_formatted"></span></p>
+                            <p class="text-gray-500">Koreksi mengurangi catatan sebelumnya. Transaksi asal dapat berada di luar periode yang dipilih.</p>
+                        </div>
                     </div>
 
                     <!-- Body -->
@@ -36,7 +42,7 @@
                             <div class="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
                                 <x-data-table id="cashFlowDetailTable" :rows="[]" :columns="[
                                     ['key' => 'date', 'label' => 'Tanggal', 'width' => '150px'],
-                                    ['key' => 'description', 'label' => 'Keterangan'],
+                                    ['key' => 'description', 'label' => 'Keterangan', 'render' => 'detailDescription'],
                                     [
                                         'key' => 'amount',
                                         'label' => 'Nominal',
@@ -45,6 +51,15 @@
                                     ],
                                 ]"
                                     :url="null" perPage="5">
+                                    <x-slot:detailDescription>
+                                        <p x-text="item.description"></p>
+                                        <p class="text-sm font-semibold" x-text="item.activity || ''"></p>
+                                        <p class="text-sm text-gray-500" x-text="item.explanation || ''"></p>
+                                        <p class="text-xs text-gray-500" x-text="item.actor ? item.actor + ' · ' + item.recorded_at : ''"></p>
+                                        @can('manajemen-pemasukan-pengeluaran.read')
+                                            <a x-show="item.history_url" :href="item.history_url" class="text-brand-500 text-sm">Lihat riwayat transaksi</a>
+                                        @endcan
+                                    </x-slot:detailDescription>
                                     <x-slot:detailAmount>
                                         <div class="text-right text-sm font-semibold text-gray-800 dark:text-white/90"
                                             x-text="item.amount"></div>

@@ -29,6 +29,17 @@
                 @endcan
             </div>
         </div>
+        @if($openingSummary !== null)
+        <div class="space-y-3 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+            <h3 class="font-semibold">Saldo efektif pada tanggal mulai pembukuan</h3>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div><p class="text-sm text-gray-500">Kas / Bank</p><p class="mt-1 text-lg font-semibold tabular-nums">{{ $money::format($openingSummary['cash']) }}</p></div>
+                <div><p class="text-sm text-gray-500">Modal Pemilik</p><p class="mt-1 text-lg font-semibold tabular-nums">{{ $money::format($openingSummary['capital']) }}</p></div>
+            </div>
+            <p class="text-sm text-gray-500">Jumlah mencakup saldo awal dan seluruh jurnal Posted bertanggal {{ $setting->start_date->format('d/m/Y') }}, termasuk koreksi dan transaksi pada tanggal tersebut. Tabel di bawah menyimpan jurnal saldo awal asli. Saldo terkini tersedia di Neraca.</p>
+            <a href="{{ route('jurnal.index', ['month' => $setting->start_date->format('Y-m')]) }}" class="inline-block text-sm font-semibold text-brand-600 dark:text-brand-300">Lihat jurnal pada bulan mulai pembukuan</a>
+        </div>
+        @endif
         @if($kind==='opening' && !$setting->start_date)
         @can('journal.post')
         <form method="POST" action="{{ route('saldo-awal.start-zero') }}" class="space-y-3 rounded-xl border border-gray-200 bg-white p-5 dark:bg-gray-900">@csrf

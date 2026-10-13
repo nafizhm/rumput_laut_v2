@@ -4,16 +4,38 @@
 @section('content')
     @php
         $money = \App\Services\Finance\AccountingMoney::class;
+        $selectedYear = (int) substr($month, 0, 4);
+        $selectedMonth = (int) substr($month, 5, 2);
+        $currentYear = now('Asia/Jakarta')->year;
+        $firstYear = min($report['start_date']?->year ?? $currentYear - 5, $selectedYear, $currentYear);
+        $lastYear = max($currentYear + 1, $selectedYear);
+        $monthNames = [1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     @endphp
     <div class="space-y-5 text-gray-800 dark:text-gray-200">
         <div class="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800 dark:bg-gray-900">
             <div><h2 class="text-xl font-semibold">{{ $type==='balance'?'Neraca':'Laporan Laba Rugi' }}</h2><p class="mt-1 text-sm text-gray-500">{{ $type==='balance'?'Posisi per '.$report['end']->locale('id')->translatedFormat('d F Y'):'Periode '.$report['start']->locale('id')->translatedFormat('d F Y').' – '.$report['end']->locale('id')->translatedFormat('d F Y') }}</p></div>
-            <form method="GET" action="{{ route($type==='balance'?'neraca.index':'laba-rugi.index') }}" class="flex flex-col gap-3 sm:flex-row"><input type="month" name="month" required value="{{ $month }}" aria-label="Bulan laporan" class="min-h-11 rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700"><button class="min-h-11 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">Tampilkan</button></form>
+            <form method="GET" action="{{ route($type==='balance'?'neraca.index':'laba-rugi.index') }}" class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label for="report-month" class="text-sm font-medium">Bulan
+                    <select id="report-month" name="report_month" required class="mt-1 block min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-800 sm:min-w-40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                        @foreach($monthNames as $number => $name)
+                            <option value="{{ $number }}" @selected($selectedMonth === $number)>{{ $name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label for="report-year" class="text-sm font-medium">Tahun
+                    <select id="report-year" name="report_year" required class="mt-1 block min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-800 sm:min-w-28 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                        @for($year = $lastYear; $year >= $firstYear; $year--)
+                            <option value="{{ $year }}" @selected($selectedYear === $year)>{{ $year }}</option>
+                        @endfor
+                    </select>
+                </label>
+                <button class="min-h-11 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">Tampilkan</button>
+            </form>
         </div>
         @if(!$report['ready'])
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900 dark:border-amber-800 dark:bg-amber-500/10 dark:text-amber-200"><h3 class="font-semibold">Laporan belum tersedia</h3><p class="mt-2 text-sm leading-6">{{ $report['start_date']?'Bulan yang dipilih berakhir sebelum tanggal mulai pembukuan '.$report['start_date']->format('d/m/Y').'. Data sebelum tanggal tersebut belum direkonsiliasi.':'Saldo awal belum diposting. Isi saldo terverifikasi dan tentukan tanggal mulai pembukuan sebelum membaca laporan.' }}</p><p class="mt-2 text-sm">Angka belum tersedia, bukan berarti saldo atau laba nol.</p>@can('journal.read')<a href="{{ route('saldo-awal.index') }}" class="mt-3 inline-block text-sm font-semibold underline">Buka Saldo Awal</a>@endcan</div>
         @else
-            <div class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900 dark:border-sky-800 dark:bg-sky-500/10 dark:text-sky-200"><strong>Laporan internal dari jurnal Posted.</strong> Transaksi operasional belum masuk otomatis. Pastikan saldo awal, HPP, penyusutan, pajak, dan penyesuaian periode sudah lengkap. {{ $report['posted_count'] }} jurnal diposting untuk tanggal transaksi bulan ini. Pembukuan dimulai {{ $report['start_date']->format('d/m/Y') }}.</div>
+            <div class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-900 dark:border-sky-800 dark:bg-sky-500/10 dark:text-sky-200"><strong>Laporan internal dari jurnal Posted.</strong> Jurnal transaksi operasional yang sudah diposting masuk otomatis ke laporan. Draft belum dihitung. Pastikan saldo awal, HPP, penyusutan, pajak, dan penyesuaian periode sudah lengkap. {{ $report['posted_count'] }} jurnal diposting untuk tanggal transaksi bulan ini. Pembukuan dimulai {{ $report['start_date']->format('d/m/Y') }}.</div>
             @if($type==='balance')
                 <x-info-help><p class="text-sm leading-6 text-gray-500">Saldo mencakup saldo awal dan seluruh mutasi sampai akhir bulan terpilih. Angka dalam kurung merupakan saldo pengurang atau saldo negatif.</p></x-info-help>
                 <div class="grid items-start gap-5 xl:grid-cols-2">

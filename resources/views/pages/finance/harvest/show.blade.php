@@ -15,11 +15,14 @@
     @if(!$harvest->separate_payment)
         <div class="rounded-xl bg-white p-6 dark:bg-gray-900"><p class="text-sm">Transaksi ini menggunakan alur lama. Nilai dan pembayaran sebelumnya dipertahankan; tidak dapat dibayar ulang melalui menu ini.</p><div class="mt-3 grid gap-3 md:grid-cols-3"><p>Nilai: Rp {{ number_format($harvest->total_harvest_value,0,',','.') }}</p><p>Dibayar: Rp {{ number_format($harvest->cash_payout,0,',','.') }}</p><p>Potongan pinjaman: Rp {{ number_format($harvest->debt_deduction,0,',','.') }}</p></div></div>
     @elseif(!$harvest->priced_at)
+        @if(!$harvest->is_received || $harvest->receipt?->status !== 'confirmed')
+        <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">Menunggu konfirmasi penerimaan barang dari gudang. Nilai pembelian dapat ditetapkan setelah barang diterima dan penerimaan dikonfirmasi.</div>
+        @else
         @can('harvest-finance.price')
         <form method="POST" action="{{ route('harvest-finance.price',$harvest) }}" class="space-y-4 rounded-xl bg-white p-6 dark:bg-gray-900" x-data="{ price: {{ (int) old('price_per_kg',0) }}, kind: @js(old('sale_deduction_type','none')), discount: {{ (float) old('sale_deduction_value',0) }}, weight: {{ (float) $harvest->total_weight }}, get gross() { return Math.round(this.weight * Number(this.price || 0)); }, get net() { const d = Number(this.discount || 0); return this.gross - Math.round(this.kind === 'percentage' ? this.gross * d / 100 : this.kind === 'weight' ? d * Number(this.price || 0) : this.kind === 'nominal' ? d : 0); } }">
             @csrf<h3 class="font-semibold">Tetapkan Nilai Pembelian</h3>
             <div class="grid gap-4 md:grid-cols-4">
-                <label class="text-sm">Tanggal Pembelian<input name="purchase_date" type="date" value="{{ old('purchase_date',max(now('Asia/Jakarta')->format('Y-m-d'),$harvest->harvest_date->format('Y-m-d'))) }}" required class="{{ $fieldClass }}"></label>
+                <label class="text-sm">Tanggal Pembelian<input name="purchase_date" type="date" min="{{ $harvest->receipt->received_date->format('Y-m-d') }}" max="{{ now('Asia/Jakarta')->format('Y-m-d') }}" value="{{ old('purchase_date',max(now('Asia/Jakarta')->format('Y-m-d'),$harvest->receipt->received_date->format('Y-m-d'))) }}" required class="{{ $fieldClass }}"></label>
                 <label class="text-sm">Harga / Kg (Rp)<input name="price_per_kg" type="number" min="1" max="1000000000" step="1" x-model="price" required class="{{ $fieldClass }}"></label>
                 <label class="text-sm">Potongan Pembelian<select name="sale_deduction_type" x-model="kind" class="{{ $fieldClass }}">@foreach(['none'=>'Tidak Ada','percentage'=>'Persentase','nominal'=>'Nominal (Rp)','weight'=>'Berat (Kg)'] as $value=>$label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select></label>
                 <label class="text-sm">Nilai Potongan<input name="sale_deduction_value" type="number" min="0" step="0.01" x-model="discount" :readonly="kind==='none'" class="{{ $fieldClass }}"></label>
@@ -30,6 +33,7 @@
             <button class="rounded-lg bg-brand-500 px-5 py-2.5 text-white">Konfirmasi Nilai Pembelian</button>
         </form>
         @endcan
+        @endif
     @else
         <div class="space-y-3 rounded-xl bg-white p-6 dark:bg-gray-900">
             <h3 class="font-semibold">Ringkasan Pembelian</h3>

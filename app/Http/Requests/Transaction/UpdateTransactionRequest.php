@@ -13,6 +13,6 @@ class UpdateTransactionRequest extends StoreTransactionRequest
 
     public function rules(): array
     {
-        return parent::rules();
+        return parent::rules() + ['change_reason' => 'nullable|string|max:2000'];
     }
 }

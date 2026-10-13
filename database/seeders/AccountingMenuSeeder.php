@@ -27,6 +27,7 @@ class AccountingMenuSeeder extends Seeder
                 Menu::updateOrCreate(['route' => $route], ['name' => $name, 'url' => $url, 'parent_id' => $parent->id, 'permission' => $permission, 'order' => $order, 'is_active' => true]);
             }
         });
+        (new FinanceNavigationSeeder)->run();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

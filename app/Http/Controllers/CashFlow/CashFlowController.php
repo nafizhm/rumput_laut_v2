@@ -16,13 +16,18 @@ class CashFlowController extends Controller
 
     public function data(Request $request)
     {
-        $type = $request->query('type', 'all');
-        $startDate = $request->filled('start_date')
-            ? Carbon::parse($request->query('start_date'))->startOfDay()
-            : Carbon::now()->startOfMonth();
-        $endDate = $request->filled('end_date')
-            ? Carbon::parse($request->query('end_date'))->endOfDay()
-            : Carbon::now()->endOfMonth();
+        $filters = $request->validate([
+            'type' => 'nullable|in:all,income,expense',
+            'start_date' => 'nullable|date_format:Y-m-d',
+            'end_date' => 'nullable|date_format:Y-m-d',
+        ]);
+        $type = $filters['type'] ?? 'all';
+        $startDate = ! empty($filters['start_date'])
+            ? Carbon::parse($filters['start_date'], 'Asia/Jakarta')->startOfDay()
+            : Carbon::now('Asia/Jakarta')->startOfMonth();
+        $endDate = ! empty($filters['end_date'])
+            ? Carbon::parse($filters['end_date'], 'Asia/Jakarta')->endOfDay()
+            : Carbon::now('Asia/Jakarta')->endOfDay();
 
         if ($startDate->gt($endDate)) {
             [$startDate, $endDate] = [$endDate->copy()->startOfDay(), $startDate->copy()->endOfDay()];

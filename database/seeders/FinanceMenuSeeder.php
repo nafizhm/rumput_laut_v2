@@ -28,5 +28,6 @@ class FinanceMenuSeeder extends Seeder
                 Menu::where('route', $route)->update(['parent_id' => $finance->id, 'order' => $order]);
             }
         });
+        (new FinanceNavigationSeeder)->run();
     }
 }

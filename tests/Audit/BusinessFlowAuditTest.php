@@ -46,6 +46,26 @@ use Tests\TestCase;
  */
 class BusinessFlowAuditTest extends TestCase
 {
+    public function test_cash_flow_rejects_invalid_filters_and_keeps_reversed_date_ranges_usable(): void
+    {
+        $this->getJson(route('cash-flow.data', ['start_date' => 'invalid', 'end_date' => '2026-02-30', 'type' => 'invalid']))
+            ->assertUnprocessable()->assertJsonValidationErrors(['start_date', 'end_date', 'type']);
+        $this->loan();
+        $normal = $this->getJson(route('cash-flow.data', ['start_date' => '2026-10-01', 'end_date' => '2026-10-07']))->assertOk()->json();
+        $reversed = $this->getJson(route('cash-flow.data', ['start_date' => '2026-10-07', 'end_date' => '2026-10-01']))->assertOk()->json();
+        $this->assertSame($normal, $reversed);
+    }
+
+    public function test_cash_flow_excludes_future_automatic_drafts_but_includes_existing_operational_cash(): void
+    {
+        $this->loan();
+        app(LoanService::class)->createLoan(['farmer_id' => $this->farmer->id, 'loan_date' => '2026-10-20', 'amount' => 500000]);
+        $rows = $this->getJson(route('cash-flow.data', ['start_date' => '2026-10-01', 'end_date' => '2026-10-31']))->assertOk()->json();
+        $this->assertSame(1000000, (int) collect($rows)->where('id', 3)->sum('amount'));
+        $future = $this->getJson(route('cash-flow.data', ['start_date' => '2026-10-20', 'end_date' => '2026-10-20']))->assertOk()->json();
+        $this->assertSame(0, (int) collect($future)->sum('amount'));
+    }
+
     public function test_dashboard_displays_completed_daily_process_as_wip_and_filters_start_dates(): void
     {
         $area = WarehouseArea::where('usage', 'processing')->firstOrFail();
@@ -325,6 +345,8 @@ class BusinessFlowAuditTest extends TestCase
     {
         $invoice = $this->invoice($this->sale());
         app(InvoicePaymentService::class)->recordPayment(['invoice_id' => $invoice->id, 'payment_date' => '2026-11-05', 'amount' => 300000]);
+        $this->assertSame(0, $this->cashIn('Penjualan Rumput Laut', '2026-11-01', '2026-11-30'));
+        Carbon::setTestNow(Carbon::parse('2026-11-05 12:00:00', 'Asia/Jakarta'));
         $this->assertSame(300000, $this->cashIn('Penjualan Rumput Laut', '2026-11-01', '2026-11-30'));
     }
 

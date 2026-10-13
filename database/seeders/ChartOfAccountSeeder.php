@@ -92,6 +92,7 @@ class ChartOfAccountSeeder extends Seeder
                 'parent_id' => $finance->id, 'order' => 7, 'is_active' => true, 'permission' => 'coa.read',
             ]);
         });
+        (new FinanceNavigationSeeder)->run();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

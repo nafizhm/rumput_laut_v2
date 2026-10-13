@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AccountingSetting;
 use App\Models\ChartOfAccount;
 use App\Models\JournalEntry;
+use App\Models\JournalLine;
 use App\Services\Finance\AccountingMoney;
 use App\Services\Finance\JournalService;
 use Illuminate\Http\Request;
@@ -42,7 +43,20 @@ class JournalController extends Controller
             ->when($filters['month'] ?? null, fn ($q, $month) => $q->whereBetween('entry_date', [$month.'-01', Carbon::parse($month.'-01')->endOfMonth()->format('Y-m-d')]))
             ->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status))->orderByDesc('entry_date')->orderByDesc('id')->get();
 
-        return view('pages.finance.journal.index', ['entries' => $entries, 'kind' => $kind, 'setting' => AccountingSetting::findOrFail(1)]);
+        $setting = AccountingSetting::findOrFail(1);
+        $openingSummary = null;
+        if ($kind === 'opening' && $setting->start_date) {
+            $lines = JournalLine::whereHas('entry', fn ($q) => $q->where('status', 'posted')
+                ->whereDate('entry_date', $setting->start_date->format('Y-m-d')))->get();
+            $cash = $lines->where('category', 'Harta')->where('account_group', 'Kas dan Bank');
+            $capital = $lines->where('account_code', '31101');
+            $openingSummary = [
+                'cash' => $cash->sum('debit_cents') - $cash->sum('credit_cents'),
+                'capital' => $capital->sum('credit_cents') - $capital->sum('debit_cents'),
+            ];
+        }
+
+        return view('pages.finance.journal.index', compact('entries', 'kind', 'setting', 'openingSummary'));
     }
 
     public function create(Request $request)

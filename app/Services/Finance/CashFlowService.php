@@ -70,7 +70,8 @@ class CashFlowService
         $rows = array_fill_keys(array_keys($definitions), []);
         $entries = JournalEntry::with(['lines', 'original.lines'])->whereBetween('entry_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
             ->where(function ($q) {
-                $q->where('status', 'posted')->orWhere(fn ($draft) => $draft->where('is_automatic', true)->where('status', 'draft'));
+                $q->where('status', 'posted')->orWhere(fn ($draft) => $draft->where('is_automatic', true)->where('status', 'draft')
+                    ->where('entry_date', '<=', now('Asia/Jakarta')->format('Y-m-d')));
             })
             ->where('kind', '!=', 'opening')->whereHas('lines', fn ($q) => $q->where('category', 'Harta')->where('account_group', 'Kas dan Bank'))->orderBy('entry_date')->orderBy('id')->get();
         foreach ($entries as $entry) {
@@ -88,7 +89,22 @@ class CashFlowService
                 default => $wasIncome ? 8 : 9,
             };
             $amount = ($definitions[$group][1] === 'Cash In' ? $net : -$net) / 100;
-            $rows[$group][] = ['id' => 'journal-'.$entry->id, 'date' => $entry->entry_date->format('d/m/Y'), 'description' => $entry->description.' ('.$entry->number.')', 'amount' => $this->money($amount), 'value' => $amount];
+            $isReversal = $entry->reversal_of_id !== null;
+            $original = $entry->original;
+            $explanation = $isReversal
+                ? 'Koreksi/pembatalan atas '.$original?->number.' tanggal '.$original?->entry_date->format('d/m/Y').'. '.$original?->description
+                : 'Pencatatan transaksi';
+            $rows[$group][] = [
+                'id' => 'journal-'.$entry->id, 'date' => $entry->entry_date->format('d/m/Y'),
+                'description' => $entry->description.' ('.$entry->number.')',
+                'amount' => $this->money($amount), 'value' => $amount,
+                'activity' => $isReversal ? 'Koreksi / Pembatalan' : 'Transaksi',
+                'explanation' => $explanation,
+                'actor' => $entry->created_by_name ?? 'Tidak tersedia',
+                'recorded_at' => $entry->created_at?->timezone('Asia/Jakarta')->format('d/m/Y H:i:s').' WIB',
+                'history_url' => $entry->source_type === (new Transaction)->getMorphClass()
+                    ? route('manajemen-pemasukan-pengeluaran.history', ['transaction_id' => $entry->source_id]) : null,
+            ];
         }
         $result = [];
         foreach ($definitions as $id => [$category,$direction]) {
@@ -100,6 +116,8 @@ class CashFlowService
                 $amount = (int) $amount;
             }
             $result[] = ['id' => $id, 'category' => $category, 'type' => $direction, 'amount' => $amount, 'amount_formatted' => $this->money($amount),
+                'transactions_formatted' => $this->money(collect($rows[$id])->where('activity', 'Transaksi')->sum('value')),
+                'corrections_formatted' => $this->money(collect($rows[$id])->where('activity', 'Koreksi / Pembatalan')->sum('value')),
                 'details' => collect($rows[$id])->map(function ($r) {
                     unset($r['value']);
 

@@ -530,8 +530,7 @@ it('summarizes confirmed batches per area and keeps received kg separate from re
     $dashboard = $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Jumlah Barang per Area');
     $areaA = $dashboard->viewData('areas')->firstWhere('code', 'BM-A');
     $areaB = $dashboard->viewData('areas')->firstWhere('code', 'BM-B');
-    expect($areaA->batch_count)->toBe(1)->and((int) $areaA->remaining_sacks)->toBe(20)
-        ->and((float) $areaA->received_weight)->toBe(2000.0)
+    expect($areaA)->toBeNull()
         ->and((int) $areaB->remaining_sacks)->toBe(24)->and((float) $areaB->received_weight)->toBe(1386.0);
     $detail = $this->get(route('manajemen-gudang.area', $this->area))->assertOk()->assertSee('Area 1')->assertSee('2.000,00');
     expect($detail->viewData('batches')->count())->toBe(1)->and($detail->viewData('batches')->sum('remaining_sacks'))->toBe(20);
@@ -750,6 +749,26 @@ it('preserves old purchase journals and prevents legacy double payment', functio
     expect(\App\Models\HarvestPayment::count())->toBe(0)->and(\App\Models\JournalEntry::count())->toBe(1);
 });
 
+
+it('uses database area names and only active areas in the dashboard and adjustment form', function () {
+    prepareOpeningStockSchema();
+    $this->area->update(['name' => 'Penerimaan Utama']);
+    $ready = WarehouseArea::where('usage', 'finished')->firstOrFail();
+    $ready->update(['name' => 'Siap Kirim Utama']);
+    $inactive = WarehouseArea::where('usage', 'receiving')->where('id', '!=', $this->area->id)->firstOrFail();
+    $inactive->update(['name' => 'Area Tidak Aktif', 'is_active' => false]);
+    $duplicate = WarehouseArea::create(['code' => 'BM-DUP', 'name' => 'Penerimaan Utama',
+        'inventory_id' => $this->inventory->id, 'usage' => 'receiving', 'is_active' => true]);
+    $page = $this->get(route('manajemen-gudang.index'))->assertOk()
+        ->assertSee('Penerimaan Utama')->assertSee('Siap Kirim Utama')->assertDontSee('Area Tidak Aktif');
+    expect($page->viewData('areas')->pluck('id')->contains($inactive->id))->toBeFalse();
+    $rows = collect($this->getJson(route('manajemen-gudang.adjustment-data'))->assertOk()->json('data'));
+    expect($rows->firstWhere('key', 'area-'.$this->area->id)['label'])->toBe('Penerimaan Utama')
+        ->and($rows->firstWhere('key', 'area-'.$ready->id)['label'])->toBe('Siap Kirim Utama')
+        ->and($rows->firstWhere('key', 'area-'.$inactive->id))->toBeNull()
+        ->and($rows->firstWhere('key', 'area-'.$duplicate->id)['label'])->toBe('Penerimaan Utama')
+        ->and($rows->pluck('key')->unique()->count())->toBe($rows->count());
+});
 
 it('shows legacy warehouse balances in Area Lama without moving or duplicating stock', function () {
     $legacy = Inventory::create(['item_name' => 'Gudang Basah', 'stock_stage' => 'legacy', 'current_stock_kg' => 150, 'current_sack_count' => 3]);

@@ -39,6 +39,36 @@ beforeEach(function () {
 });
 afterEach(function () { Carbon::setTestNow(); });
 
+it('keeps finance navigation in usage order when individual menu seeders are replayed', function () {
+    $finance = Menu::where('name', 'Keuangan')->firstOrFail();
+    Menu::create(['name' => 'Manajemen Gudang', 'is_active' => true, 'order' => 2]);
+    foreach (\Database\Seeders\FinanceNavigationSeeder::ROUTES as $route) {
+        Menu::firstOrCreate(['route' => $route], ['name' => $route, 'parent_id' => $finance->id, 'is_active' => true, 'order' => 99]);
+    }
+    foreach ([\Database\Seeders\FinanceNavigationSeeder::class, AccountingMenuSeeder::class,
+        ChartOfAccountSeeder::class, \Database\Seeders\HarvestFinanceSeeder::class,
+        \Database\Seeders\FinanceMenuSeeder::class] as $seeder) {
+        $this->seed($seeder);
+        expect($finance->children()->pluck('route')->all())->toBe(\Database\Seeders\FinanceNavigationSeeder::ROUTES);
+    }
+    expect($finance->children()->count())->toBe(9);
+});
+
+it('shows effective opening capital including posted corrections without replacing the original journal', function () {
+    $opening = ($this->postEntry)([
+        accountingTestLine('11101', '1000000000'), accountingTestLine('31101', '0', '1000000000'),
+    ], '2026-09-01', 'opening');
+    ($this->postEntry)([
+        accountingTestLine('11101', '1000000000'), accountingTestLine('31101', '0', '1000000000'),
+    ], '2026-09-01');
+    $this->get(route('saldo-awal.index'))->assertOk()->assertSee('Saldo efektif pada tanggal mulai pembukuan')
+        ->assertViewHas('openingSummary', fn ($summary) => $summary['capital'] === 200000000000 && $summary['cash'] === 200000000000);
+    expect($opening->fresh()->lines->sum('credit_cents'))->toBe(100000000000);
+    $this->get(route('neraca.index', ['month' => '2026-09']))->assertOk()
+        ->assertSee('Jurnal transaksi operasional yang sudah diposting masuk otomatis ke laporan')
+        ->assertDontSee('Transaksi operasional belum masuk otomatis');
+});
+
 it('adds finance menus and displays unavailable reports until verified opening balances are posted', function () {
     $this->seed(AccountingMenuSeeder::class);
     expect(Menu::whereIn('route', ['jurnal.index', 'saldo-awal.index', 'neraca.index', 'laba-rugi.index'])->count())->toBe(4);

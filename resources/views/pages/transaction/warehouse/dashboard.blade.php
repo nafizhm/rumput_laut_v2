@@ -20,7 +20,7 @@
 @foreach($stages as $key=>$label)<a href="{{ $key === 'process' ? route('produksi.index') : route('manajemen-gudang.stage',$key) }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-xs text-gray-500">TAHAP {{ $loop->iteration }}</p><h4 class="mt-2 font-semibold">{{ $label }}</h4><p class="mt-3 text-sm">{{ number_format($stageCounts[$key],0,',','.') }} {{ $key === 'process' ? 'catatan proses' : 'batch tersedia' }}</p></a>@endforeach
 </div></section>
 <section class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h3 class="text-lg font-semibold">Jumlah Barang per Area</h3>
-<p class="mt-2 text-sm text-gray-500">Area angka untuk bahan penerimaan, area huruf untuk bahan siap jual. Kg alokasi bahan mengikuti stok asal; Kg siap jual berasal dari timbang hasil packing.</p>
+<p class="mt-2 text-sm text-gray-500">Menampilkan area aktif sesuai nama pada master area. Kg alokasi bahan mengikuti stok asal; Kg siap jual berasal dari timbang hasil packing.</p>
 @foreach(['receiving'=>'Bahan Penerimaan','finished'=>'Bahan Siap Jual'] as $usage=>$heading)
 <h4 class="mb-3 mt-6 font-semibold">{{ $heading }}</h4><div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 @forelse($areas->where('usage',$usage) as $area)

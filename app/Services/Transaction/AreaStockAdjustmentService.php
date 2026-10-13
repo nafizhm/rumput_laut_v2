@@ -16,17 +16,17 @@ class AreaStockAdjustmentService
     {
         $result = [];
         foreach (['receiving', 'finished'] as $usage) {
-            foreach (WarehouseArea::where('usage', $usage)->where('is_active', true)->orderBy('id')->get() as $index => $area) {
-                $label = 'Area '.($usage === 'receiving' ? $index + 1 : chr(65 + $index));
+            foreach (WarehouseArea::where('usage', $usage)->where('is_active', true)->orderBy('id')->get() as $area) {
+                $label = $area->name;
                 $batches = $usage === 'receiving'
                     ? MaterialBatch::with('line.grade')->whereHas('line', fn ($query) => $query->where('warehouse_area_id', $area->id)->whereHas('receipt', fn ($receipt) => $receipt->where('status', 'confirmed')))->get()
                     : FinishedBatch::with('grade')->where('warehouse_area_id', $area->id)->get();
-                $result[] = ['label' => $label, 'name' => $area->name, 'stage' => $usage === 'receiving' ? 'Barang Masuk' : 'Barang Ready',
+                $result[] = ['key' => 'area-'.$area->id, 'label' => $label, 'name' => $area->name, 'stage' => $usage === 'receiving' ? 'Barang Masuk' : 'Barang Ready',
                     'items' => $batches->map(fn ($batch) => $this->row($usage === 'receiving' ? 'material' : 'finished', $batch, $label))->values()->all()];
             }
         }
         $legacy = Inventory::where('stock_stage', 'legacy')->get();
-        $result[] = ['label' => 'Area Lama', 'name' => 'Stok gudang lama', 'stage' => 'Stok Lama',
+        $result[] = ['key' => 'legacy', 'label' => 'Area Lama', 'name' => 'Stok gudang lama', 'stage' => 'Stok Lama',
             'items' => $legacy->map(fn ($inventory) => $this->row('legacy', $inventory, 'Area Lama'))->values()->all()];
         return $result;
     }

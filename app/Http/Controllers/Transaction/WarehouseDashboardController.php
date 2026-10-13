@@ -19,6 +19,7 @@ class WarehouseDashboardController extends Controller
     {
         $confirmed = fn ($query) => $query->whereHas('line.receipt', fn ($q) => $q->where('status', 'confirmed'));
         $areas = WarehouseArea::with(['inventory', 'grades'])
+            ->where('is_active', true)
             ->withCount(['batches as batch_count' => $confirmed])
             ->withSum(['batches as remaining_sacks' => $confirmed], 'remaining_sacks')
             ->withSum(['batches as received_weight' => $confirmed], 'incoming_weight_kg')
@@ -93,14 +94,7 @@ class WarehouseDashboardController extends Controller
 
     private function areaLabels(): array
     {
-        $labels = [];
-        foreach (['receiving', 'finished'] as $usage) {
-            foreach (WarehouseArea::where('usage', $usage)->orderBy('id')->get() as $index => $area) {
-                $letter = '';
-                for ($n = $index + 1; $n > 0; $n = intdiv($n - 1, 26)) $letter = chr(65 + ($n - 1) % 26).$letter;
-                $labels[$area->id] = 'Area '.($usage === 'receiving' ? $index + 1 : $letter);
-            }
-        }
-        return $labels;
+        return WarehouseArea::whereIn('usage', ['receiving', 'finished'])
+            ->where('is_active', true)->pluck('name', 'id')->all();
     }
 }

@@ -8,10 +8,14 @@
 
 @section('content')
     <div x-data="cashFlowPage()" x-init="init()" class="space-y-6">
+        <div class="rounded-xl border border-gray-200 bg-white p-5 text-sm leading-6 text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+            <p>Arus kas menampilkan uang masuk dan keluar pada tanggal pembayaran. Saldo awal, transfer antar Kas / Bank, dan potongan pinjaman dari panen tidak dihitung sebagai arus kas. Untuk saldo Kas / Bank, buka Neraca.</p>
+            <p class="mt-2">Jurnal manual Draft dan transaksi bertanggal mendatang belum dihitung. Sebelum saldo awal diposting, transaksi operasional yang sudah terjadi tetap ditampilkan; Neraca dan Laba Rugi tersedia setelah pembukuan dimulai.</p>
+        </div>
         <x-data-table id="cashFlowTable" :rows="[]" :url="route('cash-flow.data')" :columns="[
             ['key' => 'category', 'label' => 'Kategori', 'sortable' => true],
             ['key' => 'type', 'label' => 'Tipe', 'sortable' => true, 'render' => 'typeBadge'],
-            ['key' => 'amount_formatted', 'label' => 'Total Nominal', 'sortable' => true, 'align' => 'right'],
+            ['key' => 'amount', 'label' => 'Total Nominal', 'sortable' => true, 'align' => 'right', 'render' => 'amount'],
             ['key' => 'id', 'label' => 'Aksi', 'render' => 'action', 'width' => '120px'],
         ]">
             <x-slot:headerAction>
@@ -65,6 +69,9 @@
                 </div>
             </x-slot:headerAction>
 
+            <x-slot:amount>
+                <span class="tabular-nums" x-text="item.amount_formatted"></span>
+            </x-slot:amount>
             <x-slot:typeBadge>
                 <span
                     :class="item.type === 'Cash In' ?

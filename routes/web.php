@@ -95,6 +95,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureRoutePermission::class])->
         ->middlewareFor(['destroy'], ['can:manajemen-panen.delete', 'can:harvest-finance.price']);
     Route::get('harvest-data', [HarvestTransactionController::class, 'data'])->name('harvest-data')->middleware('can:manajemen-panen.read');
 
+    Route::get('manajemen-pemasukan-pengeluaran/riwayat', [TransactionController::class, 'history'])->name('manajemen-pemasukan-pengeluaran.history');
     Route::resource('manajemen-pemasukan-pengeluaran', TransactionController::class);
     Route::get('transaction-data', [TransactionController::class, 'data'])->name('transaction-data');
 

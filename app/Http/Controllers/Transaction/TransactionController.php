@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Transaction\StoreTransactionRequest;
 use App\Http\Requests\Transaction\UpdateTransactionRequest;
 use App\Models\ChartOfAccount;
+use App\Models\TransactionHistory;
+use App\Models\JournalEntry;
+use App\Models\Transaction;
+use Illuminate\Http\Request;
 use App\Services\Transaction\TransactionService;
 use App\Traits\JsonResponser;
 
@@ -57,9 +61,22 @@ class TransactionController extends Controller
         return $this->successResponse('Transaksi berhasil diperbarui');
     }
 
-    public function destroy($id)
+    public function history(Request $request)
     {
-        $this->service->delete($id);
+        $filters = $request->validate(['transaction_id' => 'nullable|integer|min:1']);
+        $id = $filters['transaction_id'] ?? null;
+        $histories = TransactionHistory::when($id, fn ($q) => $q->where('transaction_id', $id))
+            ->orderByDesc('id')->paginate(25)->withQueryString();
+        $journals = $id ? JournalEntry::with('lines')->where('source_type', (new Transaction)->getMorphClass())
+            ->where('source_id', $id)->orderBy('id')->get() : collect();
+
+        return view('pages.transaction.transaction.history', compact('histories', 'journals', 'id'));
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        $data = $request->validate(['change_reason' => 'required|string|max:2000']);
+        $this->service->delete($id, $data['change_reason']);
 
         return $this->successResponse('Transaksi berhasil dihapus');
     }

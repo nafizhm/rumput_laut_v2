@@ -13,6 +13,10 @@
 @endsection
 
 @section('content')
+    <div class="mb-5 rounded-xl border border-gray-200 bg-white p-5 text-sm leading-6 text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <p>Catat penerimaan atau pengeluaran kas lainnya, seperti biaya operasional dan setoran modal. Pilih akun transaksi sesuai tujuan serta akun Kas / Bank yang digunakan. Setoran modal dicatat ke Modal Pemilik.</p>
+        <p class="mt-2">Pembayaran panen, pinjaman petani, dan pembayaran penjualan dicatat melalui menu transaksinya masing-masing agar tidak tercatat dua kali. Transaksi yang disimpan membentuk jurnal otomatis.</p>
+    </div>
     <x-data-table 
         id="transactionTable" 
         :rows="$data" 
@@ -20,6 +24,7 @@
         :url="route('transaction-data')" 
     >
         <x-slot:headerAction>
+            <a href="{{ route('manajemen-pemasukan-pengeluaran.history') }}" class="text-brand-500">Semua Riwayat (termasuk pembatalan)</a>
             
 @can('manajemen-pemasukan-pengeluaran.create')
 <button 
@@ -61,6 +66,7 @@
 
         <x-slot:action>
             <div class="flex items-center gap-2">
+                <a :href="'{{ route('manajemen-pemasukan-pengeluaran.history') }}?transaction_id=' + item.id" class="text-brand-500">Riwayat</a>
                 
 @can('manajemen-pemasukan-pengeluaran.update')
 <button 
@@ -81,7 +87,7 @@
                     @click="$dispatch('delete-entity', item.id)" 
                     class="flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-rose-600"
                 >
-                    Delete
+                    Batalkan
                 </button>
 @endcan
 

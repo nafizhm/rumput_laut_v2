@@ -7,6 +7,11 @@
 @endsection
 
 @section('content')
+    <div class="mb-5 rounded-xl border border-gray-200 bg-white p-5 text-sm leading-6 text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+        <p>Pinjaman menambah piutang kepada petani dan mengurangi Kas Operasional. Nilainya masuk Neraca sebagai piutang. Pengembalian tunai dicatat melalui pembayaran utang pada detail petani; potongan hasil panen dicatat melalui Pembelian &amp; Pembayaran Panen.</p>
+        <p class="mt-2">Tabel ini menampilkan riwayat pemberian pinjaman. Saldo pinjaman yang masih harus dibayar tersedia pada detail petani.</p>
+        @can('manajemen-petani.read')<a href="{{ route('manajemen-petani.index') }}" class="mt-2 inline-block font-semibold text-brand-600 dark:text-brand-300">Buka saldo dan pembayaran petani</a>@endcan
+    </div>
     <x-data-table id="loanTable" :rows="$data" :columns="$columns" :url="route('loan-data')">
         
         <x-slot:headerAction>

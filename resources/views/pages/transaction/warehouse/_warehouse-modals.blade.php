@@ -68,9 +68,9 @@
             <template x-for="stage in ['Barang Masuk', 'Barang Ready', 'Stok Lama']" :key="stage">
                 <section class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
                     <h3 class="bg-gray-50 px-4 py-3 font-semibold text-gray-800 dark:bg-gray-800 dark:text-white" x-text="stage"></h3>
-                    <template x-for="area in adjustmentAreas.filter(area => area.stage === stage)" :key="area.label">
+                    <template x-for="area in adjustmentAreas.filter(area => area.stage === stage)" :key="area.key">
                         <div class="flex items-center gap-3 border-t px-4 py-2 dark:border-gray-700">
-                            <span class="w-24 shrink-0 text-sm font-medium text-gray-800 dark:text-white" x-text="area.label"></span>
+                            <span class="w-40 shrink-0 break-words text-sm font-medium text-gray-800 dark:text-white" x-text="area.label"></span>
                             <label class="flex min-w-0 flex-1 items-center gap-2">
                                 <input type="number" min="0" max="9999999999.99" step="0.01" required x-model="area.actual_weight" :aria-label="area.label + ' Kg'" class="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
                                 <span class="shrink-0 text-sm text-gray-500">Kg</span>
@@ -153,7 +153,7 @@ function warehouseModals() {
                     if (!response.ok) throw new Error('Stok area gagal dimuat. Tutup dan buka kembali form.');
                     const result = await response.json();
                     this.adjustmentAreas = result.data.flatMap(area => {
-                        if (area.stage === 'Stok Lama') return area.items.map(item => ({ ...area, label: item.name, items: [item] }));
+                        if (area.stage === 'Stok Lama') return area.items.map(item => ({ ...area, key: 'legacy-' + item.id, label: item.name, items: [item] }));
                         return [area];
                     }).map(area => {
                         const weight = area.items.reduce((total, item) => total + Number(item.expected_weight), 0);

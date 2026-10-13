@@ -28,9 +28,7 @@ class HarvestFinanceSeeder extends Seeder
             'name' => 'Pembelian & Pembayaran Panen', 'url' => 'keuangan/pembayaran-panen',
             'parent_id' => $finance->id, 'permission' => 'harvest-finance.read', 'is_active' => true, 'order' => 3,
         ]);
-        foreach (['manajemen-pemasukan-pengeluaran.index', 'manajemen-pinjaman.index', 'harvest-finance.index', 'jurnal.index', 'cash-flow.index', 'laba-rugi.index', 'neraca.index', 'coa.index', 'saldo-awal.index'] as $i => $route) {
-            Menu::where('parent_id', $finance->id)->where('route', $route)->update(['order' => $i + 1]);
-        }
+        (new FinanceNavigationSeeder)->run();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
