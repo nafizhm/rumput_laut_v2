@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Dashboard')
 
@@ -253,7 +253,7 @@
                                                 <p class="font-medium text-gray-800 dark:text-white/90"
                                                     x-text="item.name"></p>
                                                 <p class="text-xs text-gray-500"
-                                                    x-text="item.date + ' • ' + formatWeight(item.weight)"></p>
+                                                    x-text="item.date + ' - ' + formatWeight(item.weight)"></p>
                                             </div>
                                             <p class="text-right tabular-nums font-semibold text-gray-700 dark:text-gray-300"
                                                 x-text="formatIDRShort(item.value)"></p>
@@ -324,7 +324,7 @@
                                                 <p class="font-medium text-gray-800 dark:text-white/90"
                                                     x-text="item.name"></p>
                                                 <p class="text-xs text-gray-500"
-                                                    x-text="item.date + ' • ' + formatWeight(item.weight)"></p>
+                                                    x-text="item.date + ' - ' + formatWeight(item.weight)"></p>
                                             </div>
                                             <p class="text-right tabular-nums font-semibold text-success-600" x-text="formatIDRShort(item.value)">
                                             </p>
@@ -378,7 +378,10 @@
                 </div>
             </div>
         </div>
-    </div>
+        <div class="grid gap-6 xl:grid-cols-2">
+            <div class="rounded-2xl border border-gray-200 bg-white p-5"><h3 class="font-semibold text-gray-800 dark:text-white">Pengiriman 7 Hari ke Depan</h3><p class="mt-1 text-xs text-gray-500">Barang yang perlu disiapkan dan dikirim.</p><div class="mt-4 max-h-80 space-y-2 overflow-y-auto"><template x-if="stats.agenda.deliveries.length === 0"><p class="rounded-xl border border-dashed p-5 text-center text-sm text-gray-500">Tidak ada pengiriman dalam 7 hari ke depan.</p></template><template x-for="delivery in stats.agenda.deliveries" :key="delivery.id"><a :href="delivery.url" class="flex items-center gap-3 rounded-xl border p-3"><div class="min-w-14 text-center"><p class="text-xs font-bold text-brand-600" x-text="delivery.days_until === 0 ? 'Hari ini' : delivery.date_label"></p></div><div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold" x-text="delivery.item"></p><p class="truncate text-xs text-gray-500" x-text="delivery.customer + '  -  ' + (delivery.destination || 'Tujuan belum diisi')"></p></div><p class="text-sm font-semibold" x-text="formatWeight(delivery.quantity)"></p></a></template></div></div>
+            <div class="rounded-2xl border border-gray-200 bg-white p-5"><div class="flex flex-wrap items-start justify-between gap-3"><div><h3 class="font-semibold text-gray-800 dark:text-white">Invoice yang Akan Cair</h3><p class="mt-1 text-xs text-gray-500">Piutang belum lunas berdasarkan jatuh tempo.</p></div><div class="flex gap-1"><template x-for="days in [7,14,30]" :key="days"><button @click="setInvoiceHorizon(days)" class="rounded-md border px-2 py-1 text-xs" x-text="days + ' hari'"></button></template></div></div><div class="mt-4 max-h-80 space-y-2 overflow-y-auto"><template x-if="stats.agenda.invoices.length === 0"><p class="rounded-xl border border-dashed p-5 text-center text-sm text-gray-500">Tidak ada invoice jatuh tempo.</p></template><template x-for="invoice in stats.agenda.invoices" :key="invoice.id"><a :href="invoice.url" class="flex items-center gap-3 rounded-xl border p-3"><div class="min-w-0 flex-1"><p class="text-sm font-semibold" x-text="invoice.number"></p><p class="text-xs text-gray-500" x-text="invoice.customer + '  -  Jatuh tempo ' + invoice.due_label"></p></div><div class="text-right"><p class="text-sm font-bold" x-text="formatIDRShort(invoice.amount)"></p><p class="text-xs text-gray-500" x-text="invoice.days_until === 0 ? 'Hari ini' : invoice.days_until + ' hari lagi'"></p></div></a></template></div></div>
+        </div>    </div>
 @endsection
 
 @push('scripts')
@@ -395,6 +398,7 @@
                     shrinkageRate: 0,
                     logisticsDiscrepancy: 0,
                     recentInvoices: [],
+                    agenda: { invoiceHorizon: 14, deliveries: [], invoices: [] },
                     production: {count: 0, processing: 0, wip: 0, packed: 0, sacks: 0, recent: []},
                     weeklyHarvest: {
                         count: 0,
@@ -431,6 +435,11 @@
                         end_date: this.filters.endDate,
                     });
                     return params.toString();
+                },
+
+                async setInvoiceHorizon(days) {
+                    this.stats.agenda.invoiceHorizon = days;
+                    await this.fetchStats();
                 },
 
                 async applyFilters() {
@@ -567,3 +576,5 @@
         }
     </script>
 @endpush
+
+

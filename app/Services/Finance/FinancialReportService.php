@@ -7,10 +7,11 @@ use Illuminate\Support\Carbon;
 
 class FinancialReportService
 {
-    public function month(string $month): array
+    public function month(string $month, ?Carbon $since = null): array
     {
         $start = Carbon::createFromFormat('!Y-m', $month, 'Asia/Jakarta');
         $end = $start->copy()->endOfMonth();
+        if ($since !== null) $start = $since->copy()->startOfDay();
         $setting = AccountingSetting::findOrFail(1);
         $ready = $setting->start_date !== null && $setting->start_date->lte($end);
         $result = ['start' => $start, 'end' => $end, 'start_date' => $setting->start_date, 'ready' => $ready];

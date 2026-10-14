@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\CashFlow\CashFlowController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\BusinessProcessController;
 use App\Http\Controllers\Finance\ChartOfAccountController;
 use App\Http\Controllers\Finance\FinancialReportController;
 use App\Http\Controllers\Finance\JournalController;
@@ -53,6 +54,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureRoutePermission::class])->
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats');
     Route::get('/dashboard/chart-data', [DashboardController::class, 'chartData'])->name('dashboard.chart-data');
+    Route::get('/proses-bisnis', [BusinessProcessController::class, 'index'])->name('proses-bisnis.index')->middleware('can:financial-reports.read');
 
     Route::resource('manajemen-menu', MenuController::class);
     Route::get('menu-data', [MenuController::class, 'data'])->name('menu-data');

@@ -39,6 +39,41 @@ beforeEach(function () {
 });
 afterEach(function () { Carbon::setTestNow(); });
 
+it('separates monthly business results from cumulative results and farmer receivables', function () {
+    ($this->opening)();
+    ($this->postEntry)([accountingTestLine('11101', '200'), accountingTestLine('41101', '0', '200')], '2026-09-15');
+    ($this->postEntry)([accountingTestLine('11101', '300'), accountingTestLine('41101', '0', '300')], '2026-10-01');
+    ($this->postEntry)([accountingTestLine('11201', '100'), accountingTestLine('11101', '0', '100')], '2026-10-02');
+    $this->get(route('proses-bisnis.index', ['month' => '2026-10']))->assertOk()
+        ->assertViewHas('report', fn ($report) => $report['net_profit'] === 30000)
+        ->assertViewHas('lifetime', fn ($report) => $report['net_profit'] === 50000 && $report['totals']['sales'] === 50000)
+        ->assertSee('Piutang petani')->assertSee('Hasil sejak mulai pembukuan');
+    $this->get(route('proses-bisnis.index', ['month_number' => 10, 'year' => 2026]))->assertOk()
+        ->assertViewHas('month', '2026-10')
+        ->assertViewHas('trend', fn ($trend) => $trend->count() === 12 && $trend->last()['sales'] === 30000)
+        ->assertSee('business-trend', false)->assertSee('name="month_number"', false)->assertSee('name="year"', false);
+    $this->getJson(route('proses-bisnis.index', ['month_number' => 13, 'year' => 2026]))
+        ->assertUnprocessable()->assertJsonValidationErrors('month_number');
+});
+
+it('shows monthly cost details from posted accounts without including drafts', function () {
+    ($this->opening)();
+    ($this->postEntry)([accountingTestLine('11101', '300'), accountingTestLine('41101', '0', '300')]);
+    ($this->postEntry)([accountingTestLine('51101', '120'), accountingTestLine('11101', '0', '120')]);
+    ($this->draft)([accountingTestLine('51101', '90'), accountingTestLine('11101', '0', '90')]);
+    $this->get(route('proses-bisnis.index', ['month' => '2026-10']))->assertOk()
+        ->assertViewHas('trend', function ($trend) {
+            $detail = $trend->last();
+            return $detail['totals']['cogs'] === 12000
+                && $detail['sections']['cogs'][0]['amount'] === 12000
+                && $detail['gross_profit'] === 18000
+                && $detail['profit'] === 18000;
+        })
+        ->assertSee('business-detail-2026-10', false)
+        ->assertSee('Harga Pokok Penjualan Rumput Laut Basah')
+        ->assertSee('Biaya operasional')->assertSee('showModal()', false);
+});
+
 it('keeps finance navigation in usage order when individual menu seeders are replayed', function () {
     $finance = Menu::where('name', 'Keuangan')->firstOrFail();
     Menu::create(['name' => 'Manajemen Gudang', 'is_active' => true, 'order' => 2]);

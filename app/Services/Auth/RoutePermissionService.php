@@ -20,6 +20,7 @@ class RoutePermissionService
         'po-konsumen' => 'po-konsumen', 'harvest-finance' => 'harvest-finance',
         'saldo-awal' => 'journal', 'jurnal' => 'journal', 'neraca' => 'financial-reports',
         'laba-rugi' => 'financial-reports', 'coa' => 'coa', 'cash-flow' => 'cash-flow',
+        'proses-bisnis' => 'financial-reports',
     ];
 
     public static function permission(?string $route): ?string

@@ -7,6 +7,7 @@ use App\Models\Farmer;
 use App\Models\HarvestTransaction;
 use App\Models\Inventory;
 use App\Models\Invoice;
+use App\Models\DeliveryNote;
 use App\Models\JournalLine;
 use App\Models\Loan;
 use App\Models\ProductionRun;
@@ -28,6 +29,24 @@ class DashboardController extends Controller
     public function stats(Request $request)
     {
         [$startDate, $endDate] = $this->resolveDateRange($request);
+        $today = Carbon::now('Asia/Jakarta')->startOfDay();
+        $agendaEnd = $today->copy()->addDays(7);
+        $invoiceHorizon = (int) $request->query('invoice_horizon', 14);
+        $invoiceHorizon = in_array($invoiceHorizon, [7, 14, 30], true) ? $invoiceHorizon : 14;
+        $upcomingDeliveries = DeliveryNote::query()->whereBetween('delivery_date', [$today->toDateString(), $agendaEnd->toDateString()])
+            ->where(function ($query) { $query->whereNull('status')->orWhere('status', '!=', 'shipped'); })
+            ->orderBy('delivery_date')->orderBy('id')->limit(20)->get()->map(fn ($note) => [
+                'id' => $note->id, 'number' => $note->number, 'date_label' => $note->delivery_date->format('d/m/Y'),
+                'customer' => $note->recipient_name ?: 'Pelanggan', 'item' => $note->item_name ?: 'Barang', 'quantity' => (float) $note->quantity_kg,
+                'destination' => $note->destination_address, 'days_until' => $today->diffInDays($note->delivery_date, false), 'url' => route('surat-jalan.index'),
+            ])->values();
+        $upcomingInvoices = Invoice::query()->where('payment_status', '!=', 'paid')
+            ->whereBetween('due_date', [$today->toDateString(), $today->copy()->addDays($invoiceHorizon)->toDateString()])
+            ->orderBy('due_date')->orderBy('id')->limit(30)->get()->map(fn ($invoice) => [
+                'id' => $invoice->id, 'number' => $invoice->number, 'due_label' => $invoice->due_date->format('d/m/Y'),
+                'customer' => $invoice->customer_name ?: 'Pelanggan', 'amount' => $invoice->remaining_amount,
+                'days_until' => $today->diffInDays($invoice->due_date, false), 'url' => route('invoice.index'),
+            ])->values();
 
         $salesQuery = SalesTransaction::with('factory')->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
         $harvestQuery = HarvestTransaction::with('farmer')->whereBetween('harvest_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
@@ -141,6 +160,7 @@ class DashboardController extends Controller
             'shrinkageRate' => round($shrinkageRate, 2),
             'logisticsDiscrepancy' => round($totalDiscrepancy, 2),
             'recentInvoices' => $recentInvoices,
+            'agenda' => ['invoiceHorizon' => $invoiceHorizon, 'deliveries' => $upcomingDeliveries, 'invoices' => $upcomingInvoices],
             'production' => $production,
             'weeklyHarvest' => [
                 'count' => $weeklyHarvestCount,
@@ -219,3 +239,5 @@ class DashboardController extends Controller
         return [$startDate, $endDate];
     }
 }
+
+
