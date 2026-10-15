@@ -92,7 +92,11 @@ class AreaStockAdjustmentService
                         ': '.$beforeWeight.' ? '.$afterWeight.' Kg; '.$beforeCount.' ? '.$afterCount.' kemasan. '.$data['description'].' ? '.auth()->user()->name,
                 ];
                 if ($row['kind'] === 'finished') $movement['finished_batch_id'] = $stock->id;
-                StockMovement::create($movement);
+                $savedMovement = StockMovement::create($movement);
+                if ($row['kind'] === 'material') {
+                    app(MovementLocationService::class)->record($savedMovement, $stock->line->area,
+                        abs($difference), abs($countDifference), $stock->code, $stock->line->grade?->name);
+                }
             }
         });
     }

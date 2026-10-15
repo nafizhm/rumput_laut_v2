@@ -10,6 +10,21 @@ class StockMovement extends Model
 {
     use HasOperationalJournals;
 
+    protected static function booted(): void
+    {
+        static::created(fn (self $movement) => app(\App\Services\Transaction\MovementLocationService::class)->capture($movement));
+    }
+
+    public function locations()
+    {
+        return $this->hasMany(StockMovementLocation::class);
+    }
+
+    public function deliveryNote(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryNote::class);
+    }
+
     protected $fillable = [
         'production_run_id', 'finished_batch_id', 'cost_cents',
         'goods_receipt_id',

@@ -45,7 +45,12 @@
                 x-text="item.payment_status_label"></span>
             </div>
         </x-slot:document>
-        <x-slot:sale><span x-text="item.sale?.sale_reference || item.sale?.invoice_number || 'Belum terhubung (data lama)'"></span></x-slot:sale>
+        <x-slot:customer>
+            <div class="min-w-0 space-y-1 text-sm">
+                <p class="break-words font-medium text-gray-800 dark:text-gray-200" x-text="item.customer_name"></p>
+                <p class="break-words text-xs text-gray-500 dark:text-gray-400" x-text="item.sale?.sale_reference || item.sale?.invoice_number || 'Belum terhubung (data lama)'"></p>
+            </div>
+        </x-slot:customer>
         <x-slot:items>
             <div class="space-y-2 text-sm">
                 <template x-for="product in item.document_items" :key="product.id">

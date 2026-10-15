@@ -116,9 +116,11 @@ class ProductionService
                 $inventory->decrement('current_stock_kg', $reference / 100);
                 $inventory->decrement('current_sack_count', $taken);
                 $run->inputs()->create(['material_batch_id' => $batch->id, 'sack_count' => $taken, 'reference_weight_kg' => $reference / 100, 'cost_cents' => $inputCost]);
-                StockMovement::create(['production_run_id' => $run->id, 'inventory_id' => $inventory->id, 'movement_date' => $data['started_date'], 'direction' => 'out', 'type' => 'out',
+                $movement = StockMovement::create(['production_run_id' => $run->id, 'inventory_id' => $inventory->id, 'movement_date' => $data['started_date'], 'direction' => 'out', 'type' => 'out',
                     'weight_kg' => $reference / 100, 'sack_count' => $taken, 'cost_cents' => $inputCost, 'balance_after_kg' => $inventory->current_stock_kg,
                     'description' => 'Bahan ke proses '.$run->number.' / '.$batch->code.' (alokasi berat datang, bukan timbang hasil)']);
+                app(MovementLocationService::class)->record($movement, $batch->line->area,
+                    $reference / 100, $taken, $batch->code, $batch->line->grade?->name, $area->name);
                 $weight += $reference;
                 $sacks += $taken;
                 $cost += $inputCost;

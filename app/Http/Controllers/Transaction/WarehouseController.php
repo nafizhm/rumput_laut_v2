@@ -27,7 +27,25 @@ class WarehouseController extends Controller
     }
 
     public function movements(Request $request) {
-        return $this->renderWarehousePage('Riwayat Mutasi Gudang', $request->integer('inventory_id'), true);
+        $filters = $request->validate([
+            'tab' => 'nullable|in:movements,drafts',
+            'inventory_id' => 'nullable|integer|exists:inventories,id',
+            'area_id' => 'nullable|integer|exists:warehouse_areas,id',
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('date_from') ? ['after_or_equal:date_from'] : [])],
+        ]);
+        if (!empty($filters['inventory_id']) && !empty($filters['area_id'])) {
+            abort_unless(\App\Models\WarehouseArea::whereKey($filters['area_id'])->where('inventory_id', $filters['inventory_id'])->exists(), 422, 'Area tidak sesuai dengan gudang yang dipilih.');
+        }
+        $tab = $filters['tab'] ?? 'movements';
+        $history = app(\App\Services\Transaction\WarehouseHistoryService::class);
+        $data = $tab === 'drafts' ? $history->drafts($filters) : $history->movements($filters);
+        if ($request->query('format') === 'json') return $this->successResponse('Riwayat gudang berhasil diambil', $data);
+        return view('pages.transaction.warehouse.history', [
+            'filters' => $filters, 'tab' => $tab, 'data' => $data,
+            'inventories' => Inventory::orderBy('item_name')->get(),
+            'areas' => \App\Models\WarehouseArea::with('inventory')->orderBy('name')->get(),
+        ]);
     }
 
     public function wet()

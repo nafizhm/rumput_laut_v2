@@ -65,8 +65,19 @@ class DeliveryNoteController extends Controller
         return view('pages.sales.delivery-note.form', $this->formData($surat_jalan));
     }
     private function formData(?DeliveryNote $note=null): array {
+        $processedSaleIds = DeliveryNote::query()->pluck('sales_transaction_id')->filter();
+        if (Schema::hasTable('delivery_note_items')) {
+            $processedSaleIds = $processedSaleIds->merge(\App\Models\DeliveryNoteItem::query()->pluck('sales_transaction_id'));
+        }
         $sales = SalesTransaction::with(['factory','inventory','stockMovements','purchaseOrderItem','grade'])->where('stock_mode','delivery_note')->orderByDesc('sale_date')->get();
-        $sales = $sales->groupBy(fn($s)=>$s->sale_group_number ?: 'sale:'.$s->id)->map(function($rows) {
+        $sales = $sales->groupBy(fn($s)=>$s->sale_group_number ?: 'sale:'.$s->id)
+            ->filter(function ($rows) use ($note, $processedSaleIds) {
+                if ($note && $rows->contains('id', $note->sales_transaction_id)) return true;
+
+                return !$rows->contains(fn ($sale) => $processedSaleIds->contains($sale->id))
+                    && $rows->contains(fn ($sale) => (float) $sale->total_weight_kg > $sale->stockMovements->sum('weight_kg')
+                        && (int) $sale->sold_sacks > $sale->stockMovements->sum('sack_count'));
+            })->map(function($rows) {
             $first=$rows->sortBy('id')->first();
             return ['id'=>$first->id,'label'=>$first->sale_reference.' / '.$first->factory->name,
                 'recipient_name'=>$first->factory->name,'destination_address'=>$first->factory->address ?? '',

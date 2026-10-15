@@ -74,6 +74,56 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
+it('splits receipt history by area and keeps unsupported legacy locations unknown', function () {
+    prepareOpeningStockSchema();
+    $second = WarehouseArea::create(['code' => 'HISTORY-IN', 'name' => 'Area Penerimaan Kedua', 'inventory_id' => $this->inventory->id, 'usage' => 'receiving', 'is_active' => true]);
+    $payload = $this->payload;
+    $payload['lines'] = [
+        ['warehouse_area_id' => $this->area->id, 'quality_grade_id' => $this->grade->id, 'actual_weight_kg' => 100, 'sack_count' => 2],
+        ['warehouse_area_id' => $second->id, 'quality_grade_id' => $this->grade->id, 'actual_weight_kg' => 200, 'sack_count' => 4],
+    ];
+    $this->post(route('penerimaan-barang.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $receipt = GoodsReceipt::sole();
+    $this->post(route('penerimaan-barang.confirm', $receipt), ['confirm' => 1])->assertRedirect()->assertSessionHasNoErrors();
+    StockMovement::create(['inventory_id' => $this->inventory->id, 'movement_date' => '2026-10-06', 'direction' => 'in', 'type' => 'in', 'weight_kg' => 10, 'sack_count' => 1, 'balance_after_kg' => 10, 'description' => 'Data lama']);
+    (require database_path('migrations/2026_10_15_000001_create_stock_movement_locations.php'))->up();
+    $service = app(\App\Services\Transaction\WarehouseHistoryService::class);
+    $rows = $service->movements(['area_id' => $second->id]);
+    expect($rows)->toHaveCount(1)->and($rows[0]['weight'])->toBe(200.0)->and($rows[0]['packages'])->toBe(4)
+        ->and($rows[0]['inferred'])->toBeTrue()->and($service->movements([]))->toHaveCount(3)
+        ->and($service->movements([])->last()['area'])->toBe('Area belum tercatat');
+    // New receipts capture locations immediately, without inferring history.
+    $payload['source_reference'] = 'NOTA-NEW';
+    $this->post(route('penerimaan-barang.store'), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $receipt = GoodsReceipt::latest('id')->firstOrFail();
+    $this->post(route('penerimaan-barang.confirm', $receipt), ['confirm' => 1])->assertRedirect()->assertSessionHasNoErrors();
+    expect($service->movements(['area_id' => $second->id])->first()['inferred'])->toBeFalse();
+});
+
+it('captures source areas for production and material stock adjustments', function () {
+    prepareOpeningStockSchema();
+    (require database_path('migrations/2026_10_15_000001_create_stock_movement_locations.php'))->up();
+    app(\App\Services\Transaction\OpeningStockService::class)->save([
+        'token' => (string) \Illuminate\Support\Str::uuid(), 'stock_date' => '2026-10-06', 'usage' => 'receiving',
+        'items' => [['warehouse_area_id' => $this->area->id, 'weight_kg' => 100, 'package_count' => 4]],
+    ], $this->user);
+    $ready = WarehouseArea::where('usage', 'finished')->where('is_active', true)->firstOrFail();
+    app(\App\Services\Transaction\ProductionService::class)->recordDaily([
+        'date' => '2026-10-07', 'sources' => [['warehouse_area_id' => $this->area->id, 'sack_count' => 2]],
+        'outputs' => [['warehouse_area_id' => $ready->id, 'weight_kg' => 40, 'package_count' => 2]],
+    ], $this->user);
+    $history = app(\App\Services\Transaction\WarehouseHistoryService::class);
+    $production = $history->movements(['area_id' => $this->area->id])->first();
+    expect($production['activity'])->toBe('Bahan ke proses')->and($production['weight'])->toBe(50.0);
+    expect($history->movements(['area_id' => $ready->id])->first()['weight'])->toBe(40.0);
+    $service = app(\App\Services\Transaction\AreaStockAdjustmentService::class);
+    $item = collect($service->areas())->flatMap(fn ($area) => $area['items'])->firstWhere('kind', 'material');
+    $item['actual_weight'] = 45;
+    $service->save(['movement_date' => '2026-10-07', 'description' => 'Selisih timbang', 'items' => [$item]]);
+    $adjustment = $history->movements(['area_id' => $this->area->id])->first();
+    expect($adjustment['activity'])->toBe('Penyesuaian')->and($adjustment['weight'])->toBe(5.0)->and($adjustment['direction'])->toBe('out');
+});
+
 it('shows and saves integrated harvest receiving with only harvest read and create access', function () {
     enableHarvestFinance($this);
     $user = User::create(['name' => 'Gudang Terbatas', 'email' => 'harvest-only@example.test', 'password' => 'password']);

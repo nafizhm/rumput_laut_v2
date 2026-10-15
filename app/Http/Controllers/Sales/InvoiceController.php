@@ -23,8 +23,7 @@ class InvoiceController extends Controller
     {
         $columns = [
             ['key' => 'number', 'label' => 'Invoice', 'sortable' => true, 'render' => 'document', 'width' => '220px'],
-            ['key' => 'sale', 'label' => 'Penjualan Terkait', 'render' => 'sale'],
-            ['key' => 'customer_name', 'label' => 'Konsumen', 'sortable' => true],
+            ['key' => 'customer_name', 'label' => 'Konsumen / Penjualan', 'sortable' => true, 'render' => 'customer'],
             ['key' => 'item_name', 'label' => 'Barang', 'render' => 'items', 'width' => '240px'],
             ['key' => 'total_amount', 'label' => 'Total Tagihan', 'render' => 'total', 'align' => 'right'],
             ['key' => 'due_date', 'label' => 'Jatuh Tempo', 'sortable' => true, 'render' => 'due'],

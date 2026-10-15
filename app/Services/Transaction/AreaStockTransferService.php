@@ -114,10 +114,13 @@ class AreaStockTransferService
             $destination->increment('current_stock_kg', $weight / 100);
             $destination->increment('current_sack_count', $count);
             foreach ([['inventory' => $source->fresh(), 'direction' => 'out'], ['inventory' => $destination->fresh(), 'direction' => 'in']] as $entry) {
-                StockMovement::create(['inventory_id' => $entry['inventory']->id, 'movement_date' => $data['transfer_date'],
+                $movement = StockMovement::create(['inventory_id' => $entry['inventory']->id, 'movement_date' => $data['transfer_date'],
                     'direction' => $entry['direction'], 'type' => 'transfer', 'weight_kg' => $weight / 100, 'sack_count' => $count,
                     'balance_after_kg' => $entry['inventory']->current_stock_kg,
                     'description' => 'Transfer '.$label.' ke '.$target->name.'. '.$data['description'].' / '.auth()->user()->name]);
+                $area = $entry['direction'] === 'in' ? $target : ($origin ?? null);
+                $counterpart = $entry['direction'] === 'in' ? $label : $target->name;
+                app(MovementLocationService::class)->record($movement, $area, $weight / 100, $count, null, null, $counterpart);
             }
         });
     }

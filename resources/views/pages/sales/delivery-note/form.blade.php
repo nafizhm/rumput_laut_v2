@@ -7,7 +7,17 @@
 <div class="flex justify-between gap-3"><h2 class="text-xl font-semibold">{{ $note ? 'Edit Surat Jalan' : 'Tambah Surat Jalan' }}</h2><a href="{{ route('surat-jalan.index') }}" class="text-sm text-brand-600">Kembali ke Surat Jalan</a></div>
 <fieldset :disabled="form.processing" class="space-y-5">
 <section class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h3 class="mb-4 font-semibold">Penjualan &amp; Pengiriman</h3><div class="grid gap-4 sm:grid-cols-2">
-<label class="text-sm">Nota penjualan<select x-model="form.data.sales_transaction_id" @change="selectSale" required :disabled="editMode" class="{{ $input }}"><option value="">Pilih penjualan yang sudah dicatat</option><template x-for="sale in sales" :key="sale.id"><option :value="sale.id" x-text="sale.label"></option></template></select><span class="text-xs text-error-500" x-text="form.getError('sales_transaction_id')"></span></label>
+<div>
+@if ($note)
+<label class="text-sm">Nota penjualan<input :value="selectedSale?.label || ''" disabled class="{{ $input }}"></label>
+@else
+<x-select label="Nota penjualan" name="shipment_sale_id" :options="$sales->map(fn ($sale) => ['value' => $sale['id'], 'label' => $sale['label']])->all()" :searchable="true" placeholder="Pilih nota yang belum diproses" required
+    x-on:change="form.data.sales_transaction_id = $event.detail; selectSale()" alpine-error="form.getError('sales_transaction_id')" />
+<p class="mt-1 text-xs text-gray-500">Nota yang sudah memiliki draft atau surat jalan tidak ditampilkan.</p>
+@if ($sales->isEmpty())<p class="mt-1 text-sm text-gray-500">Tidak ada nota penjualan yang belum diproses.</p>@endif
+@endif
+<span class="text-xs text-error-500" x-text="form.getError('sales_transaction_id')"></span>
+</div>
 <label class="text-sm">Tanggal surat jalan<input type="date" x-model="form.data.delivery_date" required class="{{ $input }}"><span class="text-xs text-error-500" x-text="form.getError('delivery_date')"></span></label>
 <label class="text-sm">Penerima<input x-model="form.data.recipient_name" maxlength="255" required class="{{ $input }}"></label>
 <label class="text-sm">Alamat tujuan<input x-model="form.data.destination_address" maxlength="2000" required class="{{ $input }}"></label>
