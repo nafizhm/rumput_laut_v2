@@ -23,9 +23,12 @@
             @csrf<h3 class="font-semibold">Tetapkan Nilai Pembelian</h3>
             <div class="grid gap-4 md:grid-cols-4">
                 <label class="text-sm">Tanggal Pembelian<input name="purchase_date" type="date" min="{{ $harvest->receipt->received_date->format('Y-m-d') }}" max="{{ now('Asia/Jakarta')->format('Y-m-d') }}" value="{{ old('purchase_date',max(now('Asia/Jakarta')->format('Y-m-d'),$harvest->receipt->received_date->format('Y-m-d'))) }}" required class="{{ $fieldClass }}"></label>
-                <label class="text-sm">Harga / Kg (Rp)<input name="price_per_kg" type="number" min="1" max="1000000000" step="1" x-model="price" required class="{{ $fieldClass }}"></label>
+                <x-input label="Harga / Kg (Rp)" name="price_per_kg" :isCurrency="true" :value="old('price_per_kg', 0)" x-model="price" required />
                 <label class="text-sm">Potongan Pembelian<select name="sale_deduction_type" x-model="kind" class="{{ $fieldClass }}">@foreach(['none'=>'Tidak Ada','percentage'=>'Persentase','nominal'=>'Nominal (Rp)','weight'=>'Berat (Kg)'] as $value=>$label)<option value="{{ $value }}">{{ $label }}</option>@endforeach</select></label>
-                <label class="text-sm">Nilai Potongan<input name="sale_deduction_value" type="number" min="0" step="0.01" x-model="discount" :readonly="kind==='none'" class="{{ $fieldClass }}"></label>
+                <div>
+                    <template x-if="kind === 'nominal'"><div><x-input label="Nilai Potongan (Rp)" name="sale_deduction_value" :isCurrency="true" :value="old('sale_deduction_value', 0)" x-model="discount" /></div></template>
+                    <template x-if="kind !== 'nominal'"><label class="block text-sm">Nilai Potongan<input name="sale_deduction_value" type="number" min="0" step="0.01" x-model="discount" :readonly="kind==='none'" class="{{ $fieldClass }}"></label></template>
+                </div>
             </div>
             <p class="text-sm">Nilai bersih pembelian: <strong x-text="formatCurrency(net)"></strong></p>
             <x-info-help><p class="text-sm text-gray-500">Konfirmasi mencatat nilai persediaan dan utang kepada petani. Pembayaran dan potongan pinjaman dicatat pada langkah berikutnya. Harga dikunci setelah dikonfirmasi.</p></x-info-help>
@@ -52,8 +55,8 @@
             <x-info-help>Potongan pinjaman dapat diisi tanpa pembayaran kas, atau bersama pembayaran sebagian.</x-info-help>
             <div class="grid gap-4 md:grid-cols-4">
                 <label class="text-sm">Tanggal<input name="payment_date" type="date" value="{{ old('payment_date',now('Asia/Jakarta')->format('Y-m-d')) }}" required class="{{ $fieldClass }}"></label>
-                <label class="text-sm">Pembayaran (Rp)<input name="amount" type="number" min="0" max="{{ $harvest->outstanding_payable }}" step="1" x-model="amount" required class="{{ $fieldClass }}"></label>
-                <label class="text-sm">Potongan Pinjaman (Rp)<input name="debt_deduction" type="number" min="0" max="{{ min($harvest->outstanding_payable,$harvest->farmer->current_debt) }}" step="1" x-model="deduction" required class="{{ $fieldClass }}"></label>
+                <x-input label="Pembayaran (Rp)" name="amount" :isCurrency="true" :value="old('amount', 0)" x-model="amount" required />
+                <x-input label="Potongan Pinjaman (Rp)" name="debt_deduction" :isCurrency="true" :value="old('debt_deduction', 0)" x-model="deduction" required />
                 <label class="text-sm">Kas / Bank<select name="cash_account_id" :required="Number(amount)>0" class="{{ $fieldClass }}"><option value="">Pilih kas / bank</option>@foreach($cashAccounts as $account)<option value="{{ $account->id }}" @selected(old('cash_account_id') == $account->id)>{{ $account->code }} - {{ $account->name }}</option>@endforeach</select></label>
             </div>
             <p class="text-sm">Sisa utang setelah transaksi: <strong x-text="formatCurrency(outstanding - Number(amount || 0) - Number(deduction || 0))"></strong></p>

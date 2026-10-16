@@ -21,7 +21,7 @@
 <td class="min-w-48 p-2"><input :aria-label="'Nama barang ' + (index + 1)" type="text" x-model="row.item_name" maxlength="255" required class="{{ $input }}"><span class="block text-xs text-error-500" x-text="error(index,'item_name') || form.getError('items.' + index)"></span><span x-show="row.po_remaining != null" class="block text-xs text-gray-500" x-text="'Sisa PO: ' + formatWeight(row.po_remaining || 0)"></span></td>
 <td class="min-w-28 p-2"><input :aria-label="'Berat barang ' + (index + 1)" type="number" x-model="row.sold_weight_kg" min="0.01" :max="row.po_remaining ?? 999999999.99" step="0.01" required class="{{ $input }}"><span class="text-xs text-error-500" x-text="error(index,'sold_weight_kg')"></span></td>
 <td class="min-w-24 p-2"><input :aria-label="'Kemasan barang ' + (index + 1)" type="number" x-model="row.sold_sacks" min="1" max="1000000" step="1" required class="{{ $input }}"><span class="text-xs text-error-500" x-text="error(index,'sold_sacks')"></span></td>
-<td class="min-w-32 p-2"><input :aria-label="'Harga barang ' + (index + 1)" type="number" x-model="row.price_per_kg" min="0" max="999999999.99" step="0.01" required class="{{ $input }}"><span class="text-xs text-error-500" x-text="error(index,'price_per_kg')"></span></td>
+<td class="min-w-32 p-2"><x-input x-bind:id="'sale-item-price-' + index" x-bind:aria-label="'Harga barang ' + (index + 1)" x-model="row.price_per_kg" :isCurrency="true" :currencyDecimals="2" required /><span class="text-xs text-error-500" x-text="error(index,'price_per_kg')"></span></td>
 <td class="whitespace-nowrap p-2 pt-5 text-right tabular-nums" x-text="formatCurrency(Number(row.sold_weight_kg || 0) * Number(row.price_per_kg || 0))"></td>
 <td class="p-2 pt-5"><button type="button" @click="form.data.items.splice(index,1)" class="text-red-600" :aria-label="'Hapus barang ' + (index + 1)">Hapus</button></td>
 </tr></template></tbody></table></div>
@@ -30,7 +30,11 @@
 <div class="grid gap-4 sm:grid-cols-3">
 <label class="text-sm">Bonus / kemasan (Kg)<input type="number" x-model="form.data.deduction_weight_kg" min="0" max="1000" step="0.01" required class="{{ $input }}"><span class="text-xs text-error-500" x-text="form.getError('deduction_weight_kg')"></span></label>
 <label class="text-sm">Jenis potongan<select x-model="form.data.deduction_type" @change="form.data.deduction_value = 0" class="{{ $input }}"><option value="none">Tanpa potongan</option><option value="percentage">Persentase (%)</option><option value="nominal">Nominal (Rp)</option><option value="weight">Berat total (Kg)</option></select></label>
-<label class="text-sm">Nilai potongan<input type="number" x-model="form.data.deduction_value" :disabled="form.data.deduction_type === 'none'" min="0" :max="form.data.deduction_type === 'percentage' ? 100 : 999999999.99" step="0.01" required class="{{ $input }}"><span class="text-xs text-error-500" x-text="form.getError('deduction_value')"></span></label>
+<div>
+<template x-if="form.data.deduction_type === 'nominal'"><div><x-input label="Nilai potongan (Rp)" id="sale-nominal-deduction" x-model="form.data.deduction_value" :isCurrency="true" :currencyDecimals="2" required /></div></template>
+<template x-if="form.data.deduction_type !== 'nominal'"><label class="block text-sm">Nilai potongan<input type="number" x-model="form.data.deduction_value" :disabled="form.data.deduction_type === 'none'" min="0" :max="form.data.deduction_type === 'percentage' ? 100 : 999999999.99" step="0.01" required class="{{ $input }}"></label></template>
+<span class="text-xs text-error-500" x-text="form.getError('deduction_value')"></span>
+</div>
 </div><p class="mt-3 text-xs text-gray-500">Potongan dihitung satu kali dari total transaksi. Bonus per kemasan berlaku untuk seluruh barang.</p></div>
 </section></div>
 <aside class="space-y-4 rounded-xl border bg-white p-5 xl:sticky xl:top-5 dark:border-gray-800 dark:bg-gray-900">
