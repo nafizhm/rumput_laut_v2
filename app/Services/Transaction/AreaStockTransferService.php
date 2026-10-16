@@ -17,11 +17,10 @@ class AreaStockTransferService
     public function options(): array
     {
         return ['areas' => WarehouseArea::where('is_active', true)->whereIn('usage', ['receiving', 'finished'])->orderBy('id')->get()->map(function ($area) {
-            $index = WarehouseArea::where('usage', $area->usage)->where('is_active', true)->where('id', '<', $area->id)->count();
             $batches = $area->usage === 'receiving'
                 ? MaterialBatch::whereHas('line', fn ($query) => $query->where('warehouse_area_id', $area->id)->whereHas('receipt', fn ($receipt) => $receipt->where('status', 'confirmed')))->get()
                 : FinishedBatch::where('warehouse_area_id', $area->id)->get();
-            return ['id' => $area->id, 'usage' => $area->usage, 'label' => 'Area '.($area->usage === 'receiving' ? $index + 1 : chr(65 + $index)),
+            return ['id' => $area->id, 'usage' => $area->usage, 'label' => $area->name,
                 'weight' => (float) $batches->sum('remaining_weight_kg'), 'count' => (int) $batches->sum($area->usage === 'receiving' ? 'remaining_sacks' : 'remaining_packages')];
         }), 'legacy' => Inventory::where('stock_stage', 'legacy')->get()->map(fn ($inventory) => ['id' => $inventory->id,
             'label' => 'Area Lama / '.$inventory->item_name, 'weight' => (float) $inventory->current_stock_kg, 'count' => (int) $inventory->current_sack_count])];

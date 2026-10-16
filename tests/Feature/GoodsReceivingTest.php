@@ -820,6 +820,26 @@ it('uses database area names and only active areas in the dashboard and adjustme
         ->and($rows->pluck('key')->unique()->count())->toBe($rows->count());
 });
 
+it('keeps daily production source and destination names aligned with warehouse areas', function () {
+    prepareOpeningStockSchema();
+    $this->area->update(['name' => 'Penerimaan Utama']);
+    $ready = WarehouseArea::where('usage', 'finished')->firstOrFail();
+    $ready->update(['name' => 'Siap Kirim Utama']);
+
+    $page = $this->get(route('produksi.create'))->assertOk();
+    expect($page->viewData('areas')->pluck('id')->contains($this->area->id))->toBeTrue()
+        ->and($page->viewData('areas')->pluck('id')->contains($ready->id))->toBeFalse()
+        ->and($page->viewData('finishedAreas')->pluck('id')->contains($ready->id))->toBeTrue()
+        ->and($page->viewData('finishedAreas')->pluck('id')->contains($this->area->id))->toBeFalse();
+    $html = $page->getContent();
+    $source = explode('Masuk bahan siap jual', $html)[0];
+    $destination = explode('Masuk bahan siap jual', $html)[1];
+    expect($source)->toContain('Penerimaan Utama')->not->toContain('Siap Kirim Utama');
+    expect($destination)->toContain('Siap Kirim Utama')->not->toContain('Penerimaan Utama');
+    expect($page->viewData('areaLabels')[$this->area->id])->toBe('Penerimaan Utama')
+        ->and($page->viewData('areaLabels')[$ready->id])->toBe('Siap Kirim Utama');
+});
+
 it('shows legacy warehouse balances in Area Lama without moving or duplicating stock', function () {
     $legacy = Inventory::create(['item_name' => 'Gudang Basah', 'stock_stage' => 'legacy', 'current_stock_kg' => 150, 'current_sack_count' => 3]);
     $response = $this->getJson(route('manajemen-gudang.adjustment-data'))->assertOk();
@@ -862,6 +882,38 @@ it('formats adjustment rows safely when historical batch grades are missing', fu
     $finished->setRelation('inventory', new Inventory(['item_name' => 'Barang Jadi']));
     expect($method->invoke($service, 'material', $material, 'Area 1')['name'])->toBe('Barang masuk tanpa grade');
     expect($method->invoke($service, 'finished', $finished, 'Area A')['name'])->toBe('Barang Jadi');
+});
+
+it('uses saved receiving area names in the harvest receiving form', function () {
+    prepareOpeningStockSchema();
+    $this->user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('manajemen-panen.read', 'web'));
+    $this->area->update(['name' => 'Penerimaan Panen Z']);
+    $ready = WarehouseArea::where('usage', 'finished')->firstOrFail();
+    $ready->update(['name' => 'Ready Panen']);
+    $inactive = WarehouseArea::create(['code' => 'PANEN-INACTIVE', 'name' => 'Panen Nonaktif',
+        'usage' => 'receiving', 'inventory_id' => $this->inventory->id, 'is_active' => false]);
+
+    $areas = $this->get(route('manajemen-panen.index'))->assertOk()->viewData('areas');
+    expect($areas->firstWhere('id', $this->area->id)['name'])->toBe('Penerimaan Panen Z')
+        ->and($areas->firstWhere('id', $this->area->id)['inventory_id'])->toBe($this->inventory->id)
+        ->and($areas->firstWhere('id', $ready->id))->toBeNull()
+        ->and($areas->firstWhere('id', $inactive->id))->toBeNull();
+});
+
+it('uses saved area names and warehouse types in stock transfer options', function () {
+    prepareOpeningStockSchema();
+    $this->area->update(['name' => 'Masuk Area Z']);
+    $ready = WarehouseArea::where('usage', 'finished')->firstOrFail();
+    $ready->update(['name' => 'Ready Area 99']);
+    $inactive = WarehouseArea::create(['code' => 'TRF-INACTIVE', 'name' => 'Area Nonaktif',
+        'usage' => 'receiving', 'inventory_id' => $this->inventory->id, 'is_active' => false]);
+
+    $areas = collect($this->getJson(route('manajemen-gudang.transfer-data'))->assertOk()->json('data.areas'));
+    expect($areas->firstWhere('id', $this->area->id)['label'])->toBe('Masuk Area Z')
+        ->and($areas->firstWhere('id', $this->area->id)['usage'])->toBe('receiving')
+        ->and($areas->firstWhere('id', $ready->id)['label'])->toBe('Ready Area 99')
+        ->and($areas->firstWhere('id', $ready->id)['usage'])->toBe('finished')
+        ->and($areas->firstWhere('id', $inactive->id))->toBeNull();
 });
 
 it('transfers area stock within one warehouse type while preserving totals and history', function () {

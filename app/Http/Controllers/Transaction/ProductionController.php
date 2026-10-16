@@ -113,15 +113,7 @@ class ProductionController extends Controller
 
     private function areaLabels(): array
     {
-        $labels = [];
-        foreach (['receiving', 'finished'] as $usage) {
-            foreach (WarehouseArea::where('usage', $usage)->orderBy('id')->get() as $index => $area) {
-                $number = $index + 1;
-                $letter = '';
-                for ($n = $number; $n > 0; $n = intdiv($n - 1, 26)) $letter = chr(65 + ($n - 1) % 26).$letter;
-                $labels[$area->id] = 'Area '.($usage === 'receiving' ? $number : $letter);
-            }
-        }
-        return $labels;
+        return WarehouseArea::whereIn('usage', ['receiving', 'finished'])
+            ->pluck('name', 'id')->all();
     }
 }

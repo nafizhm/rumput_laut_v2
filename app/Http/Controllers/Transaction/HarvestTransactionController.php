@@ -37,8 +37,8 @@ class HarvestTransactionController extends Controller
         $farmers = $this->farmerService->getFarmerOptions();
         $areas = WarehouseArea::query()->where('usage', 'receiving')
             ->whereHas('inventory', fn ($query) => $query->where('stock_stage', 'material'))
-            ->orderBy('id')->get()->map(fn ($area, $index) => [
-                'id' => $area->id, 'name' => 'Area '.($index + 1),
+            ->orderBy('id')->get()->map(fn ($area) => [
+                'id' => $area->id, 'name' => $area->name,
                 'inventory_id' => $area->inventory_id, 'is_active' => $area->is_active,
             ])->filter(fn ($area) => $area['is_active'])->values();
 
