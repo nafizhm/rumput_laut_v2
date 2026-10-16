@@ -106,6 +106,8 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureRoutePermission::class])->
     Route::post('stok-awal', [\App\Http\Controllers\Transaction\OpeningStockController::class, 'store'])->name('stok-awal.store')->middleware('can:opening-stock.create');
     Route::get('produksi', [ProductionController::class, 'index'])->name('produksi.index')->middleware('can:production.read');
     Route::get('produksi/create', [ProductionController::class, 'create'])->name('produksi.create')->middleware('can:production.create');
+    Route::get('produksi/aktivitas/create', [ProductionController::class, 'createActivity'])->name('produksi.activity.create')->middleware('can:production.create');
+    Route::post('produksi/aktivitas', [ProductionController::class, 'storeActivity'])->name('produksi.activity.store')->middleware('can:production.create');
     Route::get('produksi/{produksi}/edit', [ProductionController::class, 'edit'])->name('produksi.edit')->middleware('can:production.update');
     Route::put('produksi/{produksi}', [ProductionController::class, 'update'])->name('produksi.update')->middleware('can:production.update');
     Route::post('produksi', [ProductionController::class, 'store'])->name('produksi.store')->middleware('can:production.create');

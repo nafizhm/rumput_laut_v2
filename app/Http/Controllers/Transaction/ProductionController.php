@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Transaction;
 
 use App\Http\Controllers\Controller;
 use App\Models\MaterialBatch;
+use App\Models\AreaActivity;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use App\Models\ProductionRun;
 use App\Models\WarehouseArea;
 use App\Services\Transaction\ProductionService;
@@ -20,6 +23,7 @@ class ProductionController extends Controller
         return view('pages.transaction.production.index', [
             'status' => $filters['status'] ?? '',
             'areaLabels' => $this->areaLabels(),
+            'activities' => Schema::hasTable('area_activities') ? AreaActivity::with('area')->orderByDesc('activity_date')->orderByDesc('id')->paginate(20, ['*'], 'activities_page')->withQueryString() : null,
             'runs' => ProductionRun::with(['area', 'inputs.batch.line.area', 'outputs.area'])
                 ->where('work_type', '!=', 'Stok Awal')
                 ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
@@ -57,6 +61,31 @@ class ProductionController extends Controller
                 ->whereHas('inventory', fn ($q) => $q->where('stock_stage', 'finished'))->orderBy('id')->get(),
             'areaLabels' => $this->areaLabels(),
         ]);
+    }
+
+    public function createActivity()
+    {
+        return view('pages.transaction.production.activity', [
+            'areas' => WarehouseArea::where('usage', 'receiving')->where('is_active', true)
+                ->whereHas('inventory', fn ($query) => $query->where('stock_stage', 'material'))->orderBy('name')->get(),
+        ]);
+    }
+
+    public function storeActivity(Request $request)
+    {
+        $data = $request->validate([
+            'activity_date' => 'required|date_format:Y-m-d|before_or_equal:today',
+            'warehouse_area_id' => ['required', 'integer', Rule::exists('warehouse_areas', 'id')->where('usage', 'receiving')->where('is_active', true)],
+            'work_type' => 'required|string|max:255',
+            'sack_count' => 'required|integer|min:1|max:1000000',
+            'pic' => 'required|string|max:255',
+            'notes' => 'nullable|string|max:2000',
+        ]);
+        $area = WarehouseArea::with('inventory')->findOrFail($data['warehouse_area_id']);
+        abort_unless($area->inventory?->stock_stage === 'material', 422, 'Pilih area penerimaan bahan.');
+        AreaActivity::create($data + ['created_by' => $request->user()->id, 'created_by_name' => $request->user()->name]);
+
+        return redirect()->route('produksi.index')->with('success', 'Aktivitas area dicatat. Stok tetap di area semula.');
     }
 
     public function store(Request $request)

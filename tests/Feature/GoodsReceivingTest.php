@@ -900,6 +900,38 @@ it('uses saved receiving area names in the harvest receiving form', function () 
         ->and($areas->firstWhere('id', $inactive->id))->toBeNull();
 });
 
+it('records area activities without changing stock or creating production and journals', function () {
+    prepareOpeningStockSchema();
+    (require database_path('migrations/2026_10_16_000001_create_area_activities_table.php'))->up();
+    $this->area->update(['name' => 'Area Jemur']);
+    $this->post(route('penerimaan-barang.store'), $this->payload)->assertRedirect();
+    $this->post(route('penerimaan-barang.confirm', GoodsReceipt::firstOrFail()), ['confirm' => 1])->assertRedirect();
+    $stock = $this->inventory->fresh()->getAttributes();
+    $batches = MaterialBatch::get()->toArray();
+    $movements = StockMovement::count();
+    $journals = \App\Models\JournalEntry::count();
+    $payload = ['activity_date' => '2026-10-07', 'warehouse_area_id' => $this->area->id,
+        'work_type' => 'Jemur', 'sack_count' => 10, 'pic' => 'Petugas Jemur', 'notes' => 'Balik bahan sore'];
+    $this->get(route('produksi.activity.create'))->assertOk()->assertSee('Area Jemur');
+    $this->post(route('produksi.activity.store'), $payload)->assertRedirect(route('produksi.index'))->assertSessionHasNoErrors();
+    expect(\App\Models\AreaActivity::sole()->created_by)->toBe($this->user->id)
+        ->and($this->inventory->fresh()->getAttributes())->toBe($stock)
+        ->and(MaterialBatch::get()->toArray())->toBe($batches)
+        ->and(StockMovement::count())->toBe($movements)
+        ->and(\App\Models\JournalEntry::count())->toBe($journals)
+        ->and(\App\Models\ProductionRun::count())->toBe(0);
+    $this->get(route('produksi.index'))->assertOk()->assertSee('Petugas Jemur')->assertSee('Balik bahan sore');
+    $ready = WarehouseArea::where('usage', 'finished')->firstOrFail();
+    $this->postJson(route('produksi.activity.store'), array_replace($payload, ['warehouse_area_id' => $ready->id]))->assertUnprocessable();
+    $this->area->update(['is_active' => false]);
+    $this->postJson(route('produksi.activity.store'), $payload)->assertUnprocessable();
+    $this->postJson(route('produksi.activity.store'), array_replace($payload, ['activity_date' => '2026-10-08', 'sack_count' => 0]))->assertUnprocessable();
+    expect(\App\Models\AreaActivity::count())->toBe(1);
+    $user = User::create(['name' => 'No access', 'email' => 'activity-no-access@example.test', 'password' => 'password']);
+    $this->actingAs($user)->get(route('produksi.activity.create'))->assertForbidden();
+    $this->postJson(route('produksi.activity.store'), $payload)->assertForbidden();
+});
+
 it('uses saved area names and warehouse types in stock transfer options', function () {
     prepareOpeningStockSchema();
     $this->area->update(['name' => 'Masuk Area Z']);

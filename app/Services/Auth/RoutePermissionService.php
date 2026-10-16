@@ -34,6 +34,7 @@ class RoutePermissionService
             'harvest-data' => 'manajemen-panen.read', 'transaction-data' => 'manajemen-pemasukan-pengeluaran.read',
             'saldo-awal.start-zero' => 'journal.post', 'penerimaan-barang.link-purchase' => 'receiving.update',
             'produksi.complete' => 'production.confirm', 'produksi.pack' => 'production.confirm',
+            'produksi.activity.create' => 'production.create', 'produksi.activity.store' => 'production.create',
             'manajemen-gudang.receive' => 'manajemen-gudang.create',
             'manajemen-gudang.shrinkage' => 'manajemen-gudang.update',
             'manajemen-gudang.transfer' => 'manajemen-gudang.update',

@@ -6,7 +6,7 @@
 <div class="space-y-5 rounded-xl bg-white p-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="text-xl font-semibold">Riwayat Proses Harian</h2>
-        @can('production.create')<a href="{{ route('produksi.create') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Catat Proses Harian</a>@endcan
+        @can('production.create')<div class="flex flex-wrap gap-3"><a href="{{ route('produksi.activity.create') }}" class="rounded-lg border px-4 py-3 text-sm">Catat Aktivitas Area</a><a href="{{ route('produksi.create') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Catat Proses Harian &amp; Packing</a></div>@endcan
     </div>
     <form method="GET" class="flex flex-wrap items-end gap-3">
         <label class="text-sm">Status<select name="status" class="ml-3 rounded-lg border bg-white p-3 dark:bg-gray-900">
@@ -30,6 +30,17 @@
         </tr>@empty<tr><td colspan="8" class="p-6 text-center text-gray-500">Belum ada proses pada pilihan ini.</td></tr>@endforelse</tbody>
     </table></div>
     {{ $runs->links() }}
+    <section class="space-y-3 border-t pt-5 dark:border-gray-800">
+        <h3 class="text-lg font-semibold">Riwayat Aktivitas Area</h3>
+        <p class="text-sm text-gray-500">Pencatatan pekerjaan tanpa perpindahan atau pengurangan stok. Karung yang sama dapat dikerjakan pada beberapa aktivitas.</p>
+        <div class="overflow-x-auto"><table class="w-full text-left text-sm">
+            <thead><tr>@foreach(['Tanggal','Area','Pekerjaan','Karung dikerjakan','PIC','Catatan'] as $heading)<th class="p-3">{{ $heading }}</th>@endforeach</tr></thead>
+            <tbody>@forelse($activities ?? [] as $activity)<tr class="border-t dark:border-gray-800">
+                <td class="p-3">{{ $activity->activity_date->format('d/m/Y') }}</td><td class="p-3">{{ $activity->area->name }}</td><td class="p-3">{{ $activity->work_type }}</td><td class="p-3">{{ number_format($activity->sack_count,0,',','.') }} karung</td><td class="p-3">{{ $activity->pic }}</td><td class="p-3 whitespace-pre-line">{{ $activity->notes ?: '-' }}</td>
+            </tr>@empty<tr><td colspan="6" class="p-6 text-center text-gray-500">Belum ada aktivitas area.</td></tr>@endforelse</tbody>
+        </table></div>
+        @if($activities){{ $activities->links() }}@endif
+    </section>
 </div>
 <x-warehouse-detail-modal />
 @endsection
