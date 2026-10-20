@@ -9,6 +9,7 @@ use Spatie\Permission\PermissionRegistrar;
 
 class GoodsReceivingSeeder extends Seeder
 {
+    // Initial examples only; receiving is determined by usage, regardless of the area name/code.
     public function run(): void {
         DB::transaction(function () {
             $inventory = Inventory::firstOrCreate(['stock_stage' => 'material'], ['item_name' => 'Bahan Masuk', 'current_stock_kg' => 0, 'current_sack_count' => 0]);

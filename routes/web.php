@@ -139,6 +139,7 @@ Route::middleware(['auth', \App\Http\Middleware\EnsureRoutePermission::class])->
 
     // Sales
     Route::post('invoice/{invoice}/pay', [InvoiceController::class, 'pay'])->name('invoice.pay');
+    Route::delete('invoice/payments/{invoice_payment}', [\App\Http\Controllers\Sales\InvoicePaymentController::class, 'destroy'])->name('invoice.payment.destroy')->middleware('can:invoice.update');
     Route::get('invoice-data', [InvoiceController::class, 'data'])->name('invoice.data');
     Route::get('invoice/{invoice}/cetak', [InvoiceController::class, 'print'])->name('invoice.print');
     Route::resource('invoice', InvoiceController::class)->only(['index', 'create', 'edit', 'store', 'update', 'destroy']);

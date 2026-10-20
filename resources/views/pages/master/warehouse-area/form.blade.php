@@ -6,6 +6,7 @@
 <form method="POST" action="{{ $area->exists ? route('area-gudang.update',$area) : route('area-gudang.store') }}" class="max-w-3xl space-y-5 rounded-xl bg-white p-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
 @csrf @if($area->exists) @method('PUT') @endif
 @if($errors->any())<ul class="text-sm text-red-600">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>@endif
+<p class="text-sm text-gray-500">Nama dan kode area bebas diatur sesuai lokasi gudang. Fungsi area mengikuti pilihan Jenis Area; angka atau huruf pada nama tidak menentukan barang masuk atau barang ready.</p>
 <div class="grid gap-4 sm:grid-cols-2">
 <label>Kode Area<input name="code" required maxlength="30" value="{{ old('code',$area->code) }}" class="{{ $input }}"></label>
 <label>Nama Area<input name="name" required maxlength="100" value="{{ old('name',$area->name) }}" class="{{ $input }}"></label>

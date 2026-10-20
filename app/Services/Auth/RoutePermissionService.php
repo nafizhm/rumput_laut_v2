@@ -26,6 +26,7 @@ class RoutePermissionService
     public static function permission(?string $route): ?string
     {
         $aliases = [
+            'invoice.payment.destroy' => 'invoice.update',
             'dashboard' => 'dashboard.read', 'dashboard.stats' => 'dashboard.read', 'dashboard.chart-data' => 'dashboard.read',
             'menu-data' => 'menu.read', 'permission-data' => 'permission.read', 'role-data' => 'role.read',
             'farmer-data' => 'manajemen-petani.read', 'farmer.ledgers' => 'manajemen-petani.read',

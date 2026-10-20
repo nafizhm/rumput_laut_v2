@@ -12,7 +12,7 @@ class Invoice extends Model
 
     protected $casts = ['delivery_note_references' => 'array', 'invoice_date' => 'date:Y-m-d', 'due_date' => 'date:Y-m-d', 'quantity_kg' => 'decimal:2', 'price_per_kg' => 'decimal:2'];
 
-    protected $appends = ['total_amount', 'term_days', 'days_until_due', 'due_label', 'remaining_amount', 'payment_status_label', 'deduction_amount', 'document_items'];
+    protected $appends = ['total_amount', 'term_days', 'days_until_due', 'due_label', 'remaining_amount', 'payment_status_label', 'deduction_amount', 'document_items', 'cooperation_deduction_amount', 'cash_received_amount'];
 
     public function saleItems()
     {
@@ -64,6 +64,17 @@ class Invoice extends Model
     public function getRemainingAmountAttribute(): int
     {
         return $this->payment_status === 'paid' ? 0 : max(0, (int) round($this->total_amount) - (int) $this->paid_amount);
+    }
+
+    public function getCooperationDeductionAmountAttribute(): int
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('invoice_payments')) return 0;
+        return (int) ($this->relationLoaded('payments') ? $this->payments : $this->payments()->get())->sum('cooperation_deduction');
+    }
+
+    public function getCashReceivedAmountAttribute(): int
+    {
+        return max(0, (int) $this->paid_amount - $this->cooperation_deduction_amount);
     }
 
     public function getPaymentStatusLabelAttribute(): string

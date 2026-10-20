@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('title', 'Catat Aktivitas Area')
-@section('breadcrumb')<x-breadcrumb pageTitle="Catat Aktivitas Area" :links="[['name'=>'Proses Harian','url'=>route('produksi.index')]]" />@endsection
+@section('breadcrumb')<x-breadcrumb pageTitle="Catat Aktivitas Area" :links="[['name'=>'WIP','url'=>route('produksi.index')]]" />@endsection
 @section('content')
 <div class="rounded-xl bg-white p-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
     <h2 class="text-xl font-semibold">Catat Aktivitas Area</h2>

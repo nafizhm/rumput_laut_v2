@@ -9,6 +9,7 @@ use Illuminate\Database\Seeder;
 
 class WarehouseLocationSeeder extends Seeder
 {
+    // Initial examples only. Names/codes do not determine usage and existing master labels are preserved.
     public function run(): void
     {
         $material = Inventory::firstOrCreate(['stock_stage' => 'material'], ['item_name' => 'Bahan Masuk', 'current_stock_kg' => 0, 'current_sack_count' => 0]);

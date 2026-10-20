@@ -726,7 +726,7 @@ class BusinessFlowAuditTest extends TestCase
         }
         $this->withoutVite();
         $batch = $this->sourceBatch();
-        $this->get(route('produksi.create'))->assertOk()->assertSee('Area asal')->assertSee('Area tujuan');
+        $this->get(route('produksi.create'))->assertOk()->assertSee('Area sumber')->assertSee('Mulai WIP');
         $payload = ['started_date' => '2026-10-03', 'warehouse_area_id' => WarehouseArea::where('usage', 'processing')->firstOrFail()->id, 'pic' => 'PIC', 'work_type' => 'Jemur', 'processing_cost' => 0, 'inputs' => [['material_batch_id' => $batch->id, 'sack_count' => 4]]];
         $this->postJson(route('produksi.store'), $payload)->assertUnprocessable()->assertJsonValidationErrors('confirm');
         $this->post(route('produksi.store'), $payload + ['confirm' => 1])->assertRedirect();
@@ -844,6 +844,40 @@ class BusinessFlowAuditTest extends TestCase
         $this->assertSame(0, app(FinancialReportService::class)->month('2026-10')['difference']);
     }
 
+    public function test_cooperation_deduction_settles_receivables_records_expense_and_reverses_with_cash(): void
+    {
+        (require database_path('migrations/2026_10_20_000002_add_invoice_cooperation_deductions.php'))->up();
+        $this->legacy->update(['current_stock_kg' => 0, 'current_sack_count' => 0]);
+        app(JournalService::class)->startZero('2026-10-01', $this->user);
+        $run = $this->production($this->sourceBatch());
+        app(ProductionService::class)->complete($run, '2026-10-03');
+        $this->packing($run);
+        $batch = FinishedBatch::firstOrFail();
+        $sale = app(SalesService::class)->createSale(['factory_id' => $this->factory->id, 'inventory_id' => $batch->inventory_id,
+            'finished_batch_id' => $batch->id, 'sale_date' => '2026-10-04', 'sold_weight_kg' => 80, 'sold_sacks' => 4, 'price_per_kg' => 20000]);
+        $invoice = $this->invoice($sale);
+        $payment = app(InvoicePaymentService::class)->recordPayment([
+            'invoice_id' => $invoice->id, 'payment_date' => '2026-10-05', 'amount' => 1440000,
+            'cooperation_deduction' => 160000, 'cooperation_notes' => 'Bagian mitra dihitung di luar aplikasi',
+        ]);
+        $this->assertSame('paid', $invoice->refresh()->payment_status);
+        $this->assertSame(0, $invoice->remaining_amount);
+        $this->assertSame(1440000, $invoice->cash_received_amount);
+        $this->assertSame(1600000, (int) $sale->refresh()->paid_amount);
+        $this->assertSame(1440000, $this->cashIn('Penjualan Rumput Laut'));
+        $this->assertSame(0, $this->accountNet('11202'));
+        $this->assertSame(16000000, $this->accountNet('52113'));
+        $this->assertSame(0, app(FinancialReportService::class)->month('2026-10')['difference']);
+        app(InvoicePaymentService::class)->deletePayment($payment);
+        $this->assertSame('unpaid', $invoice->refresh()->payment_status);
+        $this->assertSame(1600000, $invoice->remaining_amount);
+        $this->assertSame(0, (int) $sale->refresh()->paid_amount);
+        $this->assertSame(0, $this->cashIn('Penjualan Rumput Laut'));
+        $this->assertSame(0, $this->accountNet('52113'));
+        $this->assertSame(160000000, $this->accountNet('11202'));
+        $this->assertSame(0, app(FinancialReportService::class)->month('2026-10')['difference']);
+    }
+
     public function test_pricing_after_partial_processing_or_packing_preserves_physical_stock(): void
     {
         foreach ([2, 4] as $sacks) {
@@ -901,7 +935,7 @@ class BusinessFlowAuditTest extends TestCase
         $this->assertFalse((bool) $batch->is_costed);
         $this->assertNull($harvest->priced_at);
         $journals = JournalEntry::count();
-        $this->get(route('produksi.create'))->assertOk()->assertSee('Area asal')->assertSee('Area tujuan')->assertDontSee('Biaya proses dibayar tunai');
+        $this->get(route('produksi.create'))->assertOk()->assertSee('Area sumber')->assertSee('Mulai WIP')->assertDontSee('Biaya proses dibayar tunai');
         $processPayload = ['started_date'=>'2026-10-03','warehouse_area_id'=>WarehouseArea::where('usage','processing')->firstOrFail()->id,'pic'=>'Petugas','work_type'=>'Jemur',
             'warehouse_only'=>false,'processing_cost'=>999999,'inputs'=>[['material_batch_id'=>$batch->id,'sack_count'=>4]],'confirm'=>1];
         $this->post(route('produksi.store'),$processPayload)->assertRedirect()->assertSessionHasNoErrors();

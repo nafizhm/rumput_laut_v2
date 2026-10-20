@@ -1,12 +1,12 @@
 @extends('layouts.app')
-@section('title', 'Proses Harian')
-@section('breadcrumb')<x-breadcrumb pageTitle="Proses Harian" :links="[['name'=>'Manajemen Gudang','url'=>route('manajemen-gudang.index')]]" />
+@section('title', 'WIP')
+@section('breadcrumb')<x-breadcrumb pageTitle="WIP" :links="[['name'=>'Manajemen Gudang','url'=>route('manajemen-gudang.index')]]" />
 @endsection
 @section('content')
 <div class="space-y-5 rounded-xl bg-white p-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <h2 class="text-xl font-semibold">Riwayat Proses Harian</h2>
-        @can('production.create')<div class="flex flex-wrap gap-3"><a href="{{ route('produksi.activity.create') }}" class="rounded-lg border px-4 py-3 text-sm">Catat Aktivitas Area</a><a href="{{ route('produksi.create') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Catat Proses Harian &amp; Packing</a></div>@endcan
+        <h2 class="text-xl font-semibold">WIP — Work in Process / Work in Progress</h2>
+        @can('production.create')<div class="flex flex-wrap gap-3"><a href="{{ route('produksi.activity.create') }}" class="rounded-lg border px-4 py-3 text-sm">Catat Aktivitas Area</a><a href="{{ route('produksi.create') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Mulai WIP</a></div>@endcan
     </div>
     <form method="GET" class="flex flex-wrap items-end gap-3">
         <label class="text-sm">Status<select name="status" class="ml-3 rounded-lg border bg-white p-3 dark:bg-gray-900">
@@ -20,9 +20,9 @@
         <tbody>@forelse($runs as $run)<tr class="border-t border-gray-200 dark:border-gray-800">
             <td class="p-3">{{ $run->number }}</td><td class="p-3">{{ $run->started_date->format('d/m/Y') }}</td>
             <td class="p-3">{{ $run->inputs->map(fn($input) => $areaLabels[$input->batch->line->warehouse_area_id] ?? $input->batch->line->area->name)->unique()->implode(', ') }}</td>
-            <td class="p-3">{{ $run->input_sacks }} karung<br><span class="text-xs text-gray-500">{{ number_format($run->input_reference_weight_kg,2,',','.') }} Kg alokasi</span></td>
+            <td class="p-3">{{ $run->input_sacks }} karung<br><span class="text-xs text-gray-500">{{ number_format($run->input_reference_weight_kg,2,',','.') }} Kg alokasi</span><br><strong>Sisa WIP: {{ $run->remaining_wip_sacks }} karung</strong>@if($run->wip_mode)<br><span class="text-xs">Selesai: {{ $run->transfers->sum('source_sacks') }} karung bahan</span>@endif</td>
             <td class="p-3">{{ $run->outputs->map(fn($output) => $areaLabels[$output->warehouse_area_id] ?? $output->area->name)->unique()->implode(', ') ?: '—' }}</td>
-            <td class="p-3">@if($run->status === 'packed'){{ number_format($run->outputs->sum('weight_kg'),2,',','.') }} Kg<br>{{ $run->outputs->sum('package_count') }} kemasan @else — @endif</td>
+            <td class="p-3">@if($run->outputs->isNotEmpty()){{ number_format($run->wip_mode ? $run->transfers->sum('output_weight_kg') : $run->outputs->sum('weight_kg'),2,',','.') }} Kg<br>{{ $run->wip_mode ? $run->transfers->sum('package_count') : $run->outputs->sum('package_count') }} kemasan @else — @endif</td>
             <td class="p-3">{{ ['processing'=>'Proses aktif','wip'=>'WIP','packed'=>'Selesai packing'][$run->status] }}</td>
             <td class="p-3"><div class="flex gap-3"><a href="{{ route('produksi.show',$run) }}" @click.prevent="$dispatch('warehouse-detail', { url: $el.href })" class="text-brand-600">Detail</a>
                 @if($run->status==='processing')@can('production.update')<a href="{{ route('produksi.edit',$run) }}" class="text-brand-600">Edit</a>@endcan @endif

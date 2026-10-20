@@ -101,7 +101,7 @@ class SalesController extends Controller
     private function finishedBatchOptions()
     {
         return Schema::hasTable('finished_batches') ? FinishedBatch::with(['grade', 'area'])->where('remaining_weight_kg', '>', 0)
-            ->where('remaining_packages', '>', 0)->whereHas('run', fn ($q) => $q->where('status', 'packed'))
+            ->where('remaining_packages', '>', 0)->whereHas('run', fn ($q) => $q->hasReadyOutputs())
             ->whereHas('area', fn ($q) => $q->where('is_active', true)->where('usage', 'finished'))
             ->get()->map(fn ($b) => [
             'id' => $b->id, 'inventory_id' => $b->inventory_id, 'quality_grade_id' => $b->quality_grade_id, 'label' => $b->area->name.' / '.$b->code.' / '.$b->remaining_weight_kg.' kg / '.$b->remaining_packages.' kemasan',

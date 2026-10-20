@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title','Edit Proses Harian')
-@section('breadcrumb')<x-breadcrumb pageTitle="Edit Proses Harian" :links="[['name'=>'Proses Harian','url'=>route('produksi.index')]]" />@endsection
+@section('title','Edit WIP')
+@section('breadcrumb')<x-breadcrumb pageTitle="Edit WIP" :links="[['name'=>'WIP','url'=>route('produksi.index')]]" />@endsection
 @section('content')
 <div class="space-y-4 rounded-xl bg-white p-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
     <h2 class="text-xl font-semibold">Edit {{ $run->number }}</h2>

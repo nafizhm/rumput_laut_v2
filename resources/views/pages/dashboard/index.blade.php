@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('title', 'Dashboard')
 
@@ -82,7 +82,7 @@
 
         <section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <div><h3 class="text-lg font-semibold text-gray-800 dark:text-white">Proses Harian / Produksi</h3><x-info-help><p class="mt-1 text-sm text-gray-500">Proses yang dimulai pada periode pilihan. Selesai proses berpindah ke WIP sampai packing selesai.</p></x-info-help></div>
+                <div><h3 class="text-lg font-semibold text-gray-800 dark:text-white">WIP / Produksi</h3><x-info-help><p class="mt-1 text-sm text-gray-500">WIP yang dimulai pada periode pilihan. Bahan diambil dari satu area penerimaan dan tetap di WIP sampai hasilnya dipindahkan ke area jadi.</p></x-info-help></div>
                 <a href="{{ route('manajemen-gudang.index') }}" class="text-sm font-semibold text-brand-600">Lihat Dashboard Gudang</a>
             </div>
             <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 text-sm text-gray-600 dark:text-gray-300">

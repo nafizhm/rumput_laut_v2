@@ -20,7 +20,7 @@
                 <div class="flex justify-between"><span>Nilai barang</span><span class="tabular-nums" x-text="formatCurrency(detailGross)"></span></div>
                 <div class="flex justify-between"><span>Total bonus &amp; potongan</span><span class="tabular-nums" x-text="formatCurrency(detailGross - (detailItem?.total_sale_value || 0))"></span></div>
                 <div class="flex justify-between font-semibold"><span>Total nota</span><span class="tabular-nums" x-text="formatCurrency(detailItem?.total_sale_value || 0)"></span></div>
-                <div class="flex justify-between"><span>Sudah dibayar</span><span class="tabular-nums" x-text="formatCurrency(detailItem?.paid_amount || 0)"></span></div>
+                <div class="flex justify-between"><span>Tagihan diselesaikan</span><span class="tabular-nums" x-text="formatCurrency(detailItem?.paid_amount || 0)"></span></div>
                 <div class="flex justify-between font-semibold"><span>Sisa tagihan</span><span class="tabular-nums" x-text="formatCurrency(detailItem?.remaining_amount || 0)"></span></div>
             </div>
             <p x-show="detailItem?.has_invoice" class="rounded-lg bg-amber-50 p-3 text-sm text-amber-700">Nota ini menggunakan invoice. Pelunasan dilakukan melalui menu Invoice.</p>

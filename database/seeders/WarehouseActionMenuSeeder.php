@@ -15,7 +15,7 @@ class WarehouseActionMenuSeeder extends Seeder
             Menu::where('route', 'produksi.create')->update(['route' => 'produksi.index']);
 
             foreach ([
-                ['produksi.index', 'Proses Harian', 'produksi', 'production.read', 3],
+                ['produksi.index', 'WIP', 'produksi', 'production.read', 3],
                 ['manajemen-gudang.movements', 'Riwayat Mutasi', 'manajemen-gudang/mutasi', 'manajemen-gudang.read', 4],
             ] as [$route, $name, $url, $permission, $order]) {
                 Menu::updateOrCreate(['route' => $route], [

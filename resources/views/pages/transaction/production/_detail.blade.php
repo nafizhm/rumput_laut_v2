@@ -1,7 +1,8 @@
 <div class="space-y-5 rounded-xl bg-white p-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
     @if($errors->any())<ul class="rounded-lg bg-red-50 p-4 text-red-700">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>@endif
     <h2 class="text-xl font-semibold">{{ $run->number }}</h2>
-    @if($run->warehouse_only && $run->status === 'packed')
+    @if($run->wip_mode) @include('pages.transaction.production._wip-detail') @endif
+    @if($run->warehouse_only && !$run->wip_mode && $run->status === 'packed')
     <div class="grid gap-4 rounded-lg border p-4 text-sm sm:grid-cols-2">
         <div><h3 class="font-semibold">Diambil dari penerimaan</h3>
             @foreach($run->inputs->groupBy(fn($input) => $input->batch->line->warehouse_area_id) as $areaId => $inputs)
@@ -17,9 +18,9 @@
     @endif
     <div class="flex gap-4 text-sm"><a href="{{ route('produksi.index') }}" class="text-brand-600">Kembali ke Riwayat Proses</a>@if($run->status==='processing')@can('production.update')<a href="{{ route('produksi.edit',$run) }}" class="text-brand-600">Edit Proses</a>@endcan @endif</div>
     @if($run->notes)<p class="text-sm">Catatan: {{ $run->notes }}</p>@endif
-    <p class="text-sm">Status: <strong>{{ ['processing'=>'Proses aktif','wip'=>'WIP — menunggu press/timbang/packing','packed'=>'Selesai packing'][$run->status] }}</strong>. PIC: {{ $run->pic }}. Pekerjaan: {{ $run->work_type }}.</p>
+    <p class="text-sm">Status: <strong>{{ ['processing'=>'Proses aktif','wip'=>($run->wip_mode ? 'WIP aktif' : 'WIP — menunggu press/timbang/packing'),'packed'=>'Selesai packing'][$run->status] }}</strong>. PIC: {{ $run->pic }}. Pekerjaan: {{ $run->work_type }}.</p>
     <p class="text-sm text-gray-500">Mulai {{ $run->started_date->format('d/m/Y') }}. Bahan {{ $run->input_sacks }} karung.@if(!$run->warehouse_only) Nilai bahan {{ \App\Services\Finance\AccountingMoney::format($run->material_cost_cents) }}, biaya proses {{ \App\Services\Finance\AccountingMoney::format($run->processing_cost_cents) }}.@endif</p>
-    <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr>@foreach($run->warehouse_only ? ['Batch bahan','Petani','Karung diambil'] : ['Batch bahan','Petani','Karung diambil','Biaya bahan'] as $h)<th class="p-3 {{ str_starts_with($h,'Nilai') ? 'text-right' : '' }}">{{ $h }}</th>@endforeach</tr></thead><tbody>@foreach($run->inputs as $input)<tr class="border-t"><td class="p-3"><a class="text-brand-600" href="{{ route('penerimaan-barang.show',$input->batch->line->receipt) }}">{{ $input->batch->code }}</a></td><td class="p-3">{{ $input->batch->line->receipt->farmer->name }}</td><td class="p-3">{{ $input->sack_count }}</td>@if(!$run->warehouse_only)<td class="text-right tabular-nums p-3">{{ \App\Services\Finance\AccountingMoney::format($input->cost_cents) }}</td>@endif</tr>@endforeach</tbody></table></div>
+    <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr>@foreach($run->warehouse_only ? ['Batch bahan','Petani','Karung diambil'] : ['Batch bahan','Petani','Karung diambil','Biaya bahan'] as $h)<th class="p-3 {{ str_starts_with($h,'Nilai') ? 'text-right' : '' }}">{{ $h }}</th>@endforeach</tr></thead><tbody>@foreach($run->inputs as $input)<tr class="border-t"><td class="p-3"><a class="text-brand-600" href="{{ route('penerimaan-barang.show',$input->batch->line->receipt) }}">{{ $input->batch->code }}</a></td><td class="p-3">{{ $input->batch->line->receipt->farmer?->name ?? 'Stok awal' }}</td><td class="p-3">{{ $input->sack_count }}</td>@if(!$run->warehouse_only)<td class="text-right tabular-nums p-3">{{ \App\Services\Finance\AccountingMoney::format($input->cost_cents) }}</td>@endif</tr>@endforeach</tbody></table></div>
     @can('production.confirm')
     @if($run->status==='processing')
         <form method="POST" action="{{ route('produksi.complete',$run) }}" class="space-y-4 rounded-lg border p-4">@csrf
@@ -31,6 +32,11 @@
     @elseif($run->status==='wip')
         <form method="POST" action="{{ route('produksi.pack',$run) }}" class="space-y-4 rounded-lg border p-4" x-data="{ rows: @js(old('outputs', [['warehouse_area_id'=>'','weight_kg'=>'','package_count'=>'']])) }">@csrf
             <h3 class="font-semibold">Press, timbang aktual dan packing</h3>
+            @if($run->wip_mode)
+            <input type="hidden" name="token" value="{{ old('token',(string) \Illuminate\Support\Str::uuid()) }}">
+            <label class="block text-sm">Karung bahan yang selesai pada pemindahan ini (sisa WIP {{ $run->remaining_wip_sacks }} karung)<input type="number" name="source_sacks" value="{{ old('source_sacks') }}" min="1" max="{{ $run->remaining_wip_sacks }}" step="1" required class="mt-2 w-full rounded-lg border bg-transparent p-3"></label>
+            <label class="block text-sm">Catatan pemindahan<textarea name="notes" maxlength="2000" class="mt-2 w-full rounded-lg border bg-transparent p-3">{{ old('notes') }}</textarea></label>
+            @endif
             <label class="block text-sm">Tanggal packing<input type="date" name="packed_date" value="{{ old('packed_date',now('Asia/Jakarta')->format('Y-m-d')) }}" min="{{ $run->completed_date->format('Y-m-d') }}" max="{{ now('Asia/Jakarta')->format('Y-m-d') }}" required class="mt-2 w-full rounded-lg border bg-transparent p-3"></label>
             <x-info-help><p class="text-sm text-gray-500">Isi hasil aktual. Jumlah kemasan jadi terpisah dari karung bahan; berat hasil tidak dihitung otomatis dari berat datang.</p></x-info-help>
             <template x-for="(row,index) in rows" :key="index"><div class="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
@@ -49,7 +55,7 @@
         </form>
     @endif
     @endcan
-    @if($run->status==='packed')
+    @if($run->outputs->isNotEmpty())
         <h3 class="font-semibold">Batch barang jadi</h3>
         <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr>@foreach($run->warehouse_only ? ['Batch','Area Ready','Kg hasil','Kemasan hasil','Kg tersedia','Kemasan tersedia'] : ['Batch','Area Ready','Kg hasil','Kemasan hasil','Kg tersedia','Kemasan tersedia','Nilai hasil'] as $h)<th class="p-3 {{ str_starts_with($h,'Nilai') ? 'text-right' : '' }}">{{ $h }}</th>@endforeach</tr></thead><tbody>@foreach($run->outputs as $batch)<tr class="border-t"><td class="p-3">{{ $batch->code }}</td><td class="p-3">{{ $batch->area->name }}</td><td class="p-3">{{ number_format($batch->weight_kg,2,',','.') }}</td><td class="p-3">{{ $batch->package_count }}</td><td class="p-3">{{ number_format($batch->remaining_weight_kg,2,',','.') }}</td><td class="p-3">{{ $batch->remaining_packages }}</td>@if(!$run->warehouse_only)<td class="text-right tabular-nums p-3">{{ \App\Services\Finance\AccountingMoney::format($batch->cost_cents) }}</td>@endif</tr>@endforeach</tbody></table></div>
         <a href="{{ route('manajemen-penjualan.index') }}" class="text-sm text-brand-600">Buka penjualan</a>

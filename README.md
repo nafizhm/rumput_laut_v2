@@ -7,6 +7,14 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Konsep aplikasi
+
+Area gudang bersifat dinamis mengikuti master. Fungsi ditentukan oleh `usage`, bukan nama angka/huruf atau awalan kode. Lihat [konsep area gudang](docs/konsep-area-gudang.md).
+
+Pengambilan bahan, saldo proses, pemindahan hasil bertahap dan penyusutan mengikuti [alur WIP](docs/alur-wip.md).
+
+Pencairan invoice dapat mencatat [potongan kerja sama](docs/potongan-kerja-sama-invoice.md) terpisah dari uang diterima.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

@@ -14,12 +14,22 @@ class InvoicePayment extends Model
         'invoice_id',
         'payment_date',
         'amount',
+        'cooperation_deduction',
+        'cooperation_notes',
         'notes',
     ];
 
     protected $casts = [
         'payment_date' => 'date:Y-m-d',
+        'cooperation_deduction' => 'integer',
     ];
+
+    protected $appends = ['settlement_amount'];
+
+    public function getSettlementAmountAttribute(): int
+    {
+        return (int) $this->amount + (int) $this->cooperation_deduction;
+    }
 
     public function invoice(): BelongsTo
     {

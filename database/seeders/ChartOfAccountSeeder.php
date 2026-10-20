@@ -68,6 +68,7 @@ class ChartOfAccountSeeder extends Seeder
                 ['52110', 'Biaya Perjalanan Dinas', 'Biaya', 'Biaya Operasional', 'Debit', 'Perjalanan untuk kegiatan usaha.'],
                 ['52111', 'Biaya Telepon dan Internet', 'Biaya', 'Biaya Operasional', 'Debit', 'Telepon dan internet untuk administrasi dan komunikasi usaha.'],
                 ['52112', 'Biaya Asuransi', 'Biaya', 'Biaya Operasional', 'Debit', 'Bagian premi yang menjadi beban periode berjalan. Bagian untuk periode mendatang dicatat sebagai Biaya Dibayar di Muka.'],
+                ['52113', 'Biaya Kerja Sama Penjualan', 'Biaya', 'Biaya Operasional', 'Debit', 'Potongan kerja sama saat pencairan invoice; nominal dihitung di luar aplikasi dan mengurangi piutang tanpa menambah kas.'],
                 ['52201', 'Biaya Penyusutan', 'Biaya', 'Penyusutan', 'Debit', 'Penyusutan aset tetap untuk periode berjalan.'],
                 ['53101', 'Biaya Administrasi Bank', 'Biaya', 'Biaya Keuangan', 'Debit', 'Biaya transfer dan administrasi rekening usaha.'],
                 ['53102', 'Biaya Bunga Pinjaman', 'Biaya', 'Biaya Keuangan', 'Debit', 'Bunga pinjaman yang diterima perusahaan; pembayaran pokok mengurangi utang.'],

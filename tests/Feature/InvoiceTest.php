@@ -83,6 +83,25 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
+it('shows cash cooperation deduction and payment history separately on invoices', function () {
+    (require database_path('migrations/2026_10_20_000002_add_invoice_cooperation_deductions.php'))->up();
+    $this->postJson(route('invoice.store'), $this->payload)->assertOk();
+    $invoice = Invoice::sole();
+    $this->postJson(route('invoice.pay', $invoice), [
+        'invoice_id' => $invoice->id, 'payment_date' => '2026-10-06', 'amount' => 24000000,
+        'cooperation_deduction' => 2000000, 'cooperation_notes' => 'Mitra penjualan',
+    ])->assertOk();
+    $this->getJson(route('invoice.data'))->assertOk()
+        ->assertJsonPath('data.0.total_amount', 26000000)
+        ->assertJsonPath('data.0.payment_status', 'paid')
+        ->assertJsonPath('data.0.cash_received_amount', 24000000)
+        ->assertJsonPath('data.0.cooperation_deduction_amount', 2000000)
+        ->assertJsonPath('data.0.payments.0.cooperation_notes', 'Mitra penjualan');
+    $this->get(route('invoice.index'))->assertOk()
+        ->assertSee('Potongan Kerja Sama (Rp)')->assertSee('Uang Diterima (Rp)')
+        ->assertSee('Riwayat Pencairan')->assertSee('Pengurang tagihan');
+});
+
 it('creates, lists, edits, prints and deletes invoices with calculated totals', function () {
     $this->postJson(route('invoice.store'), $this->payload + ['total_amount' => 1])->assertOk();
     $invoice = Invoice::firstOrFail();

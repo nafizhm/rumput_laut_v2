@@ -30,6 +30,6 @@ class InvoicePaymentController extends Controller
     {
         $this->service->deletePayment($invoice_payment);
 
-        return $this->successResponse('Pembayaran invoice berhasil dihapus');
+        return $this->successResponse('Pencairan invoice beserta potongan kerja sama berhasil dibatalkan');
     }
 }

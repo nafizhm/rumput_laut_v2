@@ -18,6 +18,7 @@ beforeEach(function () {
         '2026_10_06_000006_create_invoices_table.php',
         '2026_10_06_225852_create_invoice_payments_table.php',
         '2026_10_06_000008_add_po_reference_to_invoices.php',
+        '2026_10_20_000002_add_invoice_cooperation_deductions.php',
     ] as $migration) {
         (require database_path('migrations/'.$migration))->up();
     }
@@ -36,6 +37,67 @@ beforeEach(function () {
 
 afterEach(function () {
     Carbon::setTestNow();
+});
+
+function cooperationInvoice($test, string $number): Invoice
+{
+    return Invoice::create([
+        'customer_purchase_order_id' => $test->po->id, 'number' => $number,
+        'invoice_date' => '2026-09-29', 'due_date' => '2026-10-29',
+        'customer_name' => 'PT Maju Jaya', 'customer_address' => 'Makassar', 'item_name' => 'Gracilaria Kering',
+        'quantity_kg' => 2000, 'price_per_kg' => 13000, 'payment_status' => 'unpaid',
+    ]);
+}
+
+it('settles invoices using cash plus cooperation deduction without repeating the deduction on later installments', function () {
+    $invoice = cooperationInvoice($this, 'INV-KERJASAMA');
+    $this->postJson(route('invoice.pay', $invoice), [
+        'invoice_id' => $invoice->id, 'payment_date' => '2026-10-06', 'amount' => 9000000,
+        'cooperation_deduction' => 1000000, 'cooperation_notes' => 'Bagian mitra sesuai kesepakatan',
+    ])->assertOk();
+    $invoice->refresh()->load('payments');
+    expect((int) $invoice->paid_amount)->toBe(10000000)
+        ->and($invoice->remaining_amount)->toBe(16000000)
+        ->and($invoice->cash_received_amount)->toBe(9000000)
+        ->and($invoice->cooperation_deduction_amount)->toBe(1000000)
+        ->and($invoice->payment_status)->toBe('partial')
+        ->and($invoice->payments->sole()->settlement_amount)->toBe(10000000);
+    $first = $invoice->payments->sole();
+    $this->postJson(route('invoice.pay', $invoice), [
+        'invoice_id' => $invoice->id, 'payment_date' => '2026-10-06', 'amount' => 16000000,
+    ])->assertOk();
+    expect($invoice->refresh()->payment_status)->toBe('paid')
+        ->and($invoice->remaining_amount)->toBe(0)
+        ->and($invoice->cooperation_deduction_amount)->toBe(1000000)
+        ->and($invoice->cash_received_amount)->toBe(25000000)
+        ->and((int) $invoice->total_amount)->toBe(26000000);
+    $this->deleteJson(route('invoice.payment.destroy', $first))->assertOk();
+    expect($invoice->refresh()->payment_status)->toBe('partial')
+        ->and($invoice->remaining_amount)->toBe(10000000)
+        ->and($invoice->cooperation_deduction_amount)->toBe(0)
+        ->and($invoice->cash_received_amount)->toBe(16000000);
+});
+
+it('rejects excessive negative or unexplained cooperation deductions and empty settlements', function () {
+    $invoice = cooperationInvoice($this, 'INV-KERJASAMA-INVALID');
+    $base = ['invoice_id' => $invoice->id, 'payment_date' => '2026-10-06', 'amount' => 25000000];
+    $this->postJson(route('invoice.pay', $invoice), $base + ['cooperation_deduction' => -1])->assertUnprocessable();
+    $this->postJson(route('invoice.pay', $invoice), $base + ['cooperation_deduction' => 1])->assertUnprocessable()->assertJsonValidationErrors('cooperation_notes');
+    $this->postJson(route('invoice.pay', $invoice), $base + ['cooperation_deduction' => 2000000, 'cooperation_notes' => 'Mitra'])->assertUnprocessable();
+    $this->postJson(route('invoice.pay', $invoice), array_replace($base, ['amount' => 0]))->assertUnprocessable();
+    expect(InvoicePayment::count())->toBe(0)->and($invoice->refresh()->remaining_amount)->toBe(26000000);
+});
+
+it('supports a documented settlement entirely deducted for cooperation and enforces cancellation access', function () {
+    $invoice = cooperationInvoice($this, 'INV-KERJASAMA-FULL');
+    $this->postJson(route('invoice.pay', $invoice), [
+        'invoice_id' => $invoice->id, 'payment_date' => '2026-10-06', 'amount' => 0,
+        'cooperation_deduction' => 26000000, 'cooperation_notes' => 'Seluruh pencairan dialokasikan ke mitra',
+    ])->assertOk();
+    expect($invoice->refresh()->payment_status)->toBe('paid')->and($invoice->cash_received_amount)->toBe(0);
+    auth()->user()->revokePermissionTo('invoice.update');
+    $this->deleteJson(route('invoice.payment.destroy', InvoicePayment::sole()))->assertForbidden();
+    expect(InvoicePayment::count())->toBe(1);
 });
 
 it('records partial invoice payments without marking paid before the balance is cleared', function () {

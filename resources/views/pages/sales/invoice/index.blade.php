@@ -61,13 +61,15 @@
         <x-slot:total>
             <div class="text-right text-sm">
                 <div class="text-right tabular-nums font-medium text-gray-900 dark:text-gray-300" x-text="Number(item.total_amount).toLocaleString('id-ID', {style: 'currency', currency: 'IDR'})"></div>
-                <div class="text-xs text-gray-500" x-show="item.paid_amount > 0" x-text="'Dibayar: Rp ' + Number(item.paid_amount).toLocaleString('id-ID')"></div>
+                <div class="text-xs text-gray-500" x-show="item.paid_amount > 0" x-text="'Uang diterima: Rp ' + Number(item.cash_received_amount).toLocaleString('id-ID')"></div>
+                <div class="text-xs text-gray-500" x-show="item.cooperation_deduction_amount > 0" x-text="'Potongan kerja sama: Rp ' + Number(item.cooperation_deduction_amount).toLocaleString('id-ID')"></div>
                 <div class="text-xs text-gray-500" x-show="item.remaining_amount > 0" x-text="'Sisa: Rp ' + Number(item.remaining_amount).toLocaleString('id-ID')"></div>
             </div>
         </x-slot:total>
         <x-slot:due><div><span x-text="formatDisplayDate(item.due_date)"></span><p class="text-xs" :class="item.payment_status !== 'paid' && item.days_until_due < 0 ? 'text-rose-600' : 'text-gray-500'" x-text="item.due_label"></p><p class="text-xs text-gray-500" x-text="'Termin ' + item.term_days + ' hari'"></p></div></x-slot:due>
         <x-slot:action>
             <div class="flex flex-wrap items-center gap-1.5">
+                <button type="button" @click="$dispatch('open-invoice-payment-history', item)" class="rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs dark:text-gray-300">Riwayat Pencairan</button>
                 
 @can('invoice.update')
 <button type="button" x-show="item.payment_status !== 'paid'" @click="$dispatch('open-invoice-payment', item)" class="rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs text-white">Bayar</button>
@@ -106,4 +108,5 @@
         <x-delete-modal name="delete-entity-modal" message="Yakin ingin menghapus invoice ini?" @confirm-delete-delete-entity-modal.window="remove" />
     </div>
     @include('pages.sales.invoice._payment-modal')
+    @include('pages.sales.invoice._payment-history-modal')
 @endsection

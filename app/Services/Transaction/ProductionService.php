@@ -19,6 +19,7 @@ class ProductionService
 {
     public function recordDaily(array $data, User $user): ProductionRun
     {
+        if (count($data['sources']) !== 1) $this->fail('sources', 'Satu WIP hanya boleh mengambil dari satu area sumber.');
         return DB::transaction(function () use ($data, $user) {
             $inputs = [];
             foreach (collect($data['sources'])->sortBy('warehouse_area_id') as $source) {
@@ -48,6 +49,7 @@ class ProductionService
                 'inputs' => $inputs, 'warehouse_only' => true, 'daily_record' => true,
             ], $user);
             $this->complete($run, $data['date']);
+            if ($data['start_wip'] ?? false) return $run;
             return $this->pack($run, ['packed_date' => $data['date'], 'outputs' => $data['outputs']]);
         });
     }
@@ -81,6 +83,9 @@ class ProductionService
             if ($inputs->isEmpty() || $inputs->pluck('material_batch_id')->unique()->count() !== $inputs->count()) {
                 $this->fail('inputs', 'Isi batch berbeda untuk setiap baris.');
             }
+            if (MaterialBatch::whereIn('id', $inputs->pluck('material_batch_id'))->with('line')->get()->pluck('line.warehouse_area_id')->unique()->count() !== 1) {
+                $this->fail('inputs', 'Satu WIP hanya boleh mengambil dari satu area sumber.');
+            }
             $run = ProductionRun::create(['started_date' => $data['started_date'], 'warehouse_area_id' => $area->id, 'pic' => $data['pic'],
                 'work_type' => $data['work_type'], 'notes' => $data['notes'] ?? null, 'processing_cost_cents' => $warehouseOnly ? 0 : AccountingMoney::cents($data['processing_cost'] ?? '0'),
                 'warehouse_only' => $warehouseOnly,
@@ -92,6 +97,9 @@ class ProductionService
             $cost = 0;
             foreach ($inputs as $input) {
                 $batch = MaterialBatch::with('line.receipt.harvest')->lockForUpdate()->findOrFail($input['material_batch_id']);
+                if (($data['daily_record'] ?? false) && (int) $batch->line->warehouse_area_id !== (int) $area->id) {
+                    $this->fail('inputs', 'Semua bahan WIP harus berasal dari satu area sumber.');
+                }
                 $taken = (int) $input['sack_count'];
                 if (! $warehouseOnly && (! $batch->is_costed || ! $batch->line->receipt->harvest_transaction_id)) {
                     $this->fail('inputs', 'Penerimaan '.$batch->line->receipt->number.' harus terhubung ke pembelian dengan harga yang sudah ditetapkan oleh keuangan sebelum bahan diproses.');
@@ -120,7 +128,7 @@ class ProductionService
                     'weight_kg' => $reference / 100, 'sack_count' => $taken, 'cost_cents' => $inputCost, 'balance_after_kg' => $inventory->current_stock_kg,
                     'description' => 'Bahan ke proses '.$run->number.' / '.$batch->code.' (alokasi berat datang, bukan timbang hasil)']);
                 app(MovementLocationService::class)->record($movement, $batch->line->area,
-                    $reference / 100, $taken, $batch->code, $batch->line->grade?->name, $area->name);
+                    $reference / 100, $taken, $batch->code, $batch->line->grade?->name, ($data['daily_record'] ?? false) ? 'WIP '.$run->number : $area->name);
                 $weight += $reference;
                 $sacks += $taken;
                 $cost += $inputCost;
@@ -148,6 +156,7 @@ class ProductionService
 
     public function pack(ProductionRun $run, array $data): ProductionRun
     {
+        if ($run->wip_mode) $this->fail('production', 'Gunakan pemindahan WIP dengan jumlah karung bahan selesai.');
         return DB::transaction(function () use ($run, $data) {
             $run = ProductionRun::lockForUpdate()->findOrFail($run->id);
             if ($run->status !== 'wip' || $run->outputs()->exists()) {
@@ -204,8 +213,14 @@ class ProductionService
             ->where('remaining_weight_kg', '>', 0)->where('remaining_packages', '>', 0)
             ->whereHas('grade', fn ($q) => $q->where('is_active', true))
             ->whereHas('area', fn ($q) => $q->where('is_active', true)->where('usage', 'finished'))
-            ->whereHas('run', fn ($q) => $q->where('status', 'packed')->whereDate('packed_date', '<=', $date))
-            ->orderBy(ProductionRun::select('packed_date')->whereColumn('production_runs.id', 'finished_batches.production_run_id'))
+            ->whereHas('run', fn ($q) => $q->hasReadyOutputs())
+            ->where(function ($q) use ($date) {
+                $q->whereHas('run', fn ($run) => $run->where('status', 'packed')->whereDate('packed_date', '<=', $date));
+                if (\Illuminate\Support\Facades\Schema::hasTable('wip_transfers')) {
+                    $q->orWhereHas('transfer', fn ($transfer) => $transfer->whereDate('transfer_date', '<=', $date));
+                }
+            })
+            ->orderByRaw('COALESCE((SELECT MIN(movement_date) FROM stock_movements WHERE stock_movements.finished_batch_id = finished_batches.id AND direction = ?), (SELECT packed_date FROM production_runs WHERE production_runs.id = finished_batches.production_run_id))', ['in'])
             ->orderBy('id')->lockForUpdate()->get();
         $remaining = (int) round($weight * 100);
         $parts = [];
@@ -243,12 +258,12 @@ class ProductionService
     public function consumeFinished(int $batchId, int $inventoryId, float $weight, int $packages, string $date): array
     {
         $batch = FinishedBatch::with(['run', 'area', 'grade'])->lockForUpdate()->findOrFail($batchId);
-        if (! $batch->area?->is_active || $batch->area->usage !== 'finished' || ($batch->production_run_id && $batch->run?->status !== 'packed')) {
+        if (! $batch->area?->is_active || $batch->area->usage !== 'finished' || ($batch->production_run_id && $batch->run?->status !== 'packed' && !($batch->wip_transfer_id && $batch->run?->wip_mode))) {
             $this->fail('finished_batch_id', 'Area barang ready nonaktif atau tidak sesuai.');
         }
         $kg = (int) round($weight * 100);
         $remaining = (int) round($batch->remaining_weight_kg * 100);
-        $availableDate = $batch->run?->packed_date?->format('Y-m-d')
+        $availableDate = ($batch->wip_transfer_id ? $batch->transfer?->transfer_date?->format('Y-m-d') : $batch->run?->packed_date?->format('Y-m-d'))
             ?? StockMovement::where('finished_batch_id', $batch->id)->where('direction', 'in')->min('movement_date')
             ?? $batch->created_at->format('Y-m-d');
         $this->date($date, $availableDate);

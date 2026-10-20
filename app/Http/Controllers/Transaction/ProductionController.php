@@ -10,6 +10,7 @@ use Illuminate\Validation\Rule;
 use App\Models\ProductionRun;
 use App\Models\WarehouseArea;
 use App\Services\Transaction\ProductionService;
+use App\Services\Transaction\WipService;
 use Illuminate\Http\Request;
 
 class ProductionController extends Controller
@@ -18,13 +19,15 @@ class ProductionController extends Controller
 
     public function index(Request $request)
     {
-        $filters = $request->validate(['status' => 'nullable|in:processing,wip,packed']);
+        $filters = $request->validate(['status' => 'nullable|in:processing,wip,packed', 'source_area_id' => 'nullable|integer|exists:warehouse_areas,id']);
 
         return view('pages.transaction.production.index', [
             'status' => $filters['status'] ?? '',
             'areaLabels' => $this->areaLabels(),
             'activities' => Schema::hasTable('area_activities') ? AreaActivity::with('area')->orderByDesc('activity_date')->orderByDesc('id')->paginate(20, ['*'], 'activities_page')->withQueryString() : null,
             'runs' => ProductionRun::with(['area', 'inputs.batch.line.area', 'outputs.area'])
+                ->when(Schema::hasTable('wip_transfers'), fn ($query) => $query->with('transfers.outputs.area'))
+                ->when($filters['source_area_id'] ?? null, fn ($query, $id) => $query->whereHas('inputs.batch.line', fn ($line) => $line->where('warehouse_area_id', $id)))
                 ->where('work_type', '!=', 'Stok Awal')
                 ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
                 ->latest('id')->paginate(20)->withQueryString(),
@@ -90,10 +93,23 @@ class ProductionController extends Controller
 
     public function store(Request $request)
     {
+        if ($request->has('source_area_id')) {
+            $data = $request->validate([
+                'token' => 'required|uuid',
+                'date' => 'required|date_format:Y-m-d|before_or_equal:today',
+                'source_area_id' => ['required', 'integer', Rule::exists('warehouse_areas', 'id')->where('usage', 'receiving')->where('is_active', true)],
+                'sack_count' => 'required|integer|min:1|max:1000000',
+                'work_type' => 'required|string|max:255', 'pic' => 'required|string|max:255',
+                'notes' => 'nullable|string|max:2000', 'confirm' => 'required|accepted',
+                'sources' => 'prohibited', 'inputs' => 'prohibited', 'outputs' => 'prohibited',
+            ]);
+            $run = app(WipService::class)->start($data, $request->user());
+            return redirect()->route('produksi.show', $run)->with('success', 'Bahan dari area sumber dipindahkan ke WIP. Hasil jadi dicatat saat pemindahan ke area ready.');
+        }
         if ($request->has('sources')) {
             $data = $request->validate([
                 'date' => 'required|date_format:Y-m-d|before_or_equal:today', 'notes' => 'nullable|string|max:2000',
-                'sources' => 'required|array|min:1|max:50',
+                'sources' => 'required|array|size:1',
                 'sources.*.warehouse_area_id' => 'required|integer|distinct|exists:warehouse_areas,id',
                 'sources.*.sack_count' => 'required|integer|min:1|max:1000000',
                 'outputs' => 'required|array|min:1|max:50',
@@ -115,6 +131,7 @@ class ProductionController extends Controller
 
     public function show(Request $request, ProductionRun $produksi)
     {
+        if ($produksi->wip_mode) $produksi->load('sourceArea', 'transfers.outputs.area');
         return view($request->header('X-Warehouse-Detail') === 'modal' ? 'pages.transaction.production._detail' : 'pages.transaction.production.show', ['run' => $produksi->load(['inputs.batch.line.receipt.farmer', 'inputs.batch.line.area', 'outputs.grade', 'outputs.area', 'journals']),
             'areaLabels' => $this->areaLabels(),
             'areas' => WarehouseArea::query()->where('usage', 'finished')->where('is_active', true)->get(),
@@ -131,6 +148,18 @@ class ProductionController extends Controller
 
     public function pack(Request $request, ProductionRun $produksi)
     {
+        if ($produksi->wip_mode) {
+            $data = $request->validate([
+                'token' => 'required|uuid', 'packed_date' => 'required|date_format:Y-m-d|before_or_equal:today',
+                'source_sacks' => 'required|integer|min:1|max:1000000', 'notes' => 'nullable|string|max:2000',
+                'outputs' => 'required|array|min:1|max:50',
+                'outputs.*.warehouse_area_id' => 'required|integer|exists:warehouse_areas,id',
+                'outputs.*.weight_kg' => 'required|numeric|min:0.01|max:999999999.99|decimal:0,2',
+                'outputs.*.package_count' => 'required|integer|min:1|max:1000000', 'confirm' => 'required|accepted',
+            ]);
+            app(WipService::class)->transfer($produksi, $data, $request->user());
+            return redirect()->route('produksi.show', $produksi)->with('success', 'Pemindahan WIP ke area jadi dicatat beserta hasil timbang dan selisih berat.');
+        }
         $data = $request->validate(['packed_date' => 'required|date_format:Y-m-d', 'packing_cost' => $produksi->warehouse_only ? 'prohibited' : 'required|numeric|min:0|max:9999999999|decimal:0,2',
             'outputs' => 'required|array|min:1|max:50', 'outputs.*.warehouse_area_id' => 'required|integer|exists:warehouse_areas,id',
             'outputs.*.quality_grade_id' => 'nullable|integer|exists:quality_grades,id', 'outputs.*.weight_kg' => 'required|numeric|min:0.01|max:999999999.99|decimal:0,2',

@@ -37,6 +37,7 @@ class OperationalAccountingService
         '42102' => ['Pendapatan Lain-lain', 'Pendapatan', 'Pendapatan Lainnya', 'Kredit'],
         '51103' => ['Harga Pokok Penjualan Barang Jadi Rumput Laut', 'Biaya', 'Harga Pokok Penjualan', 'Debit'],
         '54102' => ['Biaya Lain-lain', 'Biaya', 'Biaya Lainnya', 'Debit'],
+        '52113' => ['Biaya Kerja Sama Penjualan', 'Biaya', 'Biaya Operasional', 'Debit'],
     ];
 
     public function enabled(): bool
@@ -156,13 +157,15 @@ class OperationalAccountingService
         if ($invoice) {
             foreach ($invoice->payments()->orderBy('payment_date')->orderBy('id')->lockForUpdate()->get() as $payment) {
                 $amount = (int) $payment->amount * 100;
-                $againstReceivable = min($amount, $receivable);
+                $deduction = (int) $payment->cooperation_deduction * 100;
+                $settlement = $amount + $deduction;
+                $againstReceivable = min($settlement, $receivable);
                 $receivable -= $againstReceivable;
                 if ($missingOnly && ! $this->needsRecovery($payment, 'invoice-payment', $payment->payment_date->format('Y-m-d'))) {
                     continue;
                 }
                 $this->record($payment, 'invoice-payment', $payment->payment_date->format('Y-m-d'), 'Pembayaran '.$invoice->number,
-                    [['11101', $amount, 0], ['11202', 0, $againstReceivable], ['21201', 0, $amount - $againstReceivable]]);
+                    [['11101', $amount, 0], ['52113', $deduction, 0], ['11202', 0, $againstReceivable], ['21201', 0, $settlement - $againstReceivable]]);
             }
         } elseif ((int) $sale->paid_amount > 0) {
             if ($missingOnly && ! $this->needsRecovery($sale, 'sale-payment', $sale->payment_date->format('Y-m-d'))) {

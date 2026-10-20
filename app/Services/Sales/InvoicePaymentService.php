@@ -22,8 +22,15 @@ class InvoicePaymentService
                 throw \Illuminate\Validation\ValidationException::withMessages(['invoice_id' => 'Hubungkan invoice dengan transaksi penjualan terlebih dahulu agar pembayaran tercatat pada jurnal yang benar.']);
             }
             $amount = $this->normalizeAmount($data['amount']);
-            if ($amount <= 0) {
-                throw new Exception('Jumlah pembayaran harus minimal Rp 1.');
+            $deduction = $this->normalizeAmount($data['cooperation_deduction'] ?? 0);
+            if ($deduction > 0 && ! \Illuminate\Support\Facades\Schema::hasColumn('invoice_payments', 'cooperation_deduction')) {
+                throw new Exception('Jalankan migrasi potongan kerja sama sebelum mencatat potongan.');
+            }
+            if ($amount < 0 || $deduction < 0 || $amount + $deduction < 1) {
+                throw new Exception('Uang diterima dan potongan kerja sama harus tidak negatif, dengan total minimal Rp 1.');
+            }
+            if ($deduction > 0 && trim($data['cooperation_notes'] ?? '') === '') {
+                throw new Exception('Isi keterangan potongan kerja sama.');
             }
             if (Carbon::parse($data['payment_date'])->startOfDay()->lt($invoice->invoice_date->startOfDay())) {
                 throw new Exception('Tanggal pembayaran tidak boleh sebelum tanggal invoice.');
@@ -35,8 +42,8 @@ class InvoicePaymentService
                 throw new Exception('Invoice ini sudah lunas.');
             }
 
-            if ($amount > $remaining) {
-                throw new Exception('Jumlah pembayaran tidak boleh melebihi sisa tagihan sebesar Rp '.number_format($remaining, 0, ',', '.').'.');
+            if ($amount + $deduction > $remaining) {
+                throw new Exception(($deduction > 0 ? 'Uang diterima dan potongan kerja sama' : 'Jumlah pembayaran').' tidak boleh melebihi sisa tagihan sebesar Rp '.number_format($remaining, 0, ',', '.').'.');
             }
 
             $payment = InvoicePayment::create([
@@ -44,9 +51,13 @@ class InvoicePaymentService
                 'payment_date' => $data['payment_date'],
                 'amount' => $amount,
                 'notes' => $data['notes'] ?? null,
+                // These columns are optional only for legacy zero-deduction installations.
+                ...(\Illuminate\Support\Facades\Schema::hasColumn('invoice_payments', 'cooperation_deduction') ? [
+                    'cooperation_deduction' => $deduction, 'cooperation_notes' => $deduction > 0 ? trim($data['cooperation_notes']) : null,
+                ] : []),
             ]);
 
-            $paidAmount = $this->paidAmount($invoice) + $amount;
+            $paidAmount = $this->paidAmount($invoice) + $amount + $deduction;
             $invoice->update([
                 'paid_amount' => $paidAmount,
                 'payment_status' => $paidAmount >= $totalAmount ? 'paid' : 'partial',
@@ -67,7 +78,7 @@ class InvoicePaymentService
             $payment = InvoicePayment::lockForUpdate()->findOrFail($payment->id);
             $invoice = Invoice::lockForUpdate()->findOrFail($payment->invoice_id);
 
-            $paidAmount = max(0, $this->paidAmount($invoice) - $payment->amount);
+            $paidAmount = max(0, $this->paidAmount($invoice) - $payment->settlement_amount);
 
             app(OperationalAccountingService::class)->cancel($payment, 'invoice-payment');
             $payment->delete();

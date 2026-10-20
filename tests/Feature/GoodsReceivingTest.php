@@ -151,7 +151,7 @@ it('shows and saves daily production with create access without separate confirm
     foreach (['production.read', 'production.create'] as $name) {
         $user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate($name, 'web'));
     }
-    $this->actingAs($user)->get(route('produksi.index'))->assertOk()->assertSee('Catat Proses Harian');
+    $this->actingAs($user)->get(route('produksi.index'))->assertOk()->assertSee('Mulai WIP');
     $this->get(route('produksi.create'))->assertOk();
     expect($user->can('production.confirm'))->toBeFalse();
     $this->post(route('produksi.store'), ['date' => '2026-10-07',
@@ -171,6 +171,129 @@ function prepareOpeningStockSchema(): void
     }
     (new \Database\Seeders\WarehouseLocationSeeder)->run();
 }
+
+function prepareTrackedWip($test): array
+{
+    prepareOpeningStockSchema();
+    (require database_path('migrations/2026_10_20_000001_add_tracked_wip_transfers.php'))->up();
+    (require database_path('migrations/2026_10_15_000001_create_stock_movement_locations.php'))->up();
+    $test->area->update(['name' => 'Area A']);
+    $ready = WarehouseArea::where('usage', 'finished')->firstOrFail();
+    $ready->update(['name' => 'Area 4']);
+    app(\App\Services\Transaction\OpeningStockService::class)->save([
+        'token' => (string) \Illuminate\Support\Str::uuid(), 'stock_date' => '2026-10-06', 'usage' => 'receiving',
+        'items' => [['warehouse_area_id' => $test->area->id, 'weight_kg' => 5000, 'package_count' => 100]],
+    ], $test->user);
+    return [$ready, ['token' => (string) \Illuminate\Support\Str::uuid(), 'date' => '2026-10-07',
+        'source_area_id' => $test->area->id, 'sack_count' => 30, 'work_type' => 'Jemur', 'pic' => 'Operator', 'confirm' => 1]];
+}
+
+it('tracks a single source WIP through partial transfers shrinkage and final completion', function () {
+    [$ready, $start] = prepareTrackedWip($this);
+    $this->postJson(route('produksi.store'), $start)->assertRedirect()->assertSessionHasNoErrors();
+    $run = \App\Models\ProductionRun::where('wip_mode', true)->sole();
+    expect($run->status)->toBe('wip')->and((int) $run->source_area_id)->toBe($this->area->id)
+        ->and($run->remaining_wip_sacks)->toBe(30)
+        ->and((int) MaterialBatch::sum('remaining_sacks'))->toBe(70)
+        ->and((float) $this->inventory->refresh()->current_stock_kg)->toBe(3500.0);
+    $this->postJson(route('produksi.store'), $start)->assertUnprocessable();
+    $page = $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Di WIP dari Area A: 30 karung');
+    expect($page->viewData('wipSacks'))->toBe(30);
+    $this->get(route('produksi.show', $run))->assertOk()->assertSee('WIP dari Area A')->assertSee('Belum ada pemindahan');
+    $payload = ['token' => (string) \Illuminate\Support\Str::uuid(), 'packed_date' => '2026-10-07', 'source_sacks' => 10,
+        'outputs' => [['warehouse_area_id' => $ready->id, 'weight_kg' => 400, 'package_count' => 8]], 'confirm' => 1];
+    $this->post(route('produksi.pack', $run), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    $run->refresh();
+    $transfer = $run->transfers()->sole();
+    expect($run->status)->toBe('wip')->and($run->remaining_wip_sacks)->toBe(20)
+        ->and($transfer->shrinkage_kg)->toBe(100.0)
+        ->and((float) $ready->inventory->refresh()->current_stock_kg)->toBe(400.0);
+    $finished = $transfer->outputs()->sole();
+    expect(\App\Models\FinishedBatch::readyForSale()->whereKey($finished->id)->exists())->toBeTrue();
+    // Completed output can be consumed before the rest of its WIP is finished.
+    \Illuminate\Support\Facades\DB::transaction(fn () => app(\App\Services\Transaction\ProductionService::class)
+        ->consumeFinished($finished->id, $ready->inventory_id, 50, 1, '2026-10-07'));
+    expect((float) $finished->refresh()->remaining_weight_kg)->toBe(350.0);
+    expect($finished->stockMovements()->sole()->locations()->count())->toBe(1);
+    $this->postJson(route('produksi.pack', $run), $payload)->assertUnprocessable();
+    expect($run->transfers()->count())->toBe(1);
+    $page = $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Di WIP dari Area A: 20 karung');
+    expect($page->viewData('wipByArea')[$this->area->id]['completed_sacks'])->toBe(10)
+        ->and((float) $page->viewData('wipByArea')[$this->area->id]['shrinkage'])->toBe(100.0);
+    $this->get(route('produksi.show', $run))->assertOk()->assertSee('Area 4')->assertSee('100,00');
+    $payload['token'] = (string) \Illuminate\Support\Str::uuid();
+    $payload['source_sacks'] = 20;
+    $payload['outputs'][0]['weight_kg'] = 800;
+    $payload['outputs'][0]['package_count'] = 16;
+    $this->post(route('produksi.pack', $run), $payload)->assertRedirect()->assertSessionHasNoErrors();
+    expect($run->refresh()->status)->toBe('packed')->and($run->remaining_wip_sacks)->toBe(0)
+        ->and((float) $run->transfers()->sum('reference_weight_kg'))->toBe(1500.0)
+        ->and((float) $run->outputs()->sum('weight_kg'))->toBe(1200.0);
+    $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Di WIP dari Area A: 0 karung');
+    $this->get(route('produksi.index'))->assertOk()->assertSee('Sisa WIP: 0 karung');
+    $payload['token'] = (string) \Illuminate\Support\Str::uuid();
+    $this->postJson(route('produksi.pack', $run), $payload)->assertUnprocessable();
+});
+
+it('rejects mixed WIP sources insufficient stock invalid destinations and excess completion atomically', function () {
+    [$ready, $start] = prepareTrackedWip($this);
+    $invalid = $start;
+    $invalid['sources'] = [['warehouse_area_id' => $this->area->id, 'sack_count' => 1]];
+    $this->postJson(route('produksi.store'), $invalid)->assertUnprocessable();
+    $invalid = $start;
+    $invalid['sack_count'] = 101;
+    $this->postJson(route('produksi.store'), $invalid)->assertUnprocessable();
+    $invalid = $start;
+    $invalid['source_area_id'] = $ready->id;
+    $this->postJson(route('produksi.store'), $invalid)->assertUnprocessable();
+    expect((int) MaterialBatch::sum('remaining_sacks'))->toBe(100);
+    $this->post(route('produksi.store'), $start)->assertSessionHasNoErrors();
+    $run = \App\Models\ProductionRun::where('wip_mode', true)->sole();
+    $payload = ['token' => (string) \Illuminate\Support\Str::uuid(), 'packed_date' => '2026-10-07', 'source_sacks' => 31,
+        'outputs' => [['warehouse_area_id' => $ready->id, 'weight_kg' => 400, 'package_count' => 8]], 'confirm' => 1];
+    $this->postJson(route('produksi.pack', $run), $payload)->assertUnprocessable();
+    $payload['source_sacks'] = 10;
+    $payload['outputs'][] = ['warehouse_area_id' => $this->area->id, 'weight_kg' => 50, 'package_count' => 1];
+    $this->postJson(route('produksi.pack', $run), $payload)->assertUnprocessable();
+    expect($run->transfers()->count())->toBe(0)->and($run->outputs()->count())->toBe(0)
+        ->and($run->refresh()->remaining_wip_sacks)->toBe(30)
+        ->and((float) $ready->inventory->refresh()->current_stock_kg)->toBe(0.0);
+    $payload['outputs'] = [$payload['outputs'][0]];
+    $payload['packed_date'] = '2026-10-06';
+    $this->postJson(route('produksi.pack', $run), $payload)->assertUnprocessable();
+    $payload['packed_date'] = '2026-10-08';
+    $this->postJson(route('produksi.pack', $run), $payload)->assertUnprocessable();
+});
+
+it('exhausts rounded WIP allocations exactly across multiple transfer dates and destinations', function () {
+    Carbon::setTestNow(Carbon::parse('2026-10-09 12:00:00', 'Asia/Jakarta'));
+    [$ready, $start] = prepareTrackedWip($this);
+    MaterialBatch::sole()->update(['remaining_weight_kg' => 100.01, 'remaining_cost_cents' => 10001]);
+    $this->inventory->update(['current_stock_kg' => 100.01]);
+    $start['sack_count'] = 100;
+    $this->post(route('produksi.store'), $start)->assertSessionHasNoErrors();
+    $run = \App\Models\ProductionRun::where('wip_mode', true)->sole();
+    $otherReady = WarehouseArea::where('usage', 'finished')->whereKeyNot($ready->id)->firstOrFail();
+    foreach ([33, 33, 34] as $index => $sacks) {
+        $payload = ['token' => (string) \Illuminate\Support\Str::uuid(), 'packed_date' => sprintf('2026-10-%02d', 7 + $index), 'source_sacks' => $sacks,
+            'outputs' => [['warehouse_area_id' => $ready->id, 'weight_kg' => 15, 'package_count' => 1],
+                ['warehouse_area_id' => $otherReady->id, 'weight_kg' => $index === 2 ? 16 : 15, 'package_count' => 1]], 'confirm' => 1];
+        $this->post(route('produksi.pack', $run), $payload)->assertRedirect()->assertSessionHasNoErrors();
+        if ($index === 0) {
+            app(\App\Services\Transaction\AreaStockTransferService::class)->transfer([
+                'source_kind' => 'area', 'from_id' => $ready->id, 'to_area_id' => $otherReady->id,
+                'usage' => 'finished', 'weight_kg' => 15, 'sack_count' => 1,
+                'transfer_date' => '2026-10-07', 'description' => 'Pindah hasil yang sudah selesai',
+            ]);
+        }
+    }
+    expect($run->refresh()->status)->toBe('packed')
+        ->and(round((float) $run->transfers()->sum('reference_weight_kg'), 2))->toBe(100.01)
+        ->and($run->transfers()->orderBy('id')->get()->map(fn ($transfer) => (float) $transfer->reference_weight_kg)->all())->toBe([33.0, 33.01, 34.0])
+        ->and((float) $run->transfers()->sum('output_weight_kg'))->toBe(91.0)
+        ->and($run->transfers->load('outputs')->sum(fn ($transfer) => $transfer->outputs->count()))->toBe(6)
+        ->and((int) \App\Models\FinishedBatch::sum('remaining_cost_cents'))->toBe(10001);
+});
 
 it('records opening receiving stock without a purchase and prevents repeated submission', function () {
     prepareOpeningStockSchema();
@@ -286,7 +409,7 @@ it('records daily area transfers atomically and allocates oldest received stock 
         'sources' => [['warehouse_area_id' => $this->area->id, 'sack_count' => 5]],
         'outputs' => [['warehouse_area_id' => $this->area->id, 'weight_kg' => 80, 'package_count' => 2]],
     ];
-    $this->get(route('produksi.create'))->assertOk()->assertSee('Area 1')->assertSee('Area D')->assertDontSee('Batch sumber');
+    $this->get(route('produksi.create'))->assertOk()->assertSee('Area 1')->assertSee('Pilih satu area penerimaan')->assertDontSee('Batch sumber');
     $this->postJson(route('produksi.store'), $payload)->assertUnprocessable();
     expect(\App\Models\ProductionRun::count())->toBe(0)
         ->and((int) MaterialBatch::sum('remaining_sacks'))->toBe(8)
@@ -307,7 +430,7 @@ it('records daily area transfers atomically and allocates oldest received stock 
         ->and((float) $dashboard->viewData('packedWeight'))->toBe(80.0)
         ->and((float) $dashboard->viewData('finishedWeight'))->toBe(80.0)
         ->and((int) $dashboard->viewData('finishedPackages'))->toBe(2)
-        ->and($dashboard->viewData('stageCounts')['process'])->toBe(1);
+        ->and($dashboard->viewData('stageCounts')['process'])->toBe(0);
     $this->postJson(route('produksi.store'), $payload)->assertUnprocessable();
     expect(\App\Models\ProductionRun::count())->toBe(1);
 });
@@ -420,7 +543,7 @@ it('separates purchasing from physical receiving and prevents a second receipt f
 it('shows clickable warehouse stages and farmer receiving history without guessing production figures', function () {
     $this->post(route('penerimaan-barang.store'), $this->payload)->assertRedirect();
     $this->post(route('penerimaan-barang.confirm', GoodsReceipt::first()), ['confirm' => 1])->assertRedirect();
-    $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Penerimaan')->assertSee('Proses Harian')->assertSee('Bahan Siap Jual')->assertDontSee('Saldo Gudang Lama');
+    $this->get(route('manajemen-gudang.index'))->assertOk()->assertSee('Penerimaan')->assertSee('WIP')->assertSee('Bahan Siap Jual')->assertDontSee('Saldo Gudang Lama');
     $this->get(route('manajemen-gudang.stage', 'incoming'))->assertOk()->assertSee('Petani Test')->assertDontSee('>Kualitas<', false)->assertSee('3.386,00');
     foreach (['process', 'wip', 'press', 'finished'] as $stage) {
         $this->get(route('manajemen-gudang.stage', $stage))->assertOk()->assertSee('Belum ada')->assertDontSee('Pencatatan tahap ini belum tersedia');
@@ -558,7 +681,7 @@ it('shows warehouse dashboard first and moves income and expenses under finance'
     $this->user->givePermissionTo('receiving.read');
     $this->get(route('manajemen-gudang.index', ['inventory_id' => $this->inventory->id]))->assertOk()
         ->assertSee('Dashboard Gudang')->assertSee('Penerimaan sampai Siap Jual')
-        ->assertSee('Penerimaan')->assertSee('Proses Harian')->assertSee('Bahan Siap Jual');
+        ->assertSee('Penerimaan')->assertSee('WIP')->assertSee('Bahan Siap Jual');
     $menus = SidebarService::getSidebarMenu();
     expect($menus->firstWhere('name', 'Manajemen Gudang')->children->pluck('name')->all())->toContain('Dashboard Gudang');
 });
@@ -800,6 +923,31 @@ it('preserves old purchase journals and prevents legacy double payment', functio
 });
 
 
+it('classifies letter and numbered areas by master usage regardless of names and code prefixes', function () {
+    prepareOpeningStockSchema();
+    $this->area->update(['code' => 'BJ-CUSTOM', 'name' => 'Area A']);
+    $ready = WarehouseArea::where('usage', 'finished')->firstOrFail();
+    $ready->update(['code' => 'BM-CUSTOM', 'name' => 'Area 4']);
+
+    $this->get(route('area-barang-masuk.index'))->assertOk()
+        ->assertSee('Area A')->assertDontSee('Area 4');
+    $this->get(route('area-barang-ready.index'))->assertOk()
+        ->assertSee('Area 4')->assertDontSee('Area A');
+    $this->get(route('penerimaan-barang.create'))->assertOk()
+        ->assertSee('BJ-CUSTOM')->assertDontSee('BM-CUSTOM');
+    $production = $this->get(route('produksi.create'))->assertOk();
+    expect($production->viewData('areas')->pluck('id')->contains($this->area->id))->toBeTrue()
+        ->and($production->viewData('areas')->pluck('id')->contains($ready->id))->toBeFalse()
+        ->and($production->viewData('finishedAreas')->pluck('id')->contains($ready->id))->toBeTrue()
+        ->and($production->viewData('finishedAreas')->pluck('id')->contains($this->area->id))->toBeFalse();
+    $dashboard = $this->get(route('manajemen-gudang.index'))->assertOk();
+    $areas = $dashboard->viewData('areas');
+    expect($areas->where('usage', 'receiving')->pluck('name')->all())->toContain('Area A')->not->toContain('Area 4');
+    expect($areas->where('usage', 'finished')->pluck('name')->all())->toContain('Area 4')->not->toContain('Area A');
+    expect($dashboard->viewData('areaLabels')[$this->area->id])->toBe('Area A')
+        ->and($dashboard->viewData('areaLabels')[$ready->id])->toBe('Area 4');
+});
+
 it('uses database area names and only active areas in the dashboard and adjustment form', function () {
     prepareOpeningStockSchema();
     $this->area->update(['name' => 'Penerimaan Utama']);
@@ -832,10 +980,7 @@ it('keeps daily production source and destination names aligned with warehouse a
         ->and($page->viewData('finishedAreas')->pluck('id')->contains($ready->id))->toBeTrue()
         ->and($page->viewData('finishedAreas')->pluck('id')->contains($this->area->id))->toBeFalse();
     $html = $page->getContent();
-    $source = explode('Masuk bahan siap jual', $html)[0];
-    $destination = explode('Masuk bahan siap jual', $html)[1];
-    expect($source)->toContain('Penerimaan Utama')->not->toContain('Siap Kirim Utama');
-    expect($destination)->toContain('Siap Kirim Utama')->not->toContain('Penerimaan Utama');
+    expect($html)->toContain('Penerimaan Utama')->not->toContain('Siap Kirim Utama');
     expect($page->viewData('areaLabels')[$this->area->id])->toBe('Penerimaan Utama')
         ->and($page->viewData('areaLabels')[$ready->id])->toBe('Siap Kirim Utama');
 });

@@ -8,7 +8,7 @@
 <div class="flex flex-wrap gap-3">
 @can('opening-stock.read')<a href="{{ route('stok-awal.index') }}" class="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-900">Stok Awal</a>@endcan
 @if(auth()->user()->can('manajemen-panen.read') && auth()->user()->can('manajemen-panen.create'))<a href="{{ route('manajemen-panen.index') }}" class="rounded-lg bg-brand-600 px-4 py-3 text-sm text-white">Penerimaan Panen</a>@endif
-@can('production.create')<a href="{{ route('produksi.create') }}" class="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-900">Catat Proses Harian</a>@endcan
+@can('production.create')<a href="{{ route('produksi.create') }}" class="rounded-lg border bg-white px-4 py-3 text-sm dark:bg-gray-900">Mulai WIP</a>@endcan
 </div></div>
 <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 <a href="{{ route('manajemen-gudang.stage','incoming') }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-sm text-gray-500">Sisa Bahan Penerimaan</p><p class="mt-3 text-2xl font-semibold">{{ number_format($sacks,0,',','.') }} karung</p>@if($remainingWeight !== null)<p class="mt-2 text-sm">{{ number_format($remainingWeight,2,',','.') }} Kg alokasi</p>@endif</a>
@@ -17,7 +17,7 @@
 <a href="{{ route('manajemen-gudang.stage','finished') }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-sm text-gray-500">Stok Siap Jual Tersedia</p><p class="mt-3 text-2xl font-semibold">{{ number_format($finishedWeight,2,',','.') }} Kg</p><p class="mt-2 text-sm">{{ number_format($finishedPackages,0,',','.') }} kemasan tersisa</p></a>
 </div>
 <section><h3 class="mb-4 text-lg font-semibold">Alur Stok Fisik</h3><div class="grid gap-4 sm:grid-cols-3">
-@foreach($stages as $key=>$label)<a href="{{ $key === 'process' ? route('produksi.index') : route('manajemen-gudang.stage',$key) }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-xs text-gray-500">TAHAP {{ $loop->iteration }}</p><h4 class="mt-2 font-semibold">{{ $label }}</h4><p class="mt-3 text-sm">{{ number_format($stageCounts[$key],0,',','.') }} {{ $key === 'process' ? 'catatan proses' : 'batch tersedia' }}</p></a>@endforeach
+@foreach($stages as $key=>$label)<a href="{{ $key === 'process' ? route('manajemen-gudang.stage','process') : route('manajemen-gudang.stage',$key) }}" class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><p class="text-xs text-gray-500">TAHAP {{ $loop->iteration }}</p><h4 class="mt-2 font-semibold">{{ $label }}</h4><p class="mt-3 text-sm">{{ number_format($stageCounts[$key],0,',','.') }} {{ $key === 'process' ? 'WIP aktif' : 'batch tersedia' }}</p>@if($key === 'process')<p class="mt-2 text-sm">{{ number_format($wipSacks,0,',','.') }} karung masih diproses</p>@endif</a>@endforeach
 </div></section>
 <section class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h3 class="text-lg font-semibold">Jumlah Barang per Area</h3>
 <p class="mt-2 text-sm text-gray-500">Menampilkan area aktif sesuai nama pada master area. Kg alokasi bahan mengikuti stok asal; Kg siap jual berasal dari timbang hasil packing.</p>
@@ -29,6 +29,14 @@
 <p class="mt-3 text-xl font-semibold">{{ number_format($area->remaining_sacks ?? 0,0,',','.') }} karung</p>
 @if($remainingWeight !== null)<p class="mt-2 text-sm">{{ number_format($area->remaining_weight ?? 0,2,',','.') }} Kg alokasi tersisa</p>@endif
 <p class="mt-3 text-xs text-gray-500">Diterima: {{ number_format($area->received_weight ?? 0,2,',','.') }} Kg / {{ $area->batch_count }} batch</p>
+@php($wip = $wipByArea[$area->id] ?? ['sacks'=>0,'weight'=>0,'completed_sacks'=>0,'output_weight'=>0,'shrinkage'=>0])
+<div class="mt-3 border-t pt-3 text-sm">
+<p>Masih di area: {{ number_format($area->remaining_sacks ?? 0,0,',','.') }} karung</p>
+<p class="mt-1 font-semibold">Di WIP dari {{ $area->name }}: {{ number_format($wip['sacks'],0,',','.') }} karung</p>
+<p class="mt-1 text-xs">{{ number_format($wip['weight'],2,',','.') }} Kg alokasi WIP</p>
+<p class="mt-1 text-xs">Selesai dari WIP: {{ number_format($wip['completed_sacks'],0,',','.') }} karung bahan / {{ number_format($wip['output_weight'],2,',','.') }} Kg hasil kumulatif</p>
+<p class="mt-1 text-xs">Penyusutan terhadap alokasi bahan selesai: {{ number_format($wip['shrinkage'],2,',','.') }} Kg</p>
+</div>
 @else
 <p class="mt-3 text-xl font-semibold">{{ number_format($area->finished_weight ?? 0,2,',','.') }} Kg</p><p class="mt-2 text-sm">{{ number_format($area->finished_packages ?? 0,0,',','.') }} kemasan tersedia</p>
 @endif
@@ -37,6 +45,6 @@
 @can('receiving.read')
 @if($drafts > 0)<a href="{{ route('penerimaan-barang.index') }}" class="block text-sm text-brand-600">{{ $drafts }} draft penerimaan belum menambah stok.</a>@endif
 @endcan
-@if($stageCounts['wip'] > 0 || ($productionReady && $stageCounts['press'] > 0))<a href="{{ route('manajemen-gudang.stage','wip') }}" class="block text-sm text-brand-600">{{ $stageCounts['wip'] }} proses lama menunggu packing.</a>@endif
+@if($stageCounts['wip'] > 0)<a href="{{ route('manajemen-gudang.stage','wip') }}" class="block text-sm text-brand-600">{{ $stageCounts['wip'] }} WIP masih menunggu penyelesaian atau pemindahan hasil.</a>@endif
 </div>
 @endsection

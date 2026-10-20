@@ -12,7 +12,7 @@ class FinishedBatch extends Model
     {
         return $query->where('remaining_weight_kg', '>', 0)->where('remaining_packages', '>', 0)
             ->where(fn ($stock) => $stock->whereNull('production_run_id')
-                ->orWhereHas('run', fn ($run) => $run->where('status', 'packed')))
+                ->orWhereHas('run', fn ($run) => $run->hasReadyOutputs()))
             ->whereHas('area', fn ($area) => $area->where('is_active', true)->where('usage', 'finished'));
     }
 
@@ -20,6 +20,9 @@ class FinishedBatch extends Model
     {
         return $this->belongsTo(ProductionRun::class, 'production_run_id');
     }
+
+    public function transfer() { return $this->belongsTo(WipTransfer::class, 'wip_transfer_id'); }
+    public function stockMovements() { return $this->hasMany(StockMovement::class); }
 
     public function area()
     {
