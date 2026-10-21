@@ -39,6 +39,8 @@ class SalesTransaction extends Model
         'payment_proof_path',
         'payment_notes',
         'sold_sacks',
+        'cart_deduction_type',
+        'cart_deduction_value',
         'deduction_type',
         'deduction_value',
         'deduction_weight_kg',

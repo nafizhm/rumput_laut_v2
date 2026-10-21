@@ -188,6 +188,22 @@
                             : product.deduction_type === 'nominal' ? Math.round(value) : 0;
                         product.total_amount = Math.max(0, Math.round(base) - deduction);
                     }
+                    if (sale.cart_deduction_type != null) {
+                        const bases = sale.items.map(product => Math.round((Number(product.quantity_kg) - Number(product.bonus_weight || 0)) * Number(product.price_per_kg)));
+                        const baseTotal = bases.reduce((sum, base) => sum + base, 0);
+                        const weight = sale.items.reduce((sum, product) => sum + Number(product.quantity_kg), 0);
+                        const value = Number(sale.cart_deduction_value || 0);
+                        const discount = sale.cart_deduction_type === 'percentage' ? Math.round(baseTotal * value / 100)
+                            : sale.cart_deduction_type === 'weight' ? Math.round(baseTotal * value / weight)
+                            : sale.cart_deduction_type === 'nominal' ? Math.round(value) : 0;
+                        let allocated = 0, cumulative = 0;
+                        sale.items.forEach((product, index) => {
+                            cumulative += bases[index];
+                            const share = baseTotal > 0 ? Math.round(discount * cumulative / baseTotal) - allocated : 0;
+                            allocated += share;
+                            product.total_amount = bases[index] - share;
+                        });
+                    }
                     sale.subtotal = sale.items.reduce((sum, product) => sum + product.subtotal, 0);
                     sale.total_amount = sale.items.reduce((sum, product) => sum + product.total_amount, 0);
                     this.form.data.items = sale.items.map(product => ({id: product.id, item_name: product.item_name,

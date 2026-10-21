@@ -48,6 +48,7 @@ beforeEach(function () {
         '2026_10_06_225852_create_invoice_payments_table.php',
         '2026_10_06_000008_add_po_reference_to_invoices.php',
         '2026_10_07_000005_link_invoices_to_sales.php',
+        '2026_10_21_000001_preserve_cart_deduction_rules.php',
         '2026_10_07_000006_add_delivery_confirmation_stock_flow.php',
         '2026_10_10_000002_create_company_profile_and_document_numbering.php',
     ] as $migration) {
@@ -329,3 +330,41 @@ it('edits billed products and synchronizes sale invoice totals and payment balan
     $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, ['items' => $items]))
         ->assertUnprocessable()->assertJsonValidationErrors('items');
 });
+
+
+it('recalculates cart deductions after invoice item edits', function ($type, $value, $expectedDiscount) {
+    (require database_path('migrations/2026_10_12_000001_add_cart_fields_to_sales_transactions.php'))->up();
+    \Illuminate\Support\Facades\Schema::table('sales_transactions', function ($table) {
+        $table->integer('sold_sacks')->default(0);
+        $table->string('deduction_type')->default('none');
+        $table->decimal('deduction_value', 12, 2)->default(0);
+        $table->decimal('deduction_weight_kg', 12, 2)->default(0);
+    });
+    $sale = SalesTransaction::findOrFail($this->payload['sales_transaction_id']);
+    $sale->update(['sale_group_number' => 'GROUP-EDIT', 'cart_deduction_type' => $type,
+        'cart_deduction_value' => $value, 'deduction_type' => 'nominal', 'deduction_value' => 10000,
+        'sold_sacks' => 2, 'deduction_weight_kg' => 1]);
+    $second = SalesTransaction::create(array_merge($sale->getAttributes(), [
+        'id' => null, 'invoice_number' => 'SECOND-EDIT', 'total_weight_kg' => 100,
+        'price_per_kg' => 10000, 'total_sale_value' => 970000,
+    ]));
+    $this->postJson(route('invoice.store'), $this->payload)->assertOk();
+    $invoice = Invoice::sole();
+    $items = [
+        ['id' => $sale->id, 'item_name' => 'Edited A', 'quantity_kg' => 100, 'price_per_kg' => 20000],
+        ['id' => $second->id, 'item_name' => 'Edited B', 'quantity_kg' => 200, 'price_per_kg' => 10000],
+    ];
+    $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, ['items' => $items]))->assertOk();
+    $base = 3940000; // (100 - 2) * 20000 + (200 - 2) * 10000
+    expect($invoice->fresh()->total_amount)->toBe((float) ($base - $expectedDiscount))
+        ->and((int) $sale->fresh()->deduction_value + (int) $second->fresh()->deduction_value)->toBe($expectedDiscount)
+        ->and($invoice->fresh()->deduction_amount)->toBe((float) (60000 + $expectedDiscount));
+    // Repeated saves must retain the original rule rather than compound the deduction.
+    $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, ['items' => $items]))->assertOk();
+    expect($invoice->fresh()->total_amount)->toBe((float) ($base - $expectedDiscount));
+})->with([
+    'percentage' => ['percentage', 10, 394000],
+    'weight' => ['weight', 30, 394000],
+    'nominal' => ['nominal', 100000, 100000],
+    'none' => ['none', 0, 0],
+]);

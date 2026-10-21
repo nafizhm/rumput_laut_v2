@@ -78,6 +78,7 @@ class InvoiceController extends Controller
                     'invoice_id' => $linked?->id, 'customer_name' => $sale->factory->name,
                     'customer_address' => $sale->factory->address ?? '', 'item_name' => $items->count() > 1 ? 'Penjualan '.$sale->sale_reference : $sale->document_item_name,
                     'quantity_kg' => $quantity, 'price_per_kg' => $quantity > 0 ? round($subtotal / $quantity, 2) : 0,
+                    'cart_deduction_type' => $sale->cart_deduction_type, 'cart_deduction_value' => $sale->cart_deduction_value,
                     'total_amount' => $items->sum('total_sale_value'), 'subtotal' => $subtotal,
                     'stock_mode' => $sale->stock_mode, 'customer_purchase_order_id' => $sale->customer_purchase_order_id,
                     'sales_transaction_ids' => $items->pluck('id')->values(),

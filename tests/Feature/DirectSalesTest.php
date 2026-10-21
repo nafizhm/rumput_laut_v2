@@ -36,6 +36,7 @@ beforeEach(function () {
         '2026_10_06_000008_add_po_reference_to_invoices.php',
         '2026_10_06_225852_create_invoice_payments_table.php',
         '2026_10_07_000005_link_invoices_to_sales.php',
+        '2026_10_21_000001_preserve_cart_deduction_rules.php',
         '2026_10_07_000006_add_delivery_confirmation_stock_flow.php',
         '2026_10_07_000007_create_quality_grades_table.php',
         '2026_10_07_000009_create_goods_receiving_flow.php',
@@ -189,6 +190,8 @@ it('saves several checkout products without stock and applies the transaction di
         ->and(SalesTransaction::orderBy('id')->get()->pluck('document_item_name')->all())->toBe(['Rumput Laut Kering', 'Rumput Laut Bersih'])
         ->and((float) $inventory->refresh()->current_stock_kg)->toBe(0.0)
         ->and((int) $inventory->current_sack_count)->toBe(0)->and(StockMovement::count())->toBe(0)
+        ->and(SalesTransaction::where('cart_deduction_type', 'nominal')->count())->toBe(2)
+        ->and(SalesTransaction::where('cart_deduction_value', 100000)->count())->toBe(2)
         ->and((int) SalesTransaction::sum('total_sale_value'))->toBe(900000)
         ->and(SalesTransaction::whereNotNull('finished_batch_id')->count())->toBe(0);
 });

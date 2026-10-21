@@ -53,6 +53,8 @@ class SalesService
                 $cumulative += $bases[$index];
                 $share = $baseTotal > 0 ? (int) round($discount * $cumulative / $baseTotal) - $allocated : 0;
                 $allocated += $share;
+                $item['cart_deduction_type'] = $type;
+                $item['cart_deduction_value'] = $value;
                 $item['deduction_type'] = 'nominal';
                 $item['deduction_value'] = $share;
                 $item['deduction_weight_kg'] = $data['deduction_weight_kg'];

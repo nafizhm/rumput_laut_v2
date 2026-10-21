@@ -128,13 +128,16 @@ class InvoiceService
             if ($submitted->count() !== $items->count() || $items->pluck('id')->diff($submitted->keys())->isNotEmpty()) {
                 throw ValidationException::withMessages(['items' => 'Daftar barang harus sesuai dengan penjualan invoice.']);
             }
+            $cartType = $items->first()->cart_deduction_type;
+            $bases = [];
             foreach ($items as $index => $item) {
                 $input = $submitted->get($item->id);
                 $quantity = (float) $input['quantity_kg'];
                 $price = (float) $input['price_per_kg'];
                 $bonus = (int) $item->sold_sacks * (float) $item->deduction_weight_kg;
                 $base = ($quantity - $bonus) * $price;
-                $deduction = match ($item->deduction_type) {
+                $bases[$index] = (int) round($base);
+                $deduction = $cartType !== null ? 0 : match ($item->deduction_type) {
                     'percentage' => round($base * (float) $item->deduction_value / 100),
                     'nominal' => round((float) $item->deduction_value),
                     'weight' => round((float) $item->deduction_value * $price),
@@ -145,6 +148,29 @@ class InvoiceService
                 }
                 $item->fill(['item_name' => $input['item_name'], 'total_weight_kg' => $quantity,
                     'price_per_kg' => $price, 'total_sale_value' => (int) round($base) - $deduction]);
+            }
+            if ($cartType !== null) {
+                $baseTotal = array_sum($bases);
+                $weight = (float) $items->sum('total_weight_kg');
+                $value = (float) $items->first()->cart_deduction_value;
+                $discount = match ($cartType) {
+                    'percentage' => (int) round($baseTotal * $value / 100),
+                    'weight' => (int) round($baseTotal * $value / $weight),
+                    'nominal' => (int) round($value),
+                    default => 0,
+                };
+                if ($discount > $baseTotal || ($cartType === 'weight' && $value > $weight)) {
+                    throw ValidationException::withMessages(['items' => 'Jumlah atau harga barang tidak mencukupi potongan penjualan.']);
+                }
+                $allocated = 0;
+                $cumulative = 0;
+                foreach ($items as $index => $item) {
+                    $cumulative += $bases[$index];
+                    $share = $baseTotal > 0 ? (int) round($discount * $cumulative / $baseTotal) - $allocated : 0;
+                    $allocated += $share;
+                    $item->fill(['deduction_type' => 'nominal', 'deduction_value' => $share,
+                        'total_sale_value' => $bases[$index] - $share]);
+                }
             }
             if ((int) $invoice->paid_amount > (int) $items->sum('total_sale_value')) {
                 throw ValidationException::withMessages(['items' => 'Total tagihan tidak boleh lebih kecil dari pembayaran yang sudah tercatat.']);
