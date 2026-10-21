@@ -128,7 +128,11 @@ class InvoiceService
             if ($submitted->count() !== $items->count() || $items->pluck('id')->diff($submitted->keys())->isNotEmpty()) {
                 throw ValidationException::withMessages(['items' => 'Daftar barang harus sesuai dengan penjualan invoice.']);
             }
-            $cartType = $items->first()->cart_deduction_type;
+            $cartType = $data['cart_deduction_type'] ?? $items->first()->cart_deduction_type;
+            $cartValue = $data['cart_deduction_value'] ?? $items->first()->cart_deduction_value;
+            if ($cartType === 'percentage' && (float) $cartValue > 100) {
+                throw ValidationException::withMessages(['cart_deduction_value' => 'Persentase potongan tidak boleh melebihi 100%.']);
+            }
             $bases = [];
             foreach ($items as $index => $item) {
                 $input = $submitted->get($item->id);
@@ -152,7 +156,7 @@ class InvoiceService
             if ($cartType !== null) {
                 $baseTotal = array_sum($bases);
                 $weight = (float) $items->sum('total_weight_kg');
-                $value = (float) $items->first()->cart_deduction_value;
+                $value = (float) $cartValue;
                 $discount = match ($cartType) {
                     'percentage' => (int) round($baseTotal * $value / 100),
                     'weight' => (int) round($baseTotal * $value / $weight),
@@ -168,7 +172,8 @@ class InvoiceService
                     $cumulative += $bases[$index];
                     $share = $baseTotal > 0 ? (int) round($discount * $cumulative / $baseTotal) - $allocated : 0;
                     $allocated += $share;
-                    $item->fill(['deduction_type' => 'nominal', 'deduction_value' => $share,
+                    $item->fill(['cart_deduction_type' => $cartType, 'cart_deduction_value' => $value,
+                        'deduction_type' => 'nominal', 'deduction_value' => $share,
                         'total_sale_value' => $bases[$index] - $share]);
                 }
             }
@@ -177,7 +182,7 @@ class InvoiceService
             }
             foreach ($items as $item) $item->save();
         }
-        unset($data['items']);
+        unset($data['items'], $data['cart_deduction_type'], $data['cart_deduction_value']);
         $data['sales_transaction_id'] = $sale->id;
         $data['customer_name'] = $sale->factory->name;
         $data['item_name'] = $items->count() > 1 ? 'Penjualan '.$sale->sale_reference : $sale->document_item_name;

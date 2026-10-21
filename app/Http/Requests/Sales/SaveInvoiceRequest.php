@@ -26,6 +26,8 @@ class SaveInvoiceRequest extends FormRequest
             'quantity_kg' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:9999999.99'],
             'price_per_kg' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:9999999.99'],
             'items' => ['sometimes', 'array', 'min:1'],
+            'cart_deduction_type' => ['sometimes', 'required', Rule::in(['none', 'percentage', 'nominal', 'weight'])],
+            'cart_deduction_value' => ['required_with:cart_deduction_type', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'items.*.id' => ['required', 'integer', 'distinct'],
             'items.*.item_name' => ['required', 'string', 'max:255'],
             'items.*.quantity_kg' => ['required', 'numeric', 'decimal:0,2', 'min:0.01', 'max:9999999.99'],

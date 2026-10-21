@@ -44,6 +44,21 @@
             <div x-show="selectedSale" class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
                 <div class="border-b p-5 dark:border-gray-800"><h3 class="font-semibold text-gray-800 dark:text-white">Barang yang Ditagihkan</h3><p class="mt-1 text-sm text-gray-500">Saat edit, ubah deskripsi, kilo tagihan, dan harga per barang. Penjualan dan sisa tagihan ikut diperbarui. Stok dan surat jalan mengikuti pengiriman fisik.</p></div>
                 <div class="overflow-x-auto"><table class="w-full text-left text-sm text-gray-700 dark:text-gray-300"><thead class="bg-gray-50 dark:bg-gray-800"><tr><th class="p-4">Barang</th><th class="p-4 text-right">Jumlah (Kg)</th><th class="p-4 text-right">Harga / Kg</th><th class="p-4 text-right">Subtotal</th><th class="p-4 text-right">Tagihan</th></tr></thead><tbody><template x-for="product in selectedSale?.items || []" :key="product.id"><tr class="border-t dark:border-gray-800"><td class="p-4"><input aria-label="Deskripsi barang" :readonly="!editMode" x-model="product.item_name" @input="syncItems()" required maxlength="255" class="w-full rounded-lg border p-2 dark:bg-gray-900"></td><td class="p-4"><input aria-label="Jumlah kilo tagihan" :readonly="!editMode" type="number" x-model="product.quantity_kg" @input="syncItems()" required min="0.01" max="9999999.99" step="0.01" class="w-32 rounded-lg border p-2 text-right dark:bg-gray-900"></td><td class="p-4"><input aria-label="Harga per kilo" :readonly="!editMode" type="number" x-model="product.price_per_kg" @input="syncItems()" required min="0.01" max="9999999.99" step="0.01" class="w-40 rounded-lg border p-2 text-right dark:bg-gray-900"></td><td class="p-4 text-right" x-text="money(product.subtotal)"></td><td class="p-4 text-right" x-text="money(product.total_amount)"></td></tr></template></tbody></table></div>
+                <div x-show="editMode" class="space-y-2 p-5">
+                    <label class="block text-sm font-medium">Potongan seluruh barang (setelah bonus berat)</label>
+                    <div class="flex flex-wrap gap-3">
+                        <select aria-label="Jenis potongan invoice" :value="selectedSale?.cart_deduction_type ?? ''" @change="selectedSale.cart_deduction_type = $event.target.value || null; selectedSale.cart_deduction_value = 0; syncItems()" class="rounded-lg border p-2 dark:bg-gray-900">
+                            <option value="" :disabled="selectedSale?.cart_deduction_type != null">Ikuti potongan per barang tersimpan</option>
+                            <option value="none">Tanpa potongan</option>
+                            <option value="percentage">Persentase (%)</option>
+                            <option value="nominal">Nominal (Rp)</option>
+                            <option value="weight">Berat (Kg)</option>
+                        </select>
+                        <input aria-label="Nilai potongan invoice" x-show="selectedSale?.cart_deduction_type && selectedSale.cart_deduction_type !== 'none'" :value="selectedSale?.cart_deduction_value ?? 0" @input="selectedSale.cart_deduction_value = $event.target.value; syncItems()" type="number" min="0" :max="selectedSale?.cart_deduction_type === 'percentage' ? 100 : 9999999999.99" step="0.01" class="w-40 rounded-lg border p-2 dark:bg-gray-900">
+                    </div>
+                    <p class="text-xs text-gray-500">Potongan persentase otomatis dihitung ulang saat kilo atau harga berubah. Untuk data lama, pilih Persentase dan isi persentase aslinya.</p>
+                    <p class="text-sm text-error-500" x-text="form.getError('cart_deduction_type') || form.getError('cart_deduction_value')"></p>
+                </div>
                 <p class="px-5 text-sm text-error-500" x-text="form.getError('items')"></p><div class="flex flex-wrap justify-end gap-6 bg-gray-50 p-5 dark:bg-gray-800"><div><p class="text-xs text-gray-500">Potongan</p><p x-text="money((selectedSale?.subtotal || 0) - invoiceTotal)"></p></div><div><p class="text-xs text-gray-500">Total Tagihan</p><p class="text-lg font-semibold text-brand-600" x-text="money(invoiceTotal)"></p></div></div>
             </div>
             <fieldset x-show="!form.data.sales_transaction_id" :disabled="!!form.data.sales_transaction_id">
@@ -189,6 +204,8 @@
                         product.total_amount = Math.max(0, Math.round(base) - deduction);
                     }
                     if (sale.cart_deduction_type != null) {
+                        this.form.data.cart_deduction_type = sale.cart_deduction_type;
+                        this.form.data.cart_deduction_value = sale.cart_deduction_value;
                         const bases = sale.items.map(product => Math.round((Number(product.quantity_kg) - Number(product.bonus_weight || 0)) * Number(product.price_per_kg)));
                         const baseTotal = bases.reduce((sum, base) => sum + base, 0);
                         const weight = sale.items.reduce((sum, product) => sum + Number(product.quantity_kg), 0);
@@ -203,6 +220,9 @@
                             allocated += share;
                             product.total_amount = bases[index] - share;
                         });
+                    } else {
+                        delete this.form.data.cart_deduction_type;
+                        delete this.form.data.cart_deduction_value;
                     }
                     sale.subtotal = sale.items.reduce((sum, product) => sum + product.subtotal, 0);
                     sale.total_amount = sale.items.reduce((sum, product) => sum + product.total_amount, 0);

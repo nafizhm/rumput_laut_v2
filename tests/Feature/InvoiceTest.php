@@ -368,3 +368,34 @@ it('recalculates cart deductions after invoice item edits', function ($type, $va
     'nominal' => ['nominal', 100000, 100000],
     'none' => ['none', 0, 0],
 ]);
+
+it('restores a percentage rule for a legacy invoice and recalculates subsequent item edits', function () {
+    (require database_path('migrations/2026_10_12_000001_add_cart_fields_to_sales_transactions.php'))->up();
+    \Illuminate\Support\Facades\Schema::table('sales_transactions', function ($table) {
+        $table->integer('sold_sacks')->default(0);
+        $table->string('deduction_type')->default('none');
+        $table->decimal('deduction_value', 12, 2)->default(0);
+        $table->decimal('deduction_weight_kg', 12, 2)->default(0);
+    });
+    $sale = SalesTransaction::findOrFail($this->payload['sales_transaction_id']);
+    $sale->update(['deduction_type' => 'nominal', 'deduction_value' => 80000]);
+    $this->postJson(route('invoice.store'), $this->payload)->assertOk();
+    $invoice = Invoice::sole();
+    $items = [['id' => $sale->id, 'item_name' => 'Barang', 'quantity_kg' => 5000, 'price_per_kg' => 6400]];
+    $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, [
+        'items' => $items, 'cart_deduction_type' => 'percentage', 'cart_deduction_value' => 0.25,
+    ]))->assertOk();
+    expect($sale->fresh()->cart_deduction_type)->toBe('percentage')
+        ->and((float) $sale->fresh()->cart_deduction_value)->toBe(0.25)
+        ->and($invoice->fresh()->total_amount)->toBe(31920000.0);
+    $items[0]['quantity_kg'] = 4000;
+    $items[0]['price_per_kg'] = 7000;
+    $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, ['items' => $items]))->assertOk();
+    expect((int) $sale->fresh()->deduction_value)->toBe(70000)
+        ->and($invoice->fresh()->total_amount)->toBe(27930000.0);
+    $this->get(route('invoice.edit', $invoice))->assertOk()->assertSee('Persentase (%)');
+    $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, [
+        'items' => $items, 'cart_deduction_type' => 'percentage', 'cart_deduction_value' => 101,
+    ]))->assertUnprocessable()->assertJsonValidationErrors('cart_deduction_value');
+    expect($invoice->fresh()->total_amount)->toBe(27930000.0);
+});
