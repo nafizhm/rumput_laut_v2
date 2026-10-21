@@ -117,7 +117,7 @@ class InvoicePaymentService
         return (int) round((float) $amount);
     }
 
-    private function syncSale(Invoice $invoice): void
+    public function syncSale(Invoice $invoice): void
     {
         if (! $invoice->sales_transaction_id) {
             return;

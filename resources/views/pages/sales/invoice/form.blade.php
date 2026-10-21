@@ -42,9 +42,9 @@
                 <x-input label="Alamat Konsumen" name="customer_address" type="text" x-model="form.data.customer_address" alpine-error="form.getError('customer_address')" required />
             </x-form-section>
             <div x-show="selectedSale" class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-                <div class="border-b p-5 dark:border-gray-800"><h3 class="font-semibold text-gray-800 dark:text-white">Barang yang Ditagihkan</h3><p class="mt-1 text-sm text-gray-500">Seluruh barang dari penjualan terpilih. Jumlah dan harga tidak perlu diinput ulang.</p></div>
-                <div class="overflow-x-auto"><table class="w-full text-left text-sm text-gray-700 dark:text-gray-300"><thead class="bg-gray-50 dark:bg-gray-800"><tr><th class="p-4">Barang</th><th class="p-4 text-right">Jumlah (Kg)</th><th class="p-4 text-right">Harga / Kg</th><th class="p-4 text-right">Subtotal</th><th class="p-4 text-right">Tagihan</th></tr></thead><tbody><template x-for="product in selectedSale?.items || []" :key="product.id"><tr class="border-t dark:border-gray-800"><td class="p-4 font-medium" x-text="product.item_name"></td><td class="p-4 text-right" x-text="Number(product.quantity_kg).toLocaleString('id-ID')"></td><td class="p-4 text-right" x-text="money(product.price_per_kg)"></td><td class="p-4 text-right" x-text="money(product.subtotal)"></td><td class="p-4 text-right" x-text="money(product.total_amount)"></td></tr></template></tbody></table></div>
-                <div class="flex flex-wrap justify-end gap-6 bg-gray-50 p-5 dark:bg-gray-800"><div><p class="text-xs text-gray-500">Potongan</p><p x-text="money((selectedSale?.subtotal || 0) - invoiceTotal)"></p></div><div><p class="text-xs text-gray-500">Total Tagihan</p><p class="text-lg font-semibold text-brand-600" x-text="money(invoiceTotal)"></p></div></div>
+                <div class="border-b p-5 dark:border-gray-800"><h3 class="font-semibold text-gray-800 dark:text-white">Barang yang Ditagihkan</h3><p class="mt-1 text-sm text-gray-500">Saat edit, ubah deskripsi, kilo tagihan, dan harga per barang. Penjualan dan sisa tagihan ikut diperbarui. Stok dan surat jalan mengikuti pengiriman fisik.</p></div>
+                <div class="overflow-x-auto"><table class="w-full text-left text-sm text-gray-700 dark:text-gray-300"><thead class="bg-gray-50 dark:bg-gray-800"><tr><th class="p-4">Barang</th><th class="p-4 text-right">Jumlah (Kg)</th><th class="p-4 text-right">Harga / Kg</th><th class="p-4 text-right">Subtotal</th><th class="p-4 text-right">Tagihan</th></tr></thead><tbody><template x-for="product in selectedSale?.items || []" :key="product.id"><tr class="border-t dark:border-gray-800"><td class="p-4"><input aria-label="Deskripsi barang" :readonly="!editMode" x-model="product.item_name" @input="syncItems()" required maxlength="255" class="w-full rounded-lg border p-2 dark:bg-gray-900"></td><td class="p-4"><input aria-label="Jumlah kilo tagihan" :readonly="!editMode" type="number" x-model="product.quantity_kg" @input="syncItems()" required min="0.01" max="9999999.99" step="0.01" class="w-32 rounded-lg border p-2 text-right dark:bg-gray-900"></td><td class="p-4"><input aria-label="Harga per kilo" :readonly="!editMode" type="number" x-model="product.price_per_kg" @input="syncItems()" required min="0.01" max="9999999.99" step="0.01" class="w-40 rounded-lg border p-2 text-right dark:bg-gray-900"></td><td class="p-4 text-right" x-text="money(product.subtotal)"></td><td class="p-4 text-right" x-text="money(product.total_amount)"></td></tr></template></tbody></table></div>
+                <p class="px-5 text-sm text-error-500" x-text="form.getError('items')"></p><div class="flex flex-wrap justify-end gap-6 bg-gray-50 p-5 dark:bg-gray-800"><div><p class="text-xs text-gray-500">Potongan</p><p x-text="money((selectedSale?.subtotal || 0) - invoiceTotal)"></p></div><div><p class="text-xs text-gray-500">Total Tagihan</p><p class="text-lg font-semibold text-brand-600" x-text="money(invoiceTotal)"></p></div></div>
             </div>
             <fieldset x-show="!form.data.sales_transaction_id" :disabled="!!form.data.sales_transaction_id">
             <x-form-section title="Detail Barang & Harga" description="Periksa jumlah dan harga barang yang ditagihkan.">
@@ -155,6 +155,7 @@
                         payment_terms: item.payment_terms ?? '',
                         notes: item.notes ?? ''
                     };
+                    this.syncItems();
                     this.refreshDeliveryNotes();
                     this.$dispatch('set-selected-invoice_po_id', item.customer_purchase_order_id ?? null);
 
@@ -173,6 +174,24 @@
                 deleteItem(id) {
                     this.deleteId = id;
                     this.$dispatch('open-modal', 'delete-entity-modal');
+                },
+
+                syncItems() {
+                    const sale = this.selectedSale;
+                    if (!sale || !this.editMode) return;
+                    for (const product of sale.items) {
+                        product.subtotal = Number(product.quantity_kg) * Number(product.price_per_kg);
+                        const base = (Number(product.quantity_kg) - Number(product.bonus_weight || 0)) * Number(product.price_per_kg);
+                        const value = Number(product.deduction_value || 0);
+                        const deduction = product.deduction_type === 'percentage' ? Math.round(base * value / 100)
+                            : product.deduction_type === 'weight' ? Math.round(value * Number(product.price_per_kg))
+                            : product.deduction_type === 'nominal' ? Math.round(value) : 0;
+                        product.total_amount = Math.max(0, Math.round(base) - deduction);
+                    }
+                    sale.subtotal = sale.items.reduce((sum, product) => sum + product.subtotal, 0);
+                    sale.total_amount = sale.items.reduce((sum, product) => sum + product.total_amount, 0);
+                    this.form.data.items = sale.items.map(product => ({id: product.id, item_name: product.item_name,
+                        quantity_kg: product.quantity_kg, price_per_kg: product.price_per_kg}));
                 },
 
                 get availableSales() {

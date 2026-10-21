@@ -301,3 +301,31 @@ it('groups sale products into one invoice with all items and the combined amount
     $this->postJson(route('invoice.pay', $invoice), ['invoice_id' => $invoice->id, 'payment_date' => '2026-10-06', 'amount' => 26900000])->assertOk();
     expect($sale->fresh()->paid_amount)->toBe(26000000)->and($second->fresh()->paid_amount)->toBe(900000);
 });
+
+
+it('edits billed products and synchronizes sale invoice totals and payment balances atomically', function () {
+    (require database_path('migrations/2026_10_12_000001_add_cart_fields_to_sales_transactions.php'))->up();
+    $this->postJson(route('invoice.store'), $this->payload)->assertOk();
+    $invoice = Invoice::sole();
+    $sale = SalesTransaction::findOrFail($invoice->sales_transaction_id);
+    $this->postJson(route('invoice.pay', $invoice), [
+        'invoice_id' => $invoice->id, 'payment_date' => '2026-10-06', 'amount' => 1000000,
+    ])->assertOk();
+    $items = [['id' => $sale->id, 'item_name' => 'Barang koreksi', 'quantity_kg' => 100, 'price_per_kg' => 20000]];
+    $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, ['items' => $items]))->assertOk();
+    expect($sale->fresh()->item_name)->toBe('Barang koreksi')
+        ->and((float) $sale->fresh()->total_weight_kg)->toBe(100.0)
+        ->and((int) $sale->fresh()->total_sale_value)->toBe(2000000)
+        ->and((int) $sale->fresh()->paid_amount)->toBe(1000000)
+        ->and($invoice->fresh()->total_amount)->toBe(2000000.0)
+        ->and($invoice->fresh()->remaining_amount)->toBe(1000000);
+    $this->get(route('invoice.print', $invoice))->assertOk()->assertSee('Barang koreksi');
+    $items[0]['quantity_kg'] = 10;
+    $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, ['items' => $items]))
+        ->assertUnprocessable()->assertJsonValidationErrors('items');
+    expect((float) $sale->fresh()->total_weight_kg)->toBe(100.0)
+        ->and($invoice->fresh()->total_amount)->toBe(2000000.0);
+    $items[0]['id'] = 999999;
+    $this->putJson(route('invoice.update', $invoice), array_merge($this->payload, ['items' => $items]))
+        ->assertUnprocessable()->assertJsonValidationErrors('items');
+});

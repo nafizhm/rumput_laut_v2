@@ -83,6 +83,8 @@ class InvoiceController extends Controller
                     'sales_transaction_ids' => $items->pluck('id')->values(),
                     'items' => $items->map(fn ($item) => ['id' => $item->id, 'item_name' => $item->document_item_name,
                         'quantity_kg' => $item->total_weight_kg, 'price_per_kg' => $item->price_per_kg,
+                        'deduction_type' => $item->deduction_type, 'deduction_value' => $item->deduction_value,
+                        'bonus_weight' => (int) $item->sold_sacks * (float) $item->deduction_weight_kg,
                         'subtotal' => (float) $item->total_weight_kg * (float) $item->price_per_kg,
                         'total_amount' => $item->total_sale_value])->values(),
                 ];

@@ -32,7 +32,18 @@ class InvoiceService
         return DB::transaction(function () use ($invoice, $data) {
             $invoice = Invoice::lockForUpdate()->findOrFail($invoice->id);
 
-            return $invoice->update($this->withReferences($this->prepareSale($data, $invoice)));
+            $updated = $invoice->update($this->withReferences($this->prepareSale($data, $invoice)));
+            if (isset($data['items']) && $invoice->sales_transaction_id) {
+                app(InvoicePaymentService::class)->syncSale($invoice);
+                $accounting = app(\App\Services\Finance\OperationalAccountingService::class);
+                foreach ($invoice->saleItems() as $item) {
+                    foreach ($item->stockMovements()->orderBy('id')->get() as $movement) {
+                        $accounting->shipment($movement, false);
+                    }
+                }
+                $accounting->salePayments($invoice->sale);
+            }
+            return $updated;
         });
     }
 
@@ -112,13 +123,43 @@ class InvoiceService
             || (! $po->factory_id && mb_strtolower(trim($po->customer_name)) !== mb_strtolower(trim($sale->factory->name)))) {
             throw ValidationException::withMessages(['customer_purchase_order_id' => 'Konsumen PO harus sesuai dengan penjualan.']);
         }
+        if ($invoice?->sales_transaction_id && isset($data['items'])) {
+            $submitted = collect($data['items'])->keyBy('id');
+            if ($submitted->count() !== $items->count() || $items->pluck('id')->diff($submitted->keys())->isNotEmpty()) {
+                throw ValidationException::withMessages(['items' => 'Daftar barang harus sesuai dengan penjualan invoice.']);
+            }
+            foreach ($items as $index => $item) {
+                $input = $submitted->get($item->id);
+                $quantity = (float) $input['quantity_kg'];
+                $price = (float) $input['price_per_kg'];
+                $bonus = (int) $item->sold_sacks * (float) $item->deduction_weight_kg;
+                $base = ($quantity - $bonus) * $price;
+                $deduction = match ($item->deduction_type) {
+                    'percentage' => round($base * (float) $item->deduction_value / 100),
+                    'nominal' => round((float) $item->deduction_value),
+                    'weight' => round((float) $item->deduction_value * $price),
+                    default => 0,
+                };
+                if ($quantity < $bonus || $deduction > $base) {
+                    throw ValidationException::withMessages(['items' => 'Jumlah atau harga barang tidak mencukupi potongan penjualan.']);
+                }
+                $item->fill(['item_name' => $input['item_name'], 'total_weight_kg' => $quantity,
+                    'price_per_kg' => $price, 'total_sale_value' => (int) round($base) - $deduction]);
+            }
+            if ((int) $invoice->paid_amount > (int) $items->sum('total_sale_value')) {
+                throw ValidationException::withMessages(['items' => 'Total tagihan tidak boleh lebih kecil dari pembayaran yang sudah tercatat.']);
+            }
+            foreach ($items as $item) $item->save();
+        }
+        unset($data['items']);
         $data['sales_transaction_id'] = $sale->id;
         $data['customer_name'] = $sale->factory->name;
         $data['item_name'] = $items->count() > 1 ? 'Penjualan '.$sale->sale_reference : $sale->document_item_name;
         $data['quantity_kg'] = $items->sum('total_weight_kg');
         $data['price_per_kg'] = round($items->sum(fn ($item) => (float) $item->total_weight_kg * (float) $item->price_per_kg) / (float) $data['quantity_kg'], 2);
         $data['sale_total_amount'] = $items->sum('total_sale_value');
-        $data['payment_status'] = $invoice?->payment_status ?? 'unpaid';
+        $data['payment_status'] = $invoice && (int) $invoice->paid_amount > 0
+            ? ((int) $invoice->paid_amount >= (int) $data['sale_total_amount'] ? 'paid' : 'partial') : 'unpaid';
         $data['paid_amount'] = (int) $invoice?->paid_amount;
 
         return $data;
