@@ -621,7 +621,7 @@ it('opens a finished area containing migrated stock without a production record'
     $this->get(route('surat-jalan.edit', $note))->assertOk()
         ->assertViewHas('batches', fn ($batches) => $batches->contains('id', $legacy->id))
         ->assertViewHas('note', fn ($saved) => $saved->items->sole()->finished_batch_id === $legacy->id)
-        ->assertSee(':selected="String(batch.id) === String(row.finished_batch_id)"', false);
+        ->assertSee('Area stok siap jual')->assertSee('x-model="row.warehouse_area_id"', false);
 });
 
 it('preserves seed edits and requires permission and explicit confirmation', function () {

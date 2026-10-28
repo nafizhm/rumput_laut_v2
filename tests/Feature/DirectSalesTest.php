@@ -118,6 +118,80 @@ function checkoutRow($batch, string $name): array
     return ['item_name' => $name, 'sold_weight_kg' => 50, 'sold_sacks' => 2, 'price_per_kg' => 10000];
 }
 
+it('ships area stock across FIFO batches without deducting draft stock and rolls back shortages', function () {
+    [$inventory, $batches] = checkoutStock($this);
+    (require database_path('migrations/2026_10_28_000001_add_delivery_note_stock_area.php'))->up();
+    $batches[0]->update(['remaining_cost_cents' => 10000]);
+    $batches[1]->update(['remaining_cost_cents' => 20000]);
+    $this->postJson(route('manajemen-penjualan.store'), [
+        'sale_source'=>'direct', 'factory_id'=>$this->factory->id, 'sale_date'=>'2026-10-07',
+        'deduction_type'=>'none', 'deduction_value'=>0, 'deduction_weight_kg'=>0,
+        'items'=>[array_replace(checkoutRow($batches[0], 'Rumput Laut'), ['sold_weight_kg'=>150, 'sold_sacks'=>6])],
+    ])->assertOk();
+    $sale = SalesTransaction::sole();
+    $payload = array_merge($this->shipmentPayload, ['sales_transaction_id'=>$sale->id, 'items'=>[
+        ['sales_transaction_id'=>$sale->id, 'warehouse_area_id'=>$batches[0]->warehouse_area_id,
+            'item_name'=>'Rumput Laut', 'quantity_kg'=>150, 'sack_count'=>6],
+    ]]);
+    $this->postJson(route('surat-jalan.store'), $payload)->assertOk();
+    $note = DeliveryNote::sole();
+    expect((float) $inventory->refresh()->current_stock_kg)->toBe(200.0)
+        ->and((float) $batches[0]->refresh()->remaining_weight_kg)->toBe(100.0)
+        ->and(StockMovement::count())->toBe(0)
+        ->and($note->items->sole()->warehouse_area_id)->toBe($batches[0]->warehouse_area_id);
+    $batches[1]->update(['remaining_weight_kg'=>25, 'remaining_packages'=>1]);
+    $this->postJson(route('surat-jalan.dispatch', $note), ['shipped_date'=>'2026-10-07', 'confirm'=>true])->assertUnprocessable();
+    expect((float) $batches[0]->refresh()->remaining_weight_kg)->toBe(100.0)
+        ->and(StockMovement::count())->toBe(0)->and($note->fresh()->status)->toBe('draft');
+    $batches[1]->update(['remaining_weight_kg'=>100, 'remaining_packages'=>4]);
+    $this->postJson(route('surat-jalan.dispatch', $note), ['shipped_date'=>'2026-10-07', 'confirm'=>true])->assertOk();
+    expect((float) $batches[0]->refresh()->remaining_weight_kg)->toBe(0.0)
+        ->and((int) $batches[0]->remaining_packages)->toBe(0)
+        ->and((float) $batches[1]->refresh()->remaining_weight_kg)->toBe(50.0)
+        ->and((int) $batches[1]->remaining_packages)->toBe(2)
+        ->and((float) $inventory->refresh()->current_stock_kg)->toBe(50.0)
+        ->and((int) $inventory->current_sack_count)->toBe(2)
+        ->and(StockMovement::count())->toBe(2)
+        ->and((int) StockMovement::sum('cost_cents'))->toBe(20000);
+    $this->postJson(route('surat-jalan.dispatch', $note), ['shipped_date'=>'2026-10-07', 'confirm'=>true])->assertUnprocessable();
+    expect(StockMovement::count())->toBe(2);
+});
+
+it('limits automatic shipment allocation to the chosen area and grade', function () {
+    [$inventory, $batches] = checkoutStock($this);
+    (require database_path('migrations/2026_10_28_000001_add_delivery_note_stock_area.php'))->up();
+    $grade = \App\Models\QualityGrade::create(['code'=>'AREA-A', 'name'=>'Grade A', 'is_active'=>true]);
+    $otherGrade = \App\Models\QualityGrade::create(['code'=>'AREA-B', 'name'=>'Grade B', 'is_active'=>true]);
+    $batches[0]->update(['quality_grade_id'=>$grade->id]);
+    $batches[1]->update(['quality_grade_id'=>$otherGrade->id]);
+    $otherArea = \App\Models\WarehouseArea::create(['code'=>'SJ-OTHER', 'name'=>'Area Lain', 'usage'=>'finished', 'inventory_id'=>$inventory->id, 'is_active'=>true]);
+    $other = $batches[0]->replicate();
+    $other->code = 'FG-OTHER'; $other->warehouse_area_id = $otherArea->id; $other->save();
+    $this->postJson(route('manajemen-penjualan.store'), [
+        'sale_source'=>'direct', 'factory_id'=>$this->factory->id, 'sale_date'=>'2026-10-07',
+        'deduction_type'=>'none', 'deduction_value'=>0, 'deduction_weight_kg'=>0,
+        'items'=>[array_replace(checkoutRow($batches[0], 'Grade A'), ['quality_grade_id'=>$grade->id, 'sold_weight_kg'=>150, 'sold_sacks'=>6])],
+    ])->assertOk();
+    $sale = SalesTransaction::sole();
+    // Pin the grade independently of the sales request's product mapping.
+    $sale->update(['quality_grade_id'=>$grade->id]);
+    $payload = array_merge($this->shipmentPayload, ['sales_transaction_id'=>$sale->id, 'items'=>[
+        ['sales_transaction_id'=>$sale->id, 'warehouse_area_id'=>$batches[0]->warehouse_area_id,
+            'item_name'=>'Grade A', 'quantity_kg'=>150, 'sack_count'=>6],
+    ]]);
+    $this->postJson(route('surat-jalan.store'), $payload)->assertUnprocessable();
+    $payload['items'][0]['quantity_kg']=100; $payload['items'][0]['sack_count']=3;
+    $this->postJson(route('surat-jalan.store'), $payload)->assertUnprocessable();
+    $payload['items'][0]['sack_count']=4;
+    $this->postJson(route('surat-jalan.store'), $payload)->assertOk();
+    $note = DeliveryNote::sole();
+    $this->postJson(route('surat-jalan.dispatch', $note), ['shipped_date'=>'2026-10-07', 'confirm'=>true])->assertOk();
+    expect((float) $batches[0]->fresh()->remaining_weight_kg)->toBe(0.0)
+        ->and((float) $batches[1]->fresh()->remaining_weight_kg)->toBe(100.0)
+        ->and((float) $other->fresh()->remaining_weight_kg)->toBe(100.0)
+        ->and(StockMovement::count())->toBe(1);
+});
+
 it('filters warehouse history and separates shipment drafts from actual stock movements', function () {
     [$inventory, $batches] = checkoutStock($this);
     (require database_path('migrations/2026_10_15_000001_create_stock_movement_locations.php'))->up();
@@ -140,7 +214,7 @@ it('filters warehouse history and separates shipment drafts from actual stock mo
     $this->getJson($history.'?'.http_build_query($filters + ['tab' => 'drafts']))->assertOk()->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.status', 'Draft · Belum terpotong')->assertJsonPath('data.0.weight', 50);
     $this->getJson($history.'?'.http_build_query($filters))->assertOk()->assertJsonCount(0, 'data');
-    expect((float) $inventory->fresh()->current_stock_kg)->toBe(200.0);
+    expect((float) $inventory->refresh()->current_stock_kg)->toBe(200.0);
     $this->getJson($history.'?'.http_build_query(['format' => 'json', 'tab' => 'drafts', 'area_id' => $otherArea->id]))->assertJsonCount(0, 'data');
     $this->getJson($history.'?'.http_build_query($filters + ['tab' => 'drafts', 'date_from' => '2026-10-08']))->assertJsonCount(0, 'data');
     $this->postJson(route('surat-jalan.dispatch', $note), ['shipped_date' => '2026-10-07', 'confirm' => 1])->assertOk();
@@ -170,7 +244,7 @@ it('records both transfer areas without counting the same area movement twice', 
         ->and($out[0]['direction'])->toBe('out')->and($in[0]['direction'])->toBe('in')
         ->and($out[0]['counterpart'])->toBe('Area Tujuan')
         ->and($out[0]['weight'])->toBe(50.0)->and($in[0]['weight'])->toBe(50.0)
-        ->and((float) $inventory->fresh()->current_stock_kg)->toBe(200.0);
+        ->and((float) $inventory->refresh()->current_stock_kg)->toBe(200.0);
 });
 
 it('saves several checkout products without stock and applies the transaction discount only once', function () {

@@ -43,11 +43,17 @@ class DeliveryNoteService
                 if ((float)$row['quantity_kg'] > (float)$sale->total_weight_kg - $used || (int)$row['sack_count'] > (int)$sale->sold_sacks - $usedSacks) throw ValidationException::withMessages(['items.'.$index=>'Jumlah melebihi sisa penjualan yang belum dikirim.']);
                 try { $line = $this->prepare($row + array_diff_key($data, ['sales_transaction_id'=>true])); }
                 catch (ValidationException $e) { throw ValidationException::withMessages(['items.'.$index=>collect($e->errors())->flatten()->implode(' ')]); }
-                $prepared[] = array_intersect_key($line, array_flip(['sales_transaction_id','finished_batch_id','quantity_kg','sack_count'])) + ['item_name'=>$row['item_name']];
+                $prepared[] = array_intersect_key($line, array_flip(['sales_transaction_id','finished_batch_id','warehouse_area_id','quantity_kg','sack_count'])) + ['item_name'=>$row['item_name']];
             }
             foreach (collect($prepared)->filter(fn($row)=>!empty($row['finished_batch_id']))->groupBy('finished_batch_id') as $id=>$lines) {
                 $batch = FinishedBatch::lockForUpdate()->findOrFail($id);
                 if ($lines->sum('quantity_kg') > $batch->remaining_weight_kg || $lines->sum('sack_count') > $batch->remaining_packages) throw ValidationException::withMessages(['items'=>'Total pengiriman dari batch yang sama melebihi stok.']);
+            }
+            foreach (collect($prepared)->filter(fn ($row) => !empty($row['warehouse_area_id']))
+                ->groupBy(fn ($row) => $row['warehouse_area_id'].':'.(int) SalesTransaction::findOrFail($row['sales_transaction_id'])->quality_grade_id) as $lines) {
+                $area = \App\Models\WarehouseArea::findOrFail($lines->first()['warehouse_area_id']);
+                $grade = (int) SalesTransaction::findOrFail($lines->first()['sales_transaction_id'])->quality_grade_id;
+                app(ProductionService::class)->allocateGrade($area->inventory_id, $grade, (float) $lines->sum('quantity_kg'), (int) $lines->sum('sack_count'), $data['delivery_date'], false, $area->id);
             }
             $data['customer_purchase_order_id'] = $anchor->customer_purchase_order_id;
             $data['item_name'] = mb_substr(implode(', ',array_column($prepared,'item_name')),0,255);
@@ -111,7 +117,13 @@ class DeliveryNoteService
         if (! $sale || $sale->stock_mode !== 'delivery_note') {
             throw ValidationException::withMessages(['sales_transaction_id' => 'Pilih penjualan baru dengan stok keluar melalui Surat Jalan. Transaksi lama/langsung tidak boleh dipotong lagi.']);
         }
-        if ($sale->sale_group_number && !$sale->finished_batch_id) {
+        if ($sale->sale_group_number && !$sale->finished_batch_id && !empty($data['warehouse_area_id'])) {
+            $area = \App\Models\WarehouseArea::where('is_active', true)->where('usage', 'finished')->find($data['warehouse_area_id']);
+            if (!$area) throw ValidationException::withMessages(['warehouse_area_id' => 'Pilih area stok siap jual yang aktif.']);
+            app(ProductionService::class)->allocateGrade($area->inventory_id, (int) $sale->quality_grade_id, (float) $data['quantity_kg'], (int) $data['sack_count'], $data['delivery_date'], false, $area->id);
+            $data['finished_batch_id'] = null;
+            $data['origin'] = $area->name;
+        } elseif ($sale->sale_group_number && !$sale->finished_batch_id) {
             $batch = FinishedBatch::with(['area', 'run'])->readyForSale()->lockForUpdate()->find($data['finished_batch_id'] ?? $note?->finished_batch_id);
             if (!$batch
                 || ($sale->quality_grade_id && (int) $sale->quality_grade_id !== (int) $batch->quality_grade_id)) {
@@ -124,7 +136,7 @@ class DeliveryNoteService
             $data['finished_batch_id'] = $batch->id;
             $data['origin'] = $batch->area->name;
         } else {
-            unset($data['finished_batch_id']);
+            unset($data['finished_batch_id'], $data['warehouse_area_id']);
         }
         if ($note && (int) $sale->id !== (int) $note->sales_transaction_id) {
             throw ValidationException::withMessages(['sales_transaction_id' => 'Penjualan terkait tidak dapat diganti.']);
@@ -170,7 +182,7 @@ class DeliveryNoteService
             if (!$lineOnly && \Illuminate\Support\Facades\Schema::hasTable('delivery_note_items') && $note->items()->exists()) {
                 foreach ($note->items()->orderBy('sales_transaction_id')->get() as $item) {
                     $line = clone $note;
-                    $line->sales_transaction_id=$item->sales_transaction_id; $line->finished_batch_id=$item->finished_batch_id;
+                    $line->warehouse_area_id=$item->warehouse_area_id; $line->sales_transaction_id=$item->sales_transaction_id; $line->finished_batch_id=$item->finished_batch_id;
                     $line->quantity_kg=$item->quantity_kg; $line->sack_count=$item->sack_count;
                     $this->dispatch($line,$date,$user,true);
                 }
@@ -202,10 +214,13 @@ class DeliveryNoteService
                 throw ValidationException::withMessages(['quantity_kg' => 'Total pengiriman akan melebihi jumlah penjualan.']);
             }
             $selectedBatch = $note->finished_batch_id ? FinishedBatch::lockForUpdate()->findOrFail($note->finished_batch_id) : null;
-            $inventory = Inventory::lockForUpdate()->findOrFail($selectedBatch?->inventory_id ?? $sale->inventory_id);
+            $area = $note->warehouse_area_id ? \App\Models\WarehouseArea::findOrFail($note->warehouse_area_id) : null;
+            $inventory = Inventory::lockForUpdate()->findOrFail($area?->inventory_id ?? $selectedBatch?->inventory_id ?? $sale->inventory_id);
             $allocation = [];
             $allocations = [];
-            if ($selectedBatch) {
+            if ($area && $sale->sale_group_number && !$sale->finished_batch_id) {
+                $allocations = app(ProductionService::class)->allocateGrade($inventory->id, (int) $sale->quality_grade_id, (float) $note->quantity_kg, (int) $note->sack_count, $date, true, $area->id);
+            } elseif ($selectedBatch) {
                 if ($sale->quality_grade_id && (int) $selectedBatch->quality_grade_id !== (int) $sale->quality_grade_id) {
                     throw ValidationException::withMessages(['finished_batch_id' => 'Batch harus sesuai barang pada penjualan.']);
                 }

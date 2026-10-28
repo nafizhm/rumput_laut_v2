@@ -206,10 +206,22 @@ class ProductionService
         });
     }
 
-    public function allocateGrade(int $inventoryId, int $gradeId, float $weight, int $packages, string $date, bool $consume = true): array
+    public function allocateGrade(int $inventoryId, int $gradeId, float $weight, int $packages, string $date, bool $consume = true, ?int $areaId = null): array
     {
         $this->date($date);
-        $batches = FinishedBatch::with('run')->where('inventory_id', $inventoryId)->where('quality_grade_id', $gradeId)
+        $query = FinishedBatch::with('run')->where('inventory_id', $inventoryId);
+        if ($areaId !== null) {
+            $query->readyForSale()->where('warehouse_area_id', $areaId)
+                ->when($gradeId, fn ($q) => $q->where('quality_grade_id', $gradeId))
+                ->where(function ($q) use ($date) {
+                    if (\Illuminate\Support\Facades\Schema::hasTable('wip_transfers')) {
+                        $q->whereHas('transfer', fn ($transfer) => $transfer->whereDate('transfer_date', '<=', $date));
+                    }
+                    $q->orWhereHas('run', fn ($run) => $run->whereDate('packed_date', '<=', $date))
+                        ->orWhere(fn ($q) => $q->whereNull('production_run_id')->whereDate('created_at', '<=', $date));
+                });
+        } else {
+            $query->where('quality_grade_id', $gradeId)
             ->where('remaining_weight_kg', '>', 0)->where('remaining_packages', '>', 0)
             ->whereHas('grade', fn ($q) => $q->where('is_active', true))
             ->whereHas('area', fn ($q) => $q->where('is_active', true)->where('usage', 'finished'))
@@ -219,8 +231,9 @@ class ProductionService
                 if (\Illuminate\Support\Facades\Schema::hasTable('wip_transfers')) {
                     $q->orWhereHas('transfer', fn ($transfer) => $transfer->whereDate('transfer_date', '<=', $date));
                 }
-            })
-            ->orderByRaw('COALESCE((SELECT MIN(movement_date) FROM stock_movements WHERE stock_movements.finished_batch_id = finished_batches.id AND direction = ?), (SELECT packed_date FROM production_runs WHERE production_runs.id = finished_batches.production_run_id))', ['in'])
+            });
+        }
+        $batches = $query->orderByRaw('COALESCE((SELECT MIN(movement_date) FROM stock_movements WHERE stock_movements.finished_batch_id = finished_batches.id AND direction = ?), (SELECT packed_date FROM production_runs WHERE production_runs.id = finished_batches.production_run_id), finished_batches.created_at)', ['in'])
             ->orderBy('id')->lockForUpdate()->get();
         $remaining = (int) round($weight * 100);
         $parts = [];

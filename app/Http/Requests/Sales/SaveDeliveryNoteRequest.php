@@ -15,6 +15,7 @@ class SaveDeliveryNoteRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
+            'warehouse_area_id' => 'nullable|integer|exists:warehouse_areas,id',
             'finished_batch_id' => 'nullable|integer|exists:finished_batches,id',
             'sales_transaction_id' => [$this->route('surat_jalan') ? 'nullable' : 'required', 'integer', 'exists:sales_transactions,id'],
             'sack_count' => ['nullable', 'integer', 'min:0'],
@@ -46,6 +47,7 @@ class SaveDeliveryNoteRequest extends FormRequest
             unset($rules['quantity_kg'], $rules['item_name'], $rules['sack_count'], $rules['finished_batch_id']);
             $rules += ['items' => 'required|array|min:1|max:50',
                 'items.*.sales_transaction_id' => 'required|integer|distinct|exists:sales_transactions,id',
+                'items.*.warehouse_area_id' => 'nullable|integer|exists:warehouse_areas,id',
                 'items.*.finished_batch_id' => 'nullable|integer|exists:finished_batches,id',
                 'items.*.item_name' => 'required|string|max:255',
                 'items.*.quantity_kg' => 'required|numeric|decimal:0,2|min:0.01|max:999999999.99',

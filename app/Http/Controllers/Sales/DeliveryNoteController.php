@@ -90,7 +90,7 @@ class DeliveryNoteController extends Controller
         $savedBatchIds = $note ? $note->items->pluck('finished_batch_id')->push($note->finished_batch_id)->filter()->unique()->all() : [];
         $batches = Schema::hasTable('finished_batches') ? FinishedBatch::with('area')
             ->where(fn ($query) => $query->readyForSale()->orWhereIn('id', $savedBatchIds))
-            ->get()->map(fn($b)=>['id'=>$b->id,'quality_grade_id'=>$b->quality_grade_id,'label'=>($b->area?->name ?? 'Area tidak tersedia').' / '.$b->code.' / '.$b->remaining_weight_kg.' Kg / '.$b->remaining_packages.' kemasan']) : collect();
+            ->get()->map(fn($b)=>['id'=>$b->id,'warehouse_area_id'=>$b->warehouse_area_id,'area_name'=>$b->area?->name ?? 'Area tidak tersedia','weight_kg'=>$b->remaining_weight_kg,'packages'=>$b->remaining_packages,'quality_grade_id'=>$b->quality_grade_id,'label'=>($b->area?->name ?? 'Area tidak tersedia').' / '.$b->code.' / '.$b->remaining_weight_kg.' Kg / '.$b->remaining_packages.' kemasan']) : collect();
         return compact('sales','batches','note');
     }
 
