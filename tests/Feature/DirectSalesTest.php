@@ -157,6 +157,42 @@ it('ships area stock across FIFO batches without deducting draft stock and rolls
     expect(StockMovement::count())->toBe(2);
 });
 
+it('deducts shipment weight and packages from area totals despite different batch ratios', function () {
+    [$inventory, $batches] = checkoutStock($this);
+    (require database_path('migrations/2026_10_28_000001_add_delivery_note_stock_area.php'))->up();
+    $batches[0]->update(['remaining_weight_kg'=>5000, 'remaining_packages'=>200, 'remaining_cost_cents'=>10000]);
+    $batches[1]->update(['remaining_weight_kg'=>6529.31, 'remaining_packages'=>185, 'remaining_cost_cents'=>20000]);
+    $inventory->update(['current_stock_kg'=>11529.31, 'current_sack_count'=>385]);
+    $this->postJson(route('manajemen-penjualan.store'), [
+        'sale_source'=>'direct', 'factory_id'=>$this->factory->id, 'sale_date'=>'2026-10-07',
+        'deduction_type'=>'none', 'deduction_value'=>0, 'deduction_weight_kg'=>0,
+        'items'=>[array_replace(checkoutRow($batches[0], 'Rumput Laut'), ['sold_weight_kg'=>11529.31, 'sold_sacks'=>385])],
+    ])->assertOk();
+    $sale = SalesTransaction::sole();
+    foreach ([[5219, 188], [6310.31, 197]] as $index => [$weight, $count]) {
+        $payload = array_merge($this->shipmentPayload, ['number'=>'SJ-AREA-'.($index+1), 'sales_transaction_id'=>$sale->id, 'items'=>[
+            ['sales_transaction_id'=>$sale->id, 'warehouse_area_id'=>$batches[0]->warehouse_area_id,
+                'item_name'=>'Rumput Laut', 'quantity_kg'=>$weight, 'sack_count'=>$count],
+        ]]);
+        $this->postJson(route('surat-jalan.store'), $payload)->assertOk();
+        $note = DeliveryNote::latest('id')->firstOrFail();
+        $this->postJson(route('surat-jalan.dispatch', $note), ['shipped_date'=>'2026-10-07', 'confirm'=>true])->assertOk();
+        if ($index === 0) {
+            expect(round((float) $inventory->refresh()->current_stock_kg, 2))->toBe(6310.31)
+                ->and((int) $inventory->current_sack_count)->toBe(197);
+            $this->get(route('surat-jalan.edit', $note))->assertForbidden();
+            expect(\App\Models\FinishedBatch::readyForSale(true)->sum('remaining_packages'))->toBe(197);
+        }
+    }
+    expect(round((float) $inventory->refresh()->current_stock_kg, 2))->toBe(0.0)
+        ->and((int) $inventory->current_sack_count)->toBe(0)
+        ->and((float) \App\Models\FinishedBatch::sum('remaining_weight_kg'))->toBe(0.0)
+        ->and((int) \App\Models\FinishedBatch::sum('remaining_packages'))->toBe(0)
+        ->and((int) StockMovement::sum('sack_count'))->toBe(385)
+        ->and(round((float) StockMovement::sum('weight_kg'), 2))->toBe(11529.31)
+        ->and((int) StockMovement::sum('cost_cents'))->toBe(30000);
+});
+
 it('limits automatic shipment allocation to the chosen area and grade', function () {
     [$inventory, $batches] = checkoutStock($this);
     (require database_path('migrations/2026_10_28_000001_add_delivery_note_stock_area.php'))->up();
@@ -180,7 +216,7 @@ it('limits automatic shipment allocation to the chosen area and grade', function
             'item_name'=>'Grade A', 'quantity_kg'=>150, 'sack_count'=>6],
     ]]);
     $this->postJson(route('surat-jalan.store'), $payload)->assertUnprocessable();
-    $payload['items'][0]['quantity_kg']=100; $payload['items'][0]['sack_count']=3;
+    $payload['items'][0]['quantity_kg']=100; $payload['items'][0]['sack_count']=5;
     $this->postJson(route('surat-jalan.store'), $payload)->assertUnprocessable();
     $payload['items'][0]['sack_count']=4;
     $this->postJson(route('surat-jalan.store'), $payload)->assertOk();

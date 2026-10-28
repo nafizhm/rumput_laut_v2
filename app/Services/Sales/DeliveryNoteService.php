@@ -40,7 +40,8 @@ class DeliveryNoteService
                 }
                 $used = StockMovement::where('sales_transaction_id',$sale->id)->whereNotNull('delivery_note_id')->sum('weight_kg');
                 $usedSacks = StockMovement::where('sales_transaction_id',$sale->id)->whereNotNull('delivery_note_id')->sum('sack_count');
-                if ((float)$row['quantity_kg'] > (float)$sale->total_weight_kg - $used || (int)$row['sack_count'] > (int)$sale->sold_sacks - $usedSacks) throw ValidationException::withMessages(['items.'.$index=>'Jumlah melebihi sisa penjualan yang belum dikirim.']);
+                $remainingWeight = (int) round((float) $sale->total_weight_kg * 100) - (int) round((float) $used * 100);
+                if ((int) round((float) $row['quantity_kg'] * 100) > $remainingWeight || (int)$row['sack_count'] > (int)$sale->sold_sacks - $usedSacks) throw ValidationException::withMessages(['items.'.$index=>'Jumlah melebihi sisa penjualan yang belum dikirim.']);
                 try { $line = $this->prepare($row + array_diff_key($data, ['sales_transaction_id'=>true])); }
                 catch (ValidationException $e) { throw ValidationException::withMessages(['items.'.$index=>collect($e->errors())->flatten()->implode(' ')]); }
                 $prepared[] = array_intersect_key($line, array_flip(['sales_transaction_id','finished_batch_id','warehouse_area_id','quantity_kg','sack_count'])) + ['item_name'=>$row['item_name']];

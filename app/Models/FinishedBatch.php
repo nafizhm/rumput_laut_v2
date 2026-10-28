@@ -8,9 +8,13 @@ class FinishedBatch extends Model
 {
     protected $guarded = ['id'];
 
-    public function scopeReadyForSale(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    public function scopeReadyForSale(\Illuminate\Database\Eloquent\Builder $query, bool $areaBalance = false): \Illuminate\Database\Eloquent\Builder
     {
-        return $query->where('remaining_weight_kg', '>', 0)->where('remaining_packages', '>', 0)
+        return $query->where(function ($stock) use ($areaBalance) {
+            $stock->where('remaining_weight_kg', '>', 0);
+            if ($areaBalance) $stock->orWhere('remaining_packages', '>', 0);
+            else $stock->where('remaining_packages', '>', 0);
+        })
             ->where(fn ($stock) => $stock->whereNull('production_run_id')
                 ->orWhereHas('run', fn ($run) => $run->hasReadyOutputs()))
             ->whereHas('area', fn ($area) => $area->where('is_active', true)->where('usage', 'finished'));

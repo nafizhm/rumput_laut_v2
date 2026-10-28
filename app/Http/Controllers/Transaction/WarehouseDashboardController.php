@@ -83,7 +83,7 @@ class WarehouseDashboardController extends Controller
                 'process' => $productionReady ? ProductionRun::whereIn('status', ['processing', 'wip'])->where('work_type', '!=', 'Stok Awal')->count() : 0,
                 'wip' => $productionReady ? ProductionRun::where('status', 'wip')->count() : 0,
                 'press' => $productionReady ? ProductionRun::where('status', 'wip')->count() : 0,
-                'finished' => $productionReady ? FinishedBatch::where('remaining_weight_kg', '>', 0)->count() : 0,
+                'finished' => $productionReady ? FinishedBatch::where(fn ($q) => $q->where('remaining_weight_kg', '>', 0)->orWhere('remaining_packages', '>', 0))->count() : 0,
             ],
         ]);
     }
@@ -102,7 +102,7 @@ class WarehouseDashboardController extends Controller
                 ->when(Schema::hasTable('wip_transfers'), fn ($query) => $query->with('transfers'))
                 ->whereIn('status', $stage === 'process' ? ['processing', 'wip'] : ['wip'])->when($area, fn ($q) => $q->whereHas('inputs.batch.line', fn ($line) => $line->where('warehouse_area_id', $area->id)))->latest('id')->get() : collect(),
             'finished' => Schema::hasTable('finished_batches') && $stage === 'finished' ? FinishedBatch::with(['run', 'grade', 'area'])
-                ->where('remaining_weight_kg', '>', 0)->when($area, fn ($q) => $q->where('warehouse_area_id', $area->id))->latest('id')->get() : collect(),
+                ->where(fn ($q) => $q->where('remaining_weight_kg', '>', 0)->orWhere('remaining_packages', '>', 0))->when($area, fn ($q) => $q->where('warehouse_area_id', $area->id))->latest('id')->get() : collect(),
             'batches' => $stage === 'incoming' ? MaterialBatch::with(['line.receipt.farmer', 'line.grade', 'line.area'])
                 ->whereHas('line.receipt', fn ($q) => $q->where('status', 'confirmed'))
                 ->when($area, fn ($q) => $q->whereHas('line', fn ($line) => $line->where('warehouse_area_id', $area->id)))

@@ -211,15 +211,8 @@ class ProductionService
         $this->date($date);
         $query = FinishedBatch::with('run')->where('inventory_id', $inventoryId);
         if ($areaId !== null) {
-            $query->readyForSale()->where('warehouse_area_id', $areaId)
-                ->when($gradeId, fn ($q) => $q->where('quality_grade_id', $gradeId))
-                ->where(function ($q) use ($date) {
-                    if (\Illuminate\Support\Facades\Schema::hasTable('wip_transfers')) {
-                        $q->whereHas('transfer', fn ($transfer) => $transfer->whereDate('transfer_date', '<=', $date));
-                    }
-                    $q->orWhereHas('run', fn ($run) => $run->whereDate('packed_date', '<=', $date))
-                        ->orWhere(fn ($q) => $q->whereNull('production_run_id')->whereDate('created_at', '<=', $date));
-                });
+            $query->readyForSale(true)->where('warehouse_area_id', $areaId)
+                ->when($gradeId, fn ($q) => $q->where('quality_grade_id', $gradeId));
         } else {
             $query->where('quality_grade_id', $gradeId)
             ->where('remaining_weight_kg', '>', 0)->where('remaining_packages', '>', 0)
@@ -235,6 +228,15 @@ class ProductionService
         }
         $batches = $query->orderByRaw('COALESCE((SELECT MIN(movement_date) FROM stock_movements WHERE stock_movements.finished_batch_id = finished_batches.id AND direction = ?), (SELECT packed_date FROM production_runs WHERE production_runs.id = finished_batches.production_run_id), finished_batches.created_at)', ['in'])
             ->orderBy('id')->lockForUpdate()->get();
+        if ($areaId !== null) {
+            $batches = $batches->filter(function ($batch) use ($date) {
+                $availableDate = ($batch->wip_transfer_id ? $batch->transfer?->transfer_date?->format('Y-m-d') : $batch->run?->packed_date?->format('Y-m-d'))
+                    ?? \App\Models\StockMovement::where('finished_batch_id', $batch->id)->where('direction', 'in')->min('movement_date')
+                    ?? $batch->created_at->format('Y-m-d');
+                return substr($availableDate, 0, 10) <= $date;
+            });
+            return $this->allocateAreaBalance($batches, $weight, $packages, $consume);
+        }
         $remaining = (int) round($weight * 100);
         $parts = [];
         foreach ($batches as $batch) {
@@ -265,6 +267,43 @@ class ProductionService
             $allocations[] = $allocation + ['weight_kg' => $part['weight_kg'], 'sack_count' => $count];
         }
 
+        return $allocations;
+    }
+
+    /** Area weight and package counts are independent balances; batch ratios do not constrain shipments. */
+    private function allocateAreaBalance($batches, float $weight, int $packages, bool $consume): array
+    {
+        $remainingWeight = (int) round($weight * 100);
+        $remainingPackages = $packages;
+        $totalWeight = $batches->sum(fn ($batch) => (int) round($batch->remaining_weight_kg * 100));
+        $totalPackages = (int) $batches->sum('remaining_packages');
+        if ($remainingWeight <= 0 || $packages < 1 || $remainingWeight > $totalWeight || $packages > $totalPackages) {
+            $this->fail('warehouse_area_id', 'Stok area pada tanggal pengiriman tidak cukup untuk berat atau jumlah kemasan yang diisi.');
+        }
+        if (($remainingWeight === $totalWeight) !== ($packages === $totalPackages)) {
+            $this->fail('warehouse_area_id', 'Pengiriman terakhir dari area harus menghabiskan sisa berat dan kemasan area bersamaan.');
+        }
+        $allocations = [];
+        foreach ($batches as $batch) {
+            $availableWeight = (int) round($batch->remaining_weight_kg * 100);
+            $takenWeight = min($remainingWeight, $availableWeight);
+            $takenPackages = min($remainingPackages, (int) $batch->remaining_packages);
+            if (!$takenWeight && !$takenPackages) continue;
+            $cost = $takenWeight === 0 ? 0 : ($takenWeight === $availableWeight
+                ? (int) $batch->remaining_cost_cents
+                : (int) round($batch->remaining_cost_cents * $takenWeight / $availableWeight));
+            if ($consume) {
+                $batch->update([
+                    'remaining_weight_kg' => ($availableWeight - $takenWeight) / 100,
+                    'remaining_packages' => $batch->remaining_packages - $takenPackages,
+                    'remaining_cost_cents' => $batch->remaining_cost_cents - $cost,
+                ]);
+            }
+            $allocations[] = ['finished_batch_id' => $batch->id, 'weight_kg' => $takenWeight / 100,
+                'sack_count' => $takenPackages, 'cost_cents' => $cost];
+            $remainingWeight -= $takenWeight;
+            $remainingPackages -= $takenPackages;
+        }
         return $allocations;
     }
 
