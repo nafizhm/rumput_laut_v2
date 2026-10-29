@@ -21,7 +21,7 @@
 <label class="text-sm">Tanggal surat jalan<input type="date" x-model="form.data.delivery_date" required class="{{ $input }}"><span class="text-xs text-error-500" x-text="form.getError('delivery_date')"></span></label>
 <label class="text-sm">Penerima<input x-model="form.data.recipient_name" maxlength="255" required class="{{ $input }}"></label>
 <label class="text-sm">Alamat tujuan<input x-model="form.data.destination_address" maxlength="2000" required class="{{ $input }}"></label>
-</div><p class="mt-3 text-xs text-gray-500">Nomor Surat Jalan otomatis saat disimpan. Draft belum mengurangi stok.</p></section>
+</div><p class="mt-3 text-xs text-gray-500">Nomor Surat Jalan otomatis saat disimpan. Draft belum mengurangi stok. Ketersediaan memakai stok saat ini, termasuk untuk tanggal Surat Jalan mundur.</p></section>
 <section class="rounded-xl border bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h3 class="mb-4 font-semibold">Barang yang Dikirim</h3><p x-show="!form.data.items.length" class="py-5 text-sm text-gray-500">Pilih nota penjualan untuk menampilkan barangnya.</p>
 <div class="space-y-3"><template x-for="(row,index) in form.data.items" :key="row.sales_transaction_id"><div class="rounded-lg border p-4 dark:border-gray-700"><div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 <label class="text-sm">Deskripsi barang<input x-model="row.item_name" maxlength="255" required class="{{ $input }}"></label>

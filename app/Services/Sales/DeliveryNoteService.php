@@ -54,7 +54,7 @@ class DeliveryNoteService
                 ->groupBy(fn ($row) => $row['warehouse_area_id'].':'.(int) SalesTransaction::findOrFail($row['sales_transaction_id'])->quality_grade_id) as $lines) {
                 $area = \App\Models\WarehouseArea::findOrFail($lines->first()['warehouse_area_id']);
                 $grade = (int) SalesTransaction::findOrFail($lines->first()['sales_transaction_id'])->quality_grade_id;
-                app(ProductionService::class)->allocateGrade($area->inventory_id, $grade, (float) $lines->sum('quantity_kg'), (int) $lines->sum('sack_count'), $data['delivery_date'], false, $area->id);
+                app(ProductionService::class)->allocateGrade($area->inventory_id, $grade, (float) $lines->sum('quantity_kg'), (int) $lines->sum('sack_count'), Carbon::now('Asia/Jakarta')->toDateString(), false, $area->id);
             }
             $data['customer_purchase_order_id'] = $anchor->customer_purchase_order_id;
             $data['item_name'] = mb_substr(implode(', ',array_column($prepared,'item_name')),0,255);
@@ -121,7 +121,7 @@ class DeliveryNoteService
         if ($sale->sale_group_number && !$sale->finished_batch_id && !empty($data['warehouse_area_id'])) {
             $area = \App\Models\WarehouseArea::where('is_active', true)->where('usage', 'finished')->find($data['warehouse_area_id']);
             if (!$area) throw ValidationException::withMessages(['warehouse_area_id' => 'Pilih area stok siap jual yang aktif.']);
-            app(ProductionService::class)->allocateGrade($area->inventory_id, (int) $sale->quality_grade_id, (float) $data['quantity_kg'], (int) $data['sack_count'], $data['delivery_date'], false, $area->id);
+            app(ProductionService::class)->allocateGrade($area->inventory_id, (int) $sale->quality_grade_id, (float) $data['quantity_kg'], (int) $data['sack_count'], Carbon::now('Asia/Jakarta')->toDateString(), false, $area->id);
             $data['finished_batch_id'] = null;
             $data['origin'] = $area->name;
         } elseif ($sale->sale_group_number && !$sale->finished_batch_id) {
@@ -200,6 +200,8 @@ class DeliveryNoteService
             if ($sale->stock_mode !== 'delivery_note' || $sale->stockMovements()->whereNull('delivery_note_id')->exists()) {
                 throw ValidationException::withMessages(['surat_jalan' => 'Stok penjualan ini sudah ditangani di alur lama/langsung.']);
             }
+            // Document and reported shipping dates are independent of stock posting.
+            $stockDate = Carbon::now('Asia/Jakarta')->toDateString();
             $shippingDate = Carbon::parse($date)->startOfDay();
             if ($shippingDate->lt($sale->sale_date->startOfDay()) || $shippingDate->gt(Carbon::now('Asia/Jakarta')->startOfDay())) {
                 throw ValidationException::withMessages(['shipped_date' => 'Tanggal kirim harus sejak tanggal penjualan dan tidak boleh di masa depan.']);
@@ -220,21 +222,21 @@ class DeliveryNoteService
             $allocation = [];
             $allocations = [];
             if ($area && $sale->sale_group_number && !$sale->finished_batch_id) {
-                $allocations = app(ProductionService::class)->allocateGrade($inventory->id, (int) $sale->quality_grade_id, (float) $note->quantity_kg, (int) $note->sack_count, $date, true, $area->id);
+                $allocations = app(ProductionService::class)->allocateGrade($inventory->id, (int) $sale->quality_grade_id, (float) $note->quantity_kg, (int) $note->sack_count, $stockDate, true, $area->id);
             } elseif ($selectedBatch) {
                 if ($sale->quality_grade_id && (int) $selectedBatch->quality_grade_id !== (int) $sale->quality_grade_id) {
                     throw ValidationException::withMessages(['finished_batch_id' => 'Batch harus sesuai barang pada penjualan.']);
                 }
-                $allocation = app(ProductionService::class)->consumeFinished($selectedBatch->id, (int) $inventory->id, (float) $note->quantity_kg, (int) $note->sack_count, $date);
+                $allocation = app(ProductionService::class)->consumeFinished($selectedBatch->id, (int) $inventory->id, (float) $note->quantity_kg, (int) $note->sack_count, $stockDate);
             } elseif ($sale->sale_group_number && !$sale->finished_batch_id) {
                 throw ValidationException::withMessages(['finished_batch_id' => 'Pilih stok siap jual pada Surat Jalan sebelum konfirmasi kirim.']);
             } elseif ($sale->quality_grade_id) {
-                $allocations = app(ProductionService::class)->allocateGrade($inventory->id, $sale->quality_grade_id, (float) $note->quantity_kg, (int) $note->sack_count, $date);
+                $allocations = app(ProductionService::class)->allocateGrade($inventory->id, $sale->quality_grade_id, (float) $note->quantity_kg, (int) $note->sack_count, $stockDate);
             } elseif ($inventory->stock_stage === 'finished') {
                 if (! $sale->finished_batch_id) {
                     throw ValidationException::withMessages(['surat_jalan' => 'Penjualan belum memilih batch jadi.']);
                 }
-                $allocation = app(ProductionService::class)->consumeFinished($sale->finished_batch_id, (int) $inventory->id, (float) $note->quantity_kg, (int) $note->sack_count, $date);
+                $allocation = app(ProductionService::class)->consumeFinished($sale->finished_batch_id, (int) $inventory->id, (float) $note->quantity_kg, (int) $note->sack_count, $stockDate);
             }
             if ((int) round((float) $inventory->current_stock_kg * 100) < $quantity || $inventory->current_sack_count < $note->sack_count) {
                 throw ValidationException::withMessages(['quantity_kg' => 'Stok berat atau karung gudang tidak cukup untuk pengiriman.']);
@@ -247,7 +249,7 @@ class DeliveryNoteService
                 $inventory->decrement('current_sack_count', $allocation['sack_count']);
                 $movement = StockMovement::create($allocation + [
                     'inventory_id' => $inventory->id, 'sales_transaction_id' => $sale->id, 'delivery_note_id' => $note->id,
-                    'movement_date' => $date, 'direction' => 'out', 'type' => 'out',
+                    'movement_date' => $stockDate, 'direction' => 'out', 'type' => 'out',
                     'note_weight_kg' => $allocation['weight_kg'],
                     'balance_after_kg' => $inventory->current_stock_kg,
                     'description' => 'Pengiriman '.$note->number.' / Penjualan '.$sale->invoice_number,

@@ -794,3 +794,34 @@ it('fulfills PO grades independently and carries the grade through shipment and 
     $poPayload['items'] = [$poPayload['items'][1]];
     $this->putJson(route('po-konsumen.update', $po), $poPayload)->assertUnprocessable()->assertJsonValidationErrors('items');
 });
+
+
+it('ships backdated documents from current stock and posts movements on confirmation day', function (bool $useArea) {
+    [$inventory, $batches] = checkoutStock($this);
+    (require database_path('migrations/2026_10_28_000001_add_delivery_note_stock_area.php'))->up();
+    $this->postJson(route('manajemen-penjualan.store'), [
+        'sale_source' => 'direct', 'factory_id' => $this->factory->id, 'sale_date' => '2026-10-07',
+        'deduction_type' => 'none', 'deduction_value' => 0, 'deduction_weight_kg' => 0,
+        'items' => [checkoutRow($batches[0], 'Rumput Laut')],
+    ])->assertOk();
+    $sale = SalesTransaction::sole();
+    // Stock becomes available after both document dates, before confirmation.
+    $batches[0]->run->update(['packed_date' => '2026-10-08']);
+    Carbon::setTestNow(Carbon::parse('2026-10-09 12:00:00', 'Asia/Jakarta'));
+    $item = ['sales_transaction_id' => $sale->id, 'item_name' => 'Rumput Laut', 'quantity_kg' => 50, 'sack_count' => 2];
+    $item[$useArea ? 'warehouse_area_id' : 'finished_batch_id'] = $useArea ? $batches[0]->warehouse_area_id : $batches[0]->id;
+    $payload = array_merge($this->shipmentPayload, ['sales_transaction_id' => $sale->id, 'items' => [$item]]);
+    $this->postJson(route('surat-jalan.store'), $payload)->assertOk();
+    $note = DeliveryNote::sole();
+    expect(StockMovement::count())->toBe(0);
+    $this->putJson(route('surat-jalan.update', $note), $payload)->assertOk();
+    $this->postJson(route('surat-jalan.dispatch', $note), ['shipped_date' => '2026-10-07', 'confirm' => true])->assertOk();
+    expect($note->fresh()->delivery_date->format('Y-m-d'))->toBe('2026-10-07')
+        ->and($note->fresh()->shipped_date->format('Y-m-d'))->toBe('2026-10-07')
+        ->and($note->fresh()->shipped_at->timezone('Asia/Jakarta')->format('Y-m-d'))->toBe('2026-10-09')
+        ->and(StockMovement::sole()->movement_date->format('Y-m-d'))->toBe('2026-10-09')
+        ->and(\Illuminate\Support\Facades\DB::table('journal_entries')->where('source_type', (new StockMovement)->getMorphClass())->where('source_id', StockMovement::sole()->id)->value('entry_date'))->toBe('2026-10-09')
+        ->and((float) $inventory->fresh()->current_stock_kg)->toBe(150.0);
+    $this->postJson(route('surat-jalan.dispatch', $note), ['shipped_date' => '2026-10-07', 'confirm' => true])->assertUnprocessable();
+    expect(StockMovement::count())->toBe(1);
+})->with(['area' => [true], 'batch' => [false]]);

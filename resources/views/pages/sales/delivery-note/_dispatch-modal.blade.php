@@ -3,7 +3,8 @@
         <h4 class="mb-5 text-lg font-medium text-gray-800 dark:text-white">Konfirmasi Barang Dikirim</h4>
         <form @submit.prevent="submit" class="space-y-4">
             <p class="text-sm text-gray-600 dark:text-gray-400" x-text="note ? note.number + ': ' + formatWeight(note.quantity_kg) + ' / ' + note.sack_count + ' karung' : ''"></p>
-            <x-input label="Tanggal Barang Keluar" name="shipped_date" type="date" x-model="form.data.shipped_date" alpine-error="form.getError('shipped_date')" required />
+            <x-input label="Tanggal Barang Keluar (sesuai kejadian)" name="shipped_date" type="date" x-model="form.data.shipped_date" alpine-error="form.getError('shipped_date')" required />
+            <p class="text-xs text-gray-500">Tanggal barang keluar boleh mundur sejak tanggal penjualan. Stok diperiksa dari ketersediaan saat ini; mutasi stok dan jurnal pengiriman dicatat pada tanggal konfirmasi hari ini.</p>
             <label class="flex gap-3 text-sm text-gray-600 dark:text-gray-400"><input type="checkbox" x-model="form.data.confirm" required> Saya memastikan barang sudah keluar dari gudang. Konfirmasi ini memotong stok dan mengunci Surat Jalan.</label>
             <x-info-help><p class="text-xs text-gray-500">Klik ulang tidak akan memotong stok lagi. Koreksi pengiriman yang sudah dikonfirmasi memerlukan proses retur/pembatalan terpisah.</p></x-info-help>
             <div class="flex justify-end gap-3">
