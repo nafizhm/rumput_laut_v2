@@ -280,8 +280,9 @@ class ProductionService
         if ($remainingWeight <= 0 || $packages < 1 || $remainingWeight > $totalWeight || $packages > $totalPackages) {
             $this->fail('warehouse_area_id', 'Stok area pada tanggal pengiriman tidak cukup untuk berat atau jumlah kemasan yang diisi.');
         }
-        if (($remainingWeight === $totalWeight) !== ($packages === $totalPackages)) {
-            $this->fail('warehouse_area_id', 'Pengiriman terakhir dari area harus menghabiskan sisa berat dan kemasan area bersamaan.');
+        $shrinkage = $packages === $totalPackages ? $totalWeight - $remainingWeight : 0;
+        if (($remainingWeight === $totalWeight && $packages !== $totalPackages) || $shrinkage > 2500) {
+            $this->fail('warehouse_area_id', 'Pengiriman terakhir harus menghabiskan kemasan area; toleransi sisa berat maksimal 25 kg.');
         }
         $allocations = [];
         foreach ($batches as $batch) {
@@ -303,6 +304,16 @@ class ProductionService
                 'sack_count' => $takenPackages, 'cost_cents' => $cost];
             $remainingWeight -= $takenWeight;
             $remainingPackages -= $takenPackages;
+        }
+        // Clear residual weight only when posting, preserving the shipment quantity.
+        if ($consume && $shrinkage > 0) {
+            foreach ($batches as $batch) {
+                if ((float) $batch->remaining_weight_kg <= 0) continue;
+                $allocations[] = ['finished_batch_id' => $batch->id,
+                    'weight_kg' => (float) $batch->remaining_weight_kg, 'sack_count' => 0,
+                    'cost_cents' => (int) $batch->remaining_cost_cents, 'shrinkage' => true];
+                $batch->update(['remaining_weight_kg' => 0, 'remaining_cost_cents' => 0]);
+            }
         }
         return $allocations;
     }

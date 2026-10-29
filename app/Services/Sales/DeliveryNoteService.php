@@ -245,16 +245,24 @@ class DeliveryNoteService
                 $allocations = [$allocation + ['weight_kg' => $note->quantity_kg, 'sack_count' => $note->sack_count]];
             }
             foreach ($allocations as $allocation) {
+                $shrinkage = $allocation['shrinkage'] ?? false;
+                unset($allocation['shrinkage']);
                 $inventory->decrement('current_stock_kg', $allocation['weight_kg']);
                 $inventory->decrement('current_sack_count', $allocation['sack_count']);
                 $movement = StockMovement::create($allocation + [
-                    'inventory_id' => $inventory->id, 'sales_transaction_id' => $sale->id, 'delivery_note_id' => $note->id,
+                    'inventory_id' => $inventory->id, 'sales_transaction_id' => $shrinkage ? null : $sale->id, 'delivery_note_id' => $note->id,
                     'movement_date' => $stockDate, 'direction' => 'out', 'type' => 'out',
-                    'note_weight_kg' => $allocation['weight_kg'],
+                    'note_weight_kg' => $shrinkage ? 0 : $allocation['weight_kg'],
+                    'discrepancy_kg' => $shrinkage ? $allocation['weight_kg'] : 0,
                     'balance_after_kg' => $inventory->current_stock_kg,
-                    'description' => 'Pengiriman '.$note->number.' / Penjualan '.$sale->invoice_number,
+                    'description' => ($shrinkage ? 'Penyesuaian penyusutan area / ' : 'Pengiriman ').$note->number.' / Penjualan '.$sale->invoice_number,
                 ]);
-                app(OperationalAccountingService::class)->shipment($movement);
+                if ($shrinkage) {
+                    app(OperationalAccountingService::class)->record($movement, 'area-shrinkage', $stockDate, $movement->description,
+                        [['51103', (int) $movement->cost_cents, 0], ['11305', 0, (int) $movement->cost_cents]]);
+                } else {
+                    app(OperationalAccountingService::class)->shipment($movement);
+                }
             }
             $note->status = 'shipped';
             $note->shipped_date = $date;
